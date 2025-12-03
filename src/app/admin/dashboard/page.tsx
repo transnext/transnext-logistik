@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { TransNextLogo } from "@/components/ui/logo"
-import { LogOut, FileText, Search, Clock, CheckCircle, XCircle, TrendingUp, Euro, Download, CreditCard, Users, UserPlus, UserX, Eye, EyeOff } from "lucide-react"
+import { LogOut, FileText, Search, Clock, CheckCircle, XCircle, TrendingUp, Euro, Download, CreditCard, Users, UserPlus, UserX, Eye, EyeOff, Edit } from "lucide-react"
 import {
   getCurrentUser,
   getUserProfile,
@@ -24,6 +24,7 @@ import {
   getAllFahrerAdmin,
   getAdminStatistics,
   createFahrer,
+  updateFahrer,
   updateFahrerStatus
 } from "@/lib/admin-api"
 
@@ -85,6 +86,8 @@ export default function AdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedKW, setSelectedKW] = useState<string>("")
   const [showAddFahrer, setShowAddFahrer] = useState(false)
+  const [showEditFahrer, setShowEditFahrer] = useState(false)
+  const [editingFahrer, setEditingFahrer] = useState<Partial<Fahrer> | null>(null)
   const [showPassword, setShowPassword] = useState(false)
 
   const [newFahrer, setNewFahrer] = useState<Partial<Fahrer>>({
@@ -1169,6 +1172,18 @@ export default function AdminDashboardPage() {
                               {formatDate(f.erstelltAm)}
                             </TableCell>
                             <TableCell>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingFahrer(f)
+                                  setShowEditFahrer(true)
+                                }}
+                                className="text-blue-700 border-blue-300 hover:bg-blue-50 mr-2"
+                              >
+                                <Edit className="h-3 w-3 mr-1" />
+                                Bearbeiten
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
