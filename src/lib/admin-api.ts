@@ -1,8 +1,10 @@
 import { supabase } from './supabase'
 import type { Arbeitsnachweis, Auslagennachweis, Fahrer } from './supabase'
+
 // =====================================================
 // ADMIN - USER MANAGEMENT
 // =====================================================
+
 /**
  * Erstellt einen neuen Fahrer mit Supabase Edge Function
  * (verwendet SERVICE_ROLE_KEY serverseitig)
@@ -27,31 +29,58 @@ export async function createFahrer(data: {
   const { data: result, error } = await supabase.functions.invoke('create-fahrer', {
     body: data
   })
+
   if (error) throw error
   if (!result || !result.success) {
     throw new Error(result?.error || 'Fehler beim Erstellen des Fahrers')
   }
+
   return {
     user: result.user,
     fahrer: result.fahrer as Fahrer
   }
 }
+
+/**
+ * Aktualisiert Fahrer-Daten
+ */
+export async function updateFahrer(fahrerId: string, data: {
+  vorname?: string
+  nachname?: string
+  geburtsdatum?: string
+  adresse?: string
+  plz?: string
+  ort?: string
+  fuehrerschein_nr?: string
+  fuehrerschein_datum?: string
+  ausstellende_behoerde?: string
+  fuehrerscheinklassen?: string[]
+  ausweisnummer?: string
+  ausweis_ablauf?: string
+  status?: 'aktiv' | 'inaktiv'
+}) {
+  const { data: result, error } = await supabase
+    .from('fahrer')
+    .update(data)
+    .eq('id', fahrerId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return result as Fahrer
+}
+
 /**
  * Ändert Fahrer-Status (aktiv/inaktiv)
  */
 export async function updateFahrerStatus(fahrerId: string, status: 'aktiv' | 'inaktiv') {
-  const { data, error } = await supabase
-    .from('fahrer')
-    .update({ status })
-    .eq('id', fahrerId)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Fahrer
+  return updateFahrer(fahrerId, { status })
 }
+
 // =====================================================
 // ADMIN - ALLE DATEN ABRUFEN
 // =====================================================
+
 /**
  * Lädt alle Arbeitsnachweise mit Fahrer-Informationen
  */
@@ -65,12 +94,15 @@ export async function getAllArbeitsnachweiseAdmin() {
       )
     `)
     .order('datum', { ascending: false })
+
   if (error) throw error
+
   return data.map(item => ({
     ...item,
     fahrer_name: item.profiles?.full_name || 'Unbekannt'
   }))
 }
+
 /**
  * Lädt alle Auslagennachweise mit Fahrer-Informationen
  */
@@ -84,12 +116,15 @@ export async function getAllAuslagennachweiseAdmin() {
       )
     `)
     .order('datum', { ascending: false })
+
   if (error) throw error
+
   return data.map(item => ({
     ...item,
     fahrer_name: item.profiles?.full_name || 'Unbekannt'
   }))
 }
+
 /**
  * Lädt alle Fahrer mit Profil-Informationen
  */
@@ -103,24 +138,30 @@ export async function getAllFahrerAdmin() {
       )
     `)
     .order('nachname', { ascending: true })
+
   if (error) throw error
   return data
 }
+
 // =====================================================
 // ADMIN - STATISTIKEN
 // =====================================================
+
 export async function getAdminStatistics() {
   const [arbeitsnachweiseData, auslagennachweiseData, fahrerData] = await Promise.all([
     supabase.from('arbeitsnachweise').select('status, gefahrene_km'),
     supabase.from('auslagennachweise').select('status, kosten'),
     supabase.from('fahrer').select('status'),
   ])
+
   if (arbeitsnachweiseData.error) throw arbeitsnachweiseData.error
   if (auslagennachweiseData.error) throw auslagennachweiseData.error
   if (fahrerData.error) throw fahrerData.error
+
   const arbeitsnachweise = arbeitsnachweiseData.data
   const auslagennachweise = auslagennachweiseData.data
   const fahrer = fahrerData.data
+
   return {
     // Touren
     totalTouren: arbeitsnachweise.length,
@@ -129,6 +170,7 @@ export async function getAdminStatistics() {
     billedTouren: arbeitsnachweise.filter(t => t.status === 'billed').length,
     rejectedTouren: arbeitsnachweise.filter(t => t.status === 'rejected').length,
     totalKilometers: arbeitsnachweise.reduce((sum, t) => sum + (t.gefahrene_km || 0), 0),
+
     // Auslagen
     totalAuslagen: auslagennachweise.length,
     pendingAuslagen: auslagennachweise.filter(e => e.status === 'pending').length,
@@ -141,15 +183,18 @@ export async function getAdminStatistics() {
     paidAuslagenAmount: auslagennachweise
       .filter(e => e.status === 'paid')
       .reduce((sum, e) => sum + (e.kosten || 0), 0),
+
     // Fahrer
     totalFahrer: fahrer.length,
     activeFahrer: fahrer.filter(f => f.status === 'aktiv').length,
     inactiveFahrer: fahrer.filter(f => f.status === 'inaktiv').length,
   }
 }
+
 // =====================================================
 // ADMIN - KW EXPORT
 // =====================================================
+
 /**
  * Lädt Touren für eine bestimmte Kalenderwoche
  */
@@ -158,6 +203,7 @@ export async function getTourenByKW(year: number, week: number) {
   const startDate = getDateOfISOWeek(week, year)
   const endDate = new Date(startDate)
   endDate.setDate(endDate.getDate() + 6)
+
   const { data, error } = await supabase
     .from('arbeitsnachweise')
     .select(`
@@ -169,12 +215,15 @@ export async function getTourenByKW(year: number, week: number) {
     .gte('datum', startDate.toISOString().split('T')[0])
     .lte('datum', endDate.toISOString().split('T')[0])
     .order('datum', { ascending: true })
+
   if (error) throw error
+
   return data.map(item => ({
     ...item,
     fahrer_name: item.profiles?.full_name || 'Unbekannt'
   }))
 }
+
 // Helper: Berechne Start der KW
 function getDateOfISOWeek(week: number, year: number): Date {
   const simple = new Date(year, 0, 1 + (week - 1) * 7)
@@ -186,9 +235,11 @@ function getDateOfISOWeek(week: number, year: number): Date {
     ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay())
   return ISOweekStart
 }
+
 // =====================================================
 // ADMIN - BULK OPERATIONS
 // =====================================================
+
 /**
  * Ändert Status mehrerer Touren gleichzeitig
  */
@@ -201,9 +252,11 @@ export async function bulkUpdateTourenStatus(
     .update({ status })
     .in('id', tourIds)
     .select()
+
   if (error) throw error
   return data
 }
+
 /**
  * Ändert Status mehrerer Auslagen gleichzeitig
  */
@@ -216,6 +269,7 @@ export async function bulkUpdateAuslagenStatus(
     .update({ status })
     .in('id', auslagenIds)
     .select()
+
   if (error) throw error
   return data
 }
