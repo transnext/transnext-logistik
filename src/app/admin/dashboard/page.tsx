@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { TransNextLogo } from "@/components/ui/logo"
-import { LogOut, FileText, Search, Clock, CheckCircle, XCircle, TrendingUp, Euro, Download, CreditCard, Users, UserPlus, UserX, Eye, EyeOff, Edit } from "lucide-react"
+import { LogOut, FileText, Search, Clock, CheckCircle, XCircle, TrendingUp, Euro, Download, CreditCard, Users, UserPlus, UserX, Eye, EyeOff } from "lucide-react"
 import {
   getCurrentUser,
   getUserProfile,
@@ -24,8 +24,7 @@ import {
   getAllFahrerAdmin,
   getAdminStatistics,
   createFahrer,
-  updateFahrerStatus,
-  updateFahrer
+  updateFahrerStatus
 } from "@/lib/admin-api"
 
 interface Tour {
@@ -86,8 +85,6 @@ export default function AdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedKW, setSelectedKW] = useState<string>("")
   const [showAddFahrer, setShowAddFahrer] = useState(false)
-  const [showEditFahrer, setShowEditFahrer] = useState(false)
-  const [editingFahrer, setEditingFahrer] = useState<Partial<Fahrer> | null>(null)
   const [showPassword, setShowPassword] = useState(false)
 
   const [newFahrer, setNewFahrer] = useState<Partial<Fahrer>>({
@@ -316,52 +313,6 @@ export default function AdminDashboardPage() {
       setNewFahrer({ ...newFahrer, fuehrerscheinklassen: [...current, klasse] })
     } else {
       setNewFahrer({ ...newFahrer, fuehrerscheinklassen: current.filter(k => k !== klasse) })
-    }
-  }
-
-  const handleEditKlassenChange = (klasse: string, checked: boolean) => {
-    if (!editingFahrer) return
-    const current = editingFahrer.fuehrerscheinklassen || []
-    if (checked) {
-      setEditingFahrer({ ...editingFahrer, fuehrerscheinklassen: [...current, klasse] })
-    } else {
-      setEditingFahrer({ ...editingFahrer, fuehrerscheinklassen: current.filter(k => k !== klasse) })
-    }
-  }
-
-  const handleEditFahrer = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingFahrer || !editingFahrer.id) return
-    
-    setAddFahrerLoading(true)
-    setAddFahrerError("")
-    
-    try {
-      await updateFahrer(editingFahrer.id.toString(), {
-        vorname: editingFahrer.vorname || "",
-        nachname: editingFahrer.nachname || "",
-        geburtsdatum: editingFahrer.geburtsdatum || "",
-        adresse: editingFahrer.adresse || "",
-        plz: editingFahrer.plz || "",
-        ort: editingFahrer.ort || "",
-        fuehrerschein_nr: editingFahrer.fuehrerscheinNr || "",
-        fuehrerschein_datum: editingFahrer.fuehrerscheinDatum || "",
-        ausstellende_behoerde: editingFahrer.ausstellendeBehoerde || "",
-        fuehrerscheinklassen: editingFahrer.fuehrerscheinklassen || [],
-        ausweisnummer: editingFahrer.ausweisnummer || "",
-        ausweis_ablauf: editingFahrer.ausweisAblauf || "",
-        status: editingFahrer.status || 'aktiv'
-      })
-      
-      alert(`Fahrer ${editingFahrer.vorname} ${editingFahrer.nachname} erfolgreich aktualisiert!`)
-      setShowEditFahrer(false)
-      setEditingFahrer(null)
-      await loadAllData()
-      setAddFahrerLoading(false)
-    } catch (err) {
-      console.error("Fehler beim Aktualisieren:", err)
-      setAddFahrerError(err instanceof Error ? err.message : "Fehler beim Aktualisieren des Fahrers")
-      setAddFahrerLoading(false)
     }
   }
 
@@ -1147,182 +1098,6 @@ export default function AdminDashboardPage() {
               </Card>
             )}
 
-            {/* Edit Fahrer Form */}
-            {showEditFahrer && editingFahrer && (
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="text-2xl text-primary-blue">Fahrer bearbeiten</CardTitle>
-                  <CardDescription>
-                    Fahrer-Informationen bearbeiten
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleEditFahrer} className="space-y-6">
-                    {/* Persönliche Daten */}
-                    <div className="border-b pb-6">
-                      <h3 className="font-semibold text-lg mb-4 text-primary-blue">Persönliche Daten</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="edit-vorname">Vorname *</Label>
-                          <Input
-                            id="edit-vorname"
-                            required
-                            value={editingFahrer.vorname}
-                            onChange={(e) => setEditingFahrer({...editingFahrer, vorname: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-nachname">Nachname *</Label>
-                          <Input
-                            id="edit-nachname"
-                            required
-                            value={editingFahrer.nachname}
-                            onChange={(e) => setEditingFahrer({...editingFahrer, nachname: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-geburtsdatum">Geburtsdatum *</Label>
-                          <Input
-                            id="edit-geburtsdatum"
-                            type="date"
-                            required
-                            value={editingFahrer.geburtsdatum}
-                            onChange={(e) => setEditingFahrer({...editingFahrer, geburtsdatum: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-adresse">Straße & Hausnummer *</Label>
-                          <Input
-                            id="edit-adresse"
-                            required
-                            placeholder="z.B. Musterstr. 123"
-                            value={editingFahrer.adresse}
-                            onChange={(e) => setEditingFahrer({...editingFahrer, adresse: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-plz">PLZ *</Label>
-                          <Input
-                            id="edit-plz"
-                            required
-                            placeholder="z.B. 44809"
-                            value={editingFahrer.plz}
-                            onChange={(e) => setEditingFahrer({...editingFahrer, plz: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-ort">Ort *</Label>
-                          <Input
-                            id="edit-ort"
-                            required
-                            placeholder="z.B. Bochum"
-                            value={editingFahrer.ort}
-                            onChange={(e) => setEditingFahrer({...editingFahrer, ort: e.target.value})}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Führerschein-Daten */}
-                    <div className="border-b pb-6">
-                      <h3 className="font-semibold text-lg mb-4 text-primary-blue">Führerschein-Daten</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="edit-fuehrerscheinNr">Führerschein-Nummer *</Label>
-                          <Input
-                            id="edit-fuehrerscheinNr"
-                            required
-                            placeholder="z.B. D123456789"
-                            value={editingFahrer.fuehrerscheinNr}
-                            onChange={(e) => setEditingFahrer({...editingFahrer, fuehrerscheinNr: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-fuehrerscheinDatum">Ausstellungsdatum *</Label>
-                          <Input
-                            id="edit-fuehrerscheinDatum"
-                            type="date"
-                            required
-                            value={editingFahrer.fuehrerscheinDatum}
-                            onChange={(e) => setEditingFahrer({...editingFahrer, fuehrerscheinDatum: e.target.value})}
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <Label htmlFor="edit-ausstellendeBehoerde">Ausstellende Behörde *</Label>
-                          <Input
-                            id="edit-ausstellendeBehoerde"
-                            required
-                            placeholder="z.B. Stadt Bochum"
-                            value={editingFahrer.ausstellendeBehoerde}
-                            onChange={(e) => setEditingFahrer({...editingFahrer, ausstellendeBehoerde: e.target.value})}
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <Label>Führerscheinklassen * (mindestens eine auswählen)</Label>
-                          <div className="grid grid-cols-4 md:grid-cols-8 gap-2 mt-2">
-                            {fuehrerscheinklassen.map(klasse => (
-                              <label key={klasse} className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={editingFahrer.fuehrerscheinklassen?.includes(klasse)}
-                                  onChange={(e) => handleEditKlassenChange(klasse, e.target.checked)}
-                                  className="rounded border-gray-300"
-                                />
-                                <span className="text-sm font-medium">{klasse}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Ausweis-Daten */}
-                    <div className="border-b pb-6">
-                      <h3 className="font-semibold text-lg mb-4 text-primary-blue">Personalausweis-Daten</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="edit-ausweisnummer">Ausweisnummer *</Label>
-                          <Input
-                            id="edit-ausweisnummer"
-                            required
-                            placeholder="z.B. L123456789"
-                            value={editingFahrer.ausweisnummer}
-                            onChange={(e) => setEditingFahrer({...editingFahrer, ausweisnummer: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-ausweisAblauf">Ablaufdatum *</Label>
-                          <Input
-                            id="edit-ausweisAblauf"
-                            type="date"
-                            required
-                            value={editingFahrer.ausweisAblauf}
-                            onChange={(e) => setEditingFahrer({...editingFahrer, ausweisAblauf: e.target.value})}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-4">
-                      <Button type="submit" className="bg-primary-blue hover:bg-blue-700" disabled={addFahrerLoading}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        {addFahrerLoading ? "Wird gespeichert..." : "Änderungen speichern"}
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => {
-                        setShowEditFahrer(false)
-                        setEditingFahrer(null)
-                      }}>
-                        Abbrechen
-                      </Button>
-                    </div>
-                    {addFahrerError && (
-                      <p className="text-red-600 text-sm">{addFahrerError}</p>
-                    )}
-                  </form>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Fahrer-Liste */}
             <Card>
               <CardHeader>
@@ -1394,40 +1169,26 @@ export default function AdminDashboardPage() {
                               {formatDate(f.erstelltAm)}
                             </TableCell>
                             <TableCell>
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setEditingFahrer(f)
-                                    setShowEditFahrer(true)
-                                  }}
-                                  className="text-blue-700 border-blue-300 hover:bg-blue-50"
-                                >
-                                  <Edit className="h-3 w-3 mr-1" />
-                                  Bearbeiten
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => toggleFahrerStatus(f.id)}
-                                  className={f.status === 'aktiv'
-                                    ? "text-orange-700 border-orange-300 hover:bg-orange-50"
-                                    : "text-green-700 border-green-300 hover:bg-green-50"}
-                                >
-                                  {f.status === 'aktiv' ? (
-                                    <>
-                                      <UserX className="h-3 w-3 mr-1" />
-                                      Deaktivieren
-                                    </>
-                                  ) : (
-                                    <>
-                                      <CheckCircle className="h-3 w-3 mr-1" />
-                                      Aktivieren
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => toggleFahrerStatus(f.id)}
+                                className={f.status === 'aktiv'
+                                  ? "text-orange-700 border-orange-300 hover:bg-orange-50"
+                                  : "text-green-700 border-green-300 hover:bg-green-50"}
+                              >
+                                {f.status === 'aktiv' ? (
+                                  <>
+                                    <UserX className="h-3 w-3 mr-1" />
+                                    Deaktivieren
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Aktivieren
+                                  </>
+                                )}
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
