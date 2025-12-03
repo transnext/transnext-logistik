@@ -209,7 +209,7 @@ export default function AdminDashboardPage() {
         benutzername: '', // Wird nicht mehr verwendet
         passwort: '', // Wird nicht mehr verwendet
         status: f.status,
-        erstelltAm: f.created_at,
+        erstelltAm: f.created_at || new Date().toISOString(),
       })))
 
       setStats(statistiken)
