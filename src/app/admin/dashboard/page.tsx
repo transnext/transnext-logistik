@@ -28,6 +28,7 @@ import {
   updateFahrerStatus,
   updateFahrer
 } from "@/lib/admin-api"
+import { exportTourenPDF, exportAuslagenPDF, getWeekNumber } from "@/lib/pdf-export"
 
 interface Tour {
   id: number
@@ -129,6 +130,8 @@ export default function AdminDashboardPage() {
     totalFahrer: number
     activeFahrer: number
     inactiveFahrer: number
+    gesamtlohnGenehmigt: number
+    monatsumsatz: number
   } | null>(null)
 
   useEffect(() => {
@@ -472,7 +475,7 @@ export default function AdminDashboardPage() {
   }
 
   // KW-Export-Funktion
-  const exportKW = () => {
+  const exportKW = async () => {
     if (!selectedKW) {
       alert("Bitte wählen Sie eine Kalenderwoche aus")
       return
@@ -487,34 +490,80 @@ export default function AdminDashboardPage() {
       return
     }
 
-    // CSV-Export
-    let csv = "Tour-Nr.;Datum;KM;Wartezeit\n"
-    kwTouren.forEach(tour => {
-      const wartezeit = tour.wartezeit === "30-60" ? "30-60 Min." :
-                       tour.wartezeit === "60-90" ? "60-90 Min." :
-                       tour.wartezeit === "90-120" ? "90-120 Min." : "-"
-      csv += `${tour.tourNr};${formatDate(tour.datum)};${tour.gefahreneKm};${wartezeit}\n`
-    })
+    // Parse KW (Format: "2025-KW48")
+    const [year, kwPart] = selectedKW.split('-KW')
+    const kw = parseInt(kwPart)
 
-    // Download
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", `Abrechnung_${selectedKW}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    // Konvertiere zu Format für PDF-Export
+    const tourenForExport = kwTouren.map(tour => ({
+      tour_nr: tour.tourNr,
+      datum: tour.datum,
+      gefahrene_km: parseFloat(tour.gefahreneKm),
+      wartezeit: tour.wartezeit,
+      fahrer_name: tour.fahrer
+    }))
+
+    // PDF exportieren
+    exportTourenPDF(tourenForExport, kw.toString(), parseInt(year))
 
     // Touren als "abgerechnet" markieren
-    const updatedTouren = touren.map(tour =>
-      kwTouren.find(t => t.id === tour.id) ? { ...tour, status: "billed" } : tour
-    )
-    setTouren(updatedTouren)
-    localStorage.setItem("arbeitsnachweise", JSON.stringify(updatedTouren))
+    try {
+      for (const tour of kwTouren) {
+        await updateTourStatus(tour.id, "billed")
+      }
+      await loadAllData() // Reload
+      alert(`${kwTouren.length} Touren wurden als PDF exportiert und als abgerechnet markiert`)
+    } catch (error) {
+      console.error("Fehler beim Markieren der Touren:", error)
+      alert("PDF wurde erstellt, aber Fehler beim Markieren der Touren")
+    }
+  }
 
-    alert(`${kwTouren.length} Touren wurden exportiert und als abgerechnet markiert`)
+  const exportAuslagenKW = async () => {
+    if (!selectedKW) {
+      alert("Bitte wählen Sie eine Kalenderwoche aus")
+      return
+    }
+
+    const kwAuslagen = auslagen.filter(auslage =>
+      getKWFromDate(auslage.datum) === selectedKW && auslage.status === "approved"
+    )
+
+    if (kwAuslagen.length === 0) {
+      alert("Keine genehmigten Auslagen für diese KW gefunden")
+      return
+    }
+
+    // Parse KW (Format: "2025-KW48")
+    const [year, kwPart] = selectedKW.split('-KW')
+    const kw = parseInt(kwPart)
+
+    // Konvertiere zu Format für PDF-Export
+    const auslagenForExport = kwAuslagen.map(auslage => ({
+      tour_nr: auslage.tourNr,
+      kennzeichen: auslage.kennzeichen,
+      datum: auslage.datum,
+      startort: auslage.startort,
+      zielort: auslage.zielort,
+      belegart: auslage.belegart,
+      kosten: parseFloat(auslage.kosten),
+      beleg_url: auslage.belegUrl
+    }))
+
+    // PDF exportieren
+    exportAuslagenPDF(auslagenForExport, kw.toString(), parseInt(year))
+
+    // Auslagen als "überwiesen" markieren
+    try {
+      for (const auslage of kwAuslagen) {
+        await updateAuslageStatus(auslage.id, "paid")
+      }
+      await loadAllData() // Reload
+      alert(`${kwAuslagen.length} Auslagen wurden als PDF exportiert und als überwiesen markiert`)
+    } catch (error) {
+      console.error("Fehler beim Markieren der Auslagen:", error)
+      alert("PDF wurde erstellt, aber Fehler beim Markieren der Auslagen")
+    }
   }
 
   // Filter Touren
@@ -572,8 +621,8 @@ export default function AdminDashboardPage() {
           </Button>
         </div>
 
-        {/* Statistiken */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {/* Statistiken - Zeile 1 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <Card className="border-2 border-yellow-200 bg-yellow-50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -607,6 +656,35 @@ export default function AdminDashboardPage() {
                   <p className="text-xs text-gray-500 mt-1">Zur Überweisung</p>
                 </div>
                 <Euro className="h-10 w-10 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Statistiken - Zeile 2 (NEU) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <Card className="border-2 border-green-200 bg-green-50">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Gesamtlohn Genehmigt</p>
+                  <p className="text-2xl font-bold text-green-700">{formatCurrency(stats?.gesamtlohnGenehmigt || 0)}</p>
+                  <p className="text-xs text-gray-500 mt-1">Alle genehmigten Touren</p>
+                </div>
+                <CheckCircle className="h-10 w-10 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-purple-200 bg-purple-50">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Monatsumsatz</p>
+                  <p className="text-2xl font-bold text-purple-700">{formatCurrency(stats?.monatsumsatz || 0)}</p>
+                  <p className="text-xs text-gray-500 mt-1">Laufender Monat (Kundenpreise)</p>
+                </div>
+                <TrendingUp className="h-10 w-10 text-purple-600" />
               </div>
             </CardContent>
           </Card>
@@ -811,6 +889,40 @@ export default function AdminDashboardPage() {
                   </Table>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* KW-Export für Auslagen */}
+        {activeTab === "auslagen" && (
+          <Card className="mb-6 bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200">
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row md:items-end gap-4">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-primary-blue mb-2">Auslagenabrechnung exportieren</h3>
+                  <p className="text-sm text-gray-600">Wählen Sie eine Kalenderwoche, um alle genehmigten Auslagen als PDF zu exportieren und als überwiesen zu markieren.</p>
+                </div>
+                <div className="flex gap-2">
+                  <Select value={selectedKW} onValueChange={setSelectedKW}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="KW wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableKWs().map(kw => (
+                        <SelectItem key={kw} value={kw}>{kw}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={exportAuslagenKW}
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                    disabled={!selectedKW}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    PDF Exportieren
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
