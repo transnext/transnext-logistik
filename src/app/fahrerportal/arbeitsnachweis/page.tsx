@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TransNextLogo } from "@/components/ui/logo"
 import { ArrowLeft, Upload, CheckCircle } from "lucide-react"
 import { getCurrentUser, getUserProfile, createArbeitsnachweis } from "@/lib/api"
+import { uploadBeleg } from "@/lib/storage"
 
 export default function ArbeitsnachweiPage() {
   const router = useRouter()
@@ -58,11 +59,29 @@ export default function ArbeitsnachweiPage() {
     setIsLoading(true)
 
     try {
+      const user = await getCurrentUser()
+      if (!user) throw new Error('Nicht angemeldet')
+
+      let belegUrl: string | undefined
+
+      // Upload PDF wenn vorhanden
+      if (formData.beleg) {
+        const { url } = await uploadBeleg(
+          formData.beleg,
+          user.id,
+          'arbeitsnachweis',
+          formData.tourNr
+        )
+        belegUrl = url
+      }
+
+      // Erstelle Arbeitsnachweis mit Beleg-URL
       await createArbeitsnachweis({
         tour_nr: formData.tourNr,
         datum: formData.datum,
         gefahrene_km: parseFloat(formData.gefahreneKm),
         wartezeit: formData.wartezeit,
+        beleg_url: belegUrl
       })
 
       setSaved(true)

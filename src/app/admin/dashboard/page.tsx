@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { BelegDialog } from "@/components/beleg-dialog"
+import { PDFViewerDialog } from "@/components/pdf-viewer-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -38,7 +38,7 @@ interface Tour {
   fahrer: string
   status: string
   erstelltAm: string
-  beleg?: File | null
+  belegUrl?: string
 }
 
 interface Auslage {
@@ -53,7 +53,7 @@ interface Auslage {
   fahrer: string
   status: string
   erstelltAm: string
-  beleg?: File | null
+  belegUrl?: string
 }
 
 interface Fahrer {
@@ -91,7 +91,7 @@ export default function AdminDashboardPage() {
   const [showEditFahrer, setShowEditFahrer] = useState(false)
   const [editingFahrer, setEditingFahrer] = useState<Partial<Fahrer> | null>(null)
   const [showBelegDialog, setShowBelegDialog] = useState(false)
-  const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string; typ: "arbeitsnachweis" | "auslagennachweis" } | null>(null)
+  const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string; typ: "arbeitsnachweis" | "auslagennachweis"; belegUrl?: string } | null>(null)
 
   const [newFahrer, setNewFahrer] = useState<Partial<Fahrer>>({
     vorname: "",
@@ -182,6 +182,7 @@ export default function AdminDashboardPage() {
         fahrer: t.fahrer_name,
         status: t.status,
         erstelltAm: t.created_at,
+        belegUrl: t.beleg_url,
       })))
 
       setAuslagen(auslagenData.map((a) => ({
@@ -196,6 +197,7 @@ export default function AdminDashboardPage() {
         fahrer: a.fahrer_name,
         status: a.status,
         erstelltAm: a.created_at,
+        belegUrl: a.beleg_url,
       })))
 
       setFahrer(fahrerData.map((f) => ({
@@ -772,7 +774,7 @@ export default function AdminDashboardPage() {
                               size="sm"
                               variant="outline"
                               onClick={() => {
-                                setSelectedBeleg({ tourNr: tour.tourNr, datum: tour.datum, typ: "arbeitsnachweis" })
+                                setSelectedBeleg({ tourNr: tour.tourNr, datum: tour.datum, typ: "arbeitsnachweis", belegUrl: tour.belegUrl })
                                 setShowBelegDialog(true)
                               }}
                               className="text-primary-blue border-primary-blue hover:bg-blue-50"
@@ -876,7 +878,7 @@ export default function AdminDashboardPage() {
                               size="sm"
                               variant="outline"
                               onClick={() => {
-                                setSelectedBeleg({ tourNr: auslage.tourNr, datum: auslage.datum, typ: "auslagennachweis" })
+                                setSelectedBeleg({ tourNr: auslage.tourNr, datum: auslage.datum, typ: "auslagennachweis", belegUrl: auslage.belegUrl })
                                 setShowBelegDialog(true)
                               }}
                               className="text-primary-blue border-primary-blue hover:bg-blue-50"
@@ -1437,12 +1439,13 @@ export default function AdminDashboardPage() {
 
       {/* Beleg Dialog */}
       {selectedBeleg && (
-        <BelegDialog
+        <PDFViewerDialog
           open={showBelegDialog}
           onOpenChange={setShowBelegDialog}
           tourNr={selectedBeleg.tourNr}
           datum={selectedBeleg.datum}
           typ={selectedBeleg.typ}
+          belegUrl={selectedBeleg.belegUrl}
         />
       )}
     </div>

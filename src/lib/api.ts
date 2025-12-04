@@ -45,6 +45,7 @@ export async function createArbeitsnachweis(data: {
   datum: string
   gefahrene_km: number
   wartezeit: '30-60' | '60-90' | '90-120' | 'keine'
+  beleg_url?: string
 }) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Nicht angemeldet')
@@ -113,6 +114,7 @@ export async function createAuslagennachweis(data: {
   zielort: string
   belegart: 'tankbeleg' | 'waschbeleg' | 'bahnticket' | 'bc50' | 'taxi' | 'uber'
   kosten: number
+  beleg_url?: string
 }) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Nicht angemeldet')

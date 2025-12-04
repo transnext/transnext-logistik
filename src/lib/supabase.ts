@@ -41,6 +41,7 @@ export interface Arbeitsnachweis {
   datum: string
   gefahrene_km: number
   wartezeit: '30-60' | '60-90' | '90-120' | 'keine'
+  beleg_url?: string
   status: 'pending' | 'approved' | 'rejected' | 'billed'
   created_at: string
   updated_at: string
@@ -56,6 +57,7 @@ export interface Auslagennachweis {
   zielort: string
   belegart: 'tankbeleg' | 'waschbeleg' | 'bahnticket' | 'bc50' | 'taxi' | 'uber'
   kosten: number
+  beleg_url?: string
   status: 'pending' | 'approved' | 'rejected' | 'paid'
   created_at: string
   updated_at: string

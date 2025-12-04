@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { BelegDialog } from "@/components/beleg-dialog"
+import { PDFViewerDialog } from "@/components/pdf-viewer-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -23,6 +23,7 @@ interface Auslage {
   belegart: string
   kosten: string
   status?: string
+  belegUrl?: string
 }
 
 export default function AuslagenabrechnungPage() {
@@ -33,7 +34,7 @@ export default function AuslagenabrechnungPage() {
   const [gesamtKosten, setGesamtKosten] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [showBelegDialog, setShowBelegDialog] = useState(false)
-  const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string } | null>(null)
+  const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string; belegUrl?: string } | null>(null)
 
   useEffect(() => {
     checkAuthAndLoadData()
@@ -107,7 +108,8 @@ export default function AuslagenabrechnungPage() {
         zielort: a.zielort,
         belegart: a.belegart,
         kosten: a.kosten.toString(),
-        status: a.status
+        status: a.status,
+        belegUrl: a.beleg_url
       }))
 
       setAuslagen(convertedAuslagen)
@@ -301,7 +303,7 @@ export default function AuslagenabrechnungPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  setSelectedBeleg({ tourNr: auslage.tourNr, datum: auslage.datum })
+                                  setSelectedBeleg({ tourNr: auslage.tourNr, datum: auslage.datum, belegUrl: auslage.belegUrl })
                                   setShowBelegDialog(true)
                                 }}
                                 title="Beleg ansehen"
@@ -353,12 +355,13 @@ export default function AuslagenabrechnungPage() {
 
       {/* Beleg Dialog */}
       {selectedBeleg && (
-        <BelegDialog
+        <PDFViewerDialog
           open={showBelegDialog}
           onOpenChange={setShowBelegDialog}
           tourNr={selectedBeleg.tourNr}
           datum={selectedBeleg.datum}
           typ="auslagennachweis"
+          belegUrl={selectedBeleg.belegUrl}
         />
       )}
     </div>

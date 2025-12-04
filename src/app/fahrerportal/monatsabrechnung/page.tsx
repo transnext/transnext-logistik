@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { BelegDialog } from "@/components/beleg-dialog"
+import { PDFViewerDialog } from "@/components/pdf-viewer-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -22,6 +22,7 @@ interface Tour {
   wartezeit: string
   verdienst?: number
   status?: string
+  belegUrl?: string
 }
 
 export default function MonatsabrechnungPage() {
@@ -32,7 +33,7 @@ export default function MonatsabrechnungPage() {
   const [gesamtVerdienst, setGesamtVerdienst] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [showBelegDialog, setShowBelegDialog] = useState(false)
-  const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string } | null>(null)
+  const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string; belegUrl?: string } | null>(null)
 
   useEffect(() => {
     checkAuthAndLoadData()
@@ -108,7 +109,8 @@ export default function MonatsabrechnungPage() {
           gefahreneKm: tour.gefahrene_km.toString(),
           wartezeit: tour.wartezeit,
           status: tour.status,
-          verdienst: verdienst
+          verdienst: verdienst,
+          belegUrl: tour.beleg_url
         }
       })
 
@@ -287,7 +289,7 @@ export default function MonatsabrechnungPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  setSelectedBeleg({ tourNr: tour.tourNr, datum: tour.datum })
+                                  setSelectedBeleg({ tourNr: tour.tourNr, datum: tour.datum, belegUrl: tour.belegUrl })
                                   setShowBelegDialog(true)
                                 }}
                                 title="Beleg ansehen"
@@ -339,12 +341,13 @@ export default function MonatsabrechnungPage() {
 
       {/* Beleg Dialog */}
       {selectedBeleg && (
-        <BelegDialog
+        <PDFViewerDialog
           open={showBelegDialog}
           onOpenChange={setShowBelegDialog}
           tourNr={selectedBeleg.tourNr}
           datum={selectedBeleg.datum}
           typ="arbeitsnachweis"
+          belegUrl={selectedBeleg.belegUrl}
         />
       )}
     </div>

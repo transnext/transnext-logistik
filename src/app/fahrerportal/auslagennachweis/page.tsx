@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TransNextLogo } from "@/components/ui/logo"
 import { ArrowLeft, Upload, CheckCircle } from "lucide-react"
 import { getCurrentUser, getUserProfile, createAuslagennachweis } from "@/lib/api"
+import { uploadBeleg } from "@/lib/storage"
 
 export default function AuslagennachweisPage() {
   const router = useRouter()
@@ -61,6 +62,23 @@ export default function AuslagennachweisPage() {
     setIsLoading(true)
 
     try {
+      const user = await getCurrentUser()
+      if (!user) throw new Error('Nicht angemeldet')
+
+      let belegUrl: string | undefined
+
+      // Upload PDF wenn vorhanden
+      if (formData.beleg) {
+        const { url } = await uploadBeleg(
+          formData.beleg,
+          user.id,
+          'auslagennachweis',
+          formData.tourNr
+        )
+        belegUrl = url
+      }
+
+      // Erstelle Auslagennachweis mit Beleg-URL
       await createAuslagennachweis({
         tour_nr: formData.tourNr,
         kennzeichen: formData.kennzeichen,
@@ -69,6 +87,7 @@ export default function AuslagennachweisPage() {
         zielort: formData.zielort,
         belegart: formData.belegart,
         kosten: parseFloat(formData.kosten),
+        beleg_url: belegUrl
       })
 
       setSaved(true)
