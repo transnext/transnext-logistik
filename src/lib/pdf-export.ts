@@ -93,12 +93,6 @@ export function exportTourenPDF(
   doc.text(`Gesamt:`, 120, finalY + 10)
   doc.text(`${gesamt.toFixed(2)} €`, 155, finalY + 10, { align: 'right' })
 
-  // Fußnote
-  doc.setFontSize(8)
-  doc.setFont('helvetica', 'normal')
-  doc.text(`Wartezeit pro Stunde: 12,00 €`, 14, finalY + 25)
-  doc.text(`KM-Liste mit 10% Erhöhung (gerundet)`, 14, finalY + 30)
-
   // Download
   doc.save(`Tourenabrechnung_KW${kw}_${year}.pdf`)
 }
