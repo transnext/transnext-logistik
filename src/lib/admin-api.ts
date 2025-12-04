@@ -1,5 +1,7 @@
 import { supabase } from './supabase'
 import type { Arbeitsnachweis, Auslagennachweis, Fahrer } from './supabase'
+import { calculateTourVerdienst } from './salary-calculator'
+import { calculateCustomerTotal } from './customer-pricing'
 
 // =====================================================
 // ADMIN - USER MANAGEMENT
@@ -149,7 +151,7 @@ export async function getAllFahrerAdmin() {
 
 export async function getAdminStatistics() {
   const [arbeitsnachweiseData, auslagennachweiseData, fahrerData] = await Promise.all([
-    supabase.from('arbeitsnachweise').select('status, gefahrene_km'),
+    supabase.from('arbeitsnachweise').select('status, gefahrene_km, wartezeit, datum'),
     supabase.from('auslagennachweise').select('status, kosten'),
     supabase.from('fahrer').select('status'),
   ])
@@ -162,11 +164,29 @@ export async function getAdminStatistics() {
   const auslagennachweise = auslagennachweiseData.data
   const fahrer = fahrerData.data
 
+  // Aktueller Monat
+  const now = new Date()
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+  // Touren des aktuellen Monats
+  const currentMonthTouren = arbeitsnachweise.filter(t => t.datum.startsWith(currentMonth))
+
+  // Gesamtlohn genehmigte Touren (nur approved)
+  const approvedTouren = arbeitsnachweise.filter(t => t.status === 'approved')
+  const gesamtlohnGenehmigt = approvedTouren.reduce((sum, t) => {
+    return sum + calculateTourVerdienst(t.gefahrene_km || 0, t.wartezeit)
+  }, 0)
+
+  // Monatsumsatz (alle Touren des Monats mit Kunden-Preisen)
+  const monatsumsatz = currentMonthTouren.reduce((sum, t) => {
+    return sum + calculateCustomerTotal(t.gefahrene_km || 0, t.wartezeit)
+  }, 0)
+
   return {
     // Touren
     totalTouren: arbeitsnachweise.length,
     pendingTouren: arbeitsnachweise.filter(t => t.status === 'pending').length,
-    approvedTouren: arbeitsnachweise.filter(t => t.status === 'approved').length,
+    approvedTouren: approvedTouren.length,
     billedTouren: arbeitsnachweise.filter(t => t.status === 'billed').length,
     rejectedTouren: arbeitsnachweise.filter(t => t.status === 'rejected').length,
     totalKilometers: arbeitsnachweise.reduce((sum, t) => sum + (t.gefahrene_km || 0), 0),
@@ -188,6 +208,10 @@ export async function getAdminStatistics() {
     totalFahrer: fahrer.length,
     activeFahrer: fahrer.filter(f => f.status === 'aktiv').length,
     inactiveFahrer: fahrer.filter(f => f.status === 'inaktiv').length,
+
+    // NEU: Lohn & Umsatz
+    gesamtlohnGenehmigt: gesamtlohnGenehmigt,
+    monatsumsatz: monatsumsatz,
   }
 }
 
