@@ -42,9 +42,9 @@ export async function createFahrer(data: {
 }
 
 /**
- * Aktualisiert Fahrer-Daten
+ * Aktualisiert Fahrer-Daten (ohne Email/Passwort)
  */
-export async function updateFahrer(fahrerId: string, data: {
+export async function updateFahrer(fahrerId: number, data: {
   vorname?: string
   nachname?: string
   geburtsdatum?: string
@@ -74,7 +74,7 @@ export async function updateFahrer(fahrerId: string, data: {
  * Ändert Fahrer-Status (aktiv/inaktiv)
  */
 export async function updateFahrerStatus(fahrerId: string, status: 'aktiv' | 'inaktiv') {
-  return updateFahrer(fahrerId, { status })
+  return updateFahrer(Number.parseInt(fahrerId), { status })
 }
 
 // =====================================================

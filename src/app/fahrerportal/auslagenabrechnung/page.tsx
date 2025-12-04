@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { BelegDialog } from "@/components/beleg-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -31,6 +32,8 @@ export default function AuslagenabrechnungPage() {
   const [auslagen, setAuslagen] = useState<Auslage[]>([])
   const [gesamtKosten, setGesamtKosten] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [showBelegDialog, setShowBelegDialog] = useState(false)
+  const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string } | null>(null)
 
   useEffect(() => {
     checkAuthAndLoadData()
@@ -297,7 +300,10 @@ export default function AuslagenabrechnungPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => alert('Beleg-Ansicht: Diese Funktion wird mit dem Backend implementiert.')}
+                                onClick={() => {
+                                  setSelectedBeleg({ tourNr: auslage.tourNr, datum: auslage.datum })
+                                  setShowBelegDialog(true)
+                                }}
                                 title="Beleg ansehen"
                               >
                                 <FileText className="h-4 w-4" />
@@ -344,6 +350,17 @@ export default function AuslagenabrechnungPage() {
           </Card>
         )}
       </main>
+
+      {/* Beleg Dialog */}
+      {selectedBeleg && (
+        <BelegDialog
+          open={showBelegDialog}
+          onOpenChange={setShowBelegDialog}
+          tourNr={selectedBeleg.tourNr}
+          datum={selectedBeleg.datum}
+          typ="auslagennachweis"
+        />
+      )}
     </div>
   )
 }

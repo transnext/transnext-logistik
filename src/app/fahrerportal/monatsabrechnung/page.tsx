@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { BelegDialog } from "@/components/beleg-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { TransNextLogo } from "@/components/ui/logo"
 import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle } from "lucide-react"
 import { getCurrentUser, getUserProfile, getArbeitsnachweiseByUser } from "@/lib/api"
+import { calculateTourVerdienst } from "@/lib/salary-calculator"
 
 interface Tour {
   id: number
@@ -29,6 +31,8 @@ export default function MonatsabrechnungPage() {
   const [touren, setTouren] = useState<Tour[]>([])
   const [gesamtVerdienst, setGesamtVerdienst] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [showBelegDialog, setShowBelegDialog] = useState(false)
+  const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string } | null>(null)
 
   useEffect(() => {
     checkAuthAndLoadData()
@@ -92,16 +96,10 @@ export default function MonatsabrechnungPage() {
         return item.datum.startsWith(month)
       })
 
-      // Berechne Verdienst für jede Tour
+      // Berechne Verdienst für jede Tour mit offizieller KM-Range
       const tourenMitVerdienst = filtered.map((tour) => {
         const km = tour.gefahrene_km || 0
-        const baseVerdienst = km * 0.40 // Beispiel: 0,40€ pro km
-
-        // Wartezeit Bonus
-        let wartezeitBonus = 0
-        if (tour.wartezeit === "30-60") wartezeitBonus = 15
-        else if (tour.wartezeit === "60-90") wartezeitBonus = 25
-        else if (tour.wartezeit === "90-120") wartezeitBonus = 35
+        const verdienst = calculateTourVerdienst(km, tour.wartezeit)
 
         return {
           id: tour.id,
@@ -110,7 +108,7 @@ export default function MonatsabrechnungPage() {
           gefahreneKm: tour.gefahrene_km.toString(),
           wartezeit: tour.wartezeit,
           status: tour.status,
-          verdienst: baseVerdienst + wartezeitBonus
+          verdienst: verdienst
         }
       })
 
@@ -288,7 +286,10 @@ export default function MonatsabrechnungPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => alert('Beleg-Ansicht: Diese Funktion wird mit dem Backend implementiert.')}
+                                onClick={() => {
+                                  setSelectedBeleg({ tourNr: tour.tourNr, datum: tour.datum })
+                                  setShowBelegDialog(true)
+                                }}
                                 title="Beleg ansehen"
                               >
                                 <FileText className="h-4 w-4" />
@@ -327,7 +328,7 @@ export default function MonatsabrechnungPage() {
 
                   <div className="text-sm text-gray-500 mt-4 p-4 bg-blue-50 rounded-lg">
                     <p className="font-medium text-gray-700 mb-2">Hinweis zur Berechnung:</p>
-                    <p>Der angezeigte Verdienst ist eine vorläufige Berechnung basierend auf einem Beispiel-Abrechnungsschlüssel (0,40€/km). Die finale Abrechnung wird durch die Verwaltung erstellt.</p>
+                    <p>Der angezeigte Verdienst wird nach der offiziellen KM-Range-Tabelle berechnet. Wartezeiten werden zusätzlich vergütet (30-60 Min: +15€, 60-90 Min: +25€, 90-120 Min: +35€).</p>
                   </div>
                 </div>
               )}
@@ -335,6 +336,17 @@ export default function MonatsabrechnungPage() {
           </Card>
         )}
       </main>
+
+      {/* Beleg Dialog */}
+      {selectedBeleg && (
+        <BelegDialog
+          open={showBelegDialog}
+          onOpenChange={setShowBelegDialog}
+          tourNr={selectedBeleg.tourNr}
+          datum={selectedBeleg.datum}
+          typ="arbeitsnachweis"
+        />
+      )}
     </div>
   )
 }
