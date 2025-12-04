@@ -328,7 +328,7 @@ export default function MonatsabrechnungPage() {
 
                   <div className="text-sm text-gray-500 mt-4 p-4 bg-blue-50 rounded-lg">
                     <p className="font-medium text-gray-700 mb-2">Hinweis zur Berechnung:</p>
-                    <p>Der angezeigte Verdienst wird nach der offiziellen KM-Range-Tabelle berechnet. Wartezeiten werden zusätzlich vergütet (30-60 Min: +15€, 60-90 Min: +25€, 90-120 Min: +35€).</p>
+                    <p>Der angezeigte Verdienst wird nach der offiziellen KM-Range-Tabelle berechnet. Wartezeiten werden zusätzlich vergütet (10€ pro Stunde: 30-60 Min: +10€, 60-90 Min: +15€, 90-120 Min: +20€).</p>
                   </div>
                 </div>
               )}

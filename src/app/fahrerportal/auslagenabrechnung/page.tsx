@@ -342,7 +342,7 @@ export default function AuslagenabrechnungPage() {
 
                   <div className="text-sm text-gray-500 mt-4 p-4 bg-blue-50 rounded-lg">
                     <p className="font-medium text-gray-700 mb-2">Hinweis:</p>
-                    <p>Die Erstattung der Auslagen erfolgt mit der nächsten Gehaltsabrechnung. Bei Fragen wenden Sie sich bitte an die Verwaltung.</p>
+                    <p>Die Erstattung der Auslagen erfolgt innerhalb einer Woche nach Genehmigung. Den Status Ihrer Auslagen können Sie hier im Portal verfolgen.</p>
                   </div>
                 </div>
               )}

@@ -45,18 +45,18 @@ export function calculateVerguetung(km: number): number {
 }
 
 /**
- * Berechnet Wartezeit-Bonus
+ * Berechnet Wartezeit-Bonus (10€ pro Stunde)
  */
 export function calculateWartezeitBonus(wartezeit?: string): number {
   if (!wartezeit || wartezeit === "keine") return 0
 
   switch (wartezeit) {
     case "30-60":
-      return 15
+      return 10 // ~0.5-1h = 10€
     case "60-90":
-      return 25
+      return 15 // ~1-1.5h = 15€
     case "90-120":
-      return 35
+      return 20 // ~1.5-2h = 20€
     default:
       return 0
   }
