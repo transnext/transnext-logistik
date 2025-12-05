@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { TransNextLogo } from "@/components/ui/logo"
 import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle } from "lucide-react"
-import { getCurrentUser, getUserProfile, getArbeitsnachweiseByUser } from "@/lib/api"
+import { getCurrentUser, getUserProfile, getArbeitsnachweiseByUser, getFahrerByUserId } from "@/lib/api"
 import { calculateTourVerdienst, calculateMonthlyPayout, MONTHLY_LIMIT } from "@/lib/salary-calculator"
 
 interface Tour {
@@ -131,30 +131,14 @@ export default function MonatsabrechnungPage() {
 
   const loadVormonatUeberschuss = async (userId: string, currentMonth: string) => {
     try {
-      // Berechne Vormonat
-      const [year, month] = currentMonth.split('-')
-      const date = new Date(parseInt(year), parseInt(month) - 2, 1) // -2 weil Monat 0-basiert ist
-      const vormonat = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-
-      const arbeitsnachweise = await getArbeitsnachweiseByUser(userId)
-
-      // Filter nach Vormonat
-      const vormonatTouren = arbeitsnachweise.filter((item) => {
-        return item.datum.startsWith(vormonat)
-      })
-
-      // Berechne Gesamtverdienst des Vormonats
-      const vormonatGesamt = vormonatTouren.reduce((sum, tour) => {
-        const km = tour.gefahrene_km || 0
-        const verdienst = calculateTourVerdienst(km, tour.wartezeit)
-        return sum + verdienst
-      }, 0)
-
-      // Berechne Überschuss
-      const { ueberschuss } = calculateMonthlyPayout(vormonatGesamt)
+      // Lade Überschuss aus der Datenbank (Fahrer-Tabelle)
+      const fahrerData = await getFahrerByUserId(userId)
+      const ueberschuss = fahrerData.ueberschuss_vormonat || 0
       setVormonatUeberschuss(ueberschuss)
     } catch (error) {
       console.error("Fehler beim Laden des Vormonat-Überschusses:", error)
+      // Fallback: kein Überschuss
+      setVormonatUeberschuss(0)
     }
   }
 
