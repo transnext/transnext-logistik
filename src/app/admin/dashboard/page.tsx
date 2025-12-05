@@ -431,8 +431,32 @@ export default function AdminDashboardPage() {
       return
     }
     try {
+      // Get selected tours
+      const selectedTours = touren.filter(tour => selectedTourIds.includes(tour.id))
+      
+      // Generate PDF before marking as billed
+      if (selectedTours.length > 0) {
+        // Get current date for filename
+        const now = new Date()
+        const kw = getWeekNumber(now)
+        const year = now.getFullYear()
+        
+        // Convert to format for PDF export
+        const tourenForExport = selectedTours.map(tour => ({
+          tour_nr: tour.tourNr,
+          datum: tour.datum,
+          gefahrene_km: parseFloat(tour.gefahreneKm),
+          wartezeit: tour.wartezeit,
+          fahrer_name: tour.fahrer
+        }))
+        
+        // Export PDF
+        exportTourenPDF(tourenForExport, kw.toString(), year)
+      }
+      
+      // Mark tours as billed
       await billMultipleTours(selectedTourIds)
-      alert(`${selectedTourIds.length} Touren wurden als abgerechnet markiert`)
+      alert(`${selectedTourIds.length} Touren wurden als PDF exportiert und als abgerechnet markiert`)
       setSelectedTourIds([])
       await loadAllData()
     } catch (error) {
