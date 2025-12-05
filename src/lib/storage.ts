@@ -12,16 +12,16 @@ export async function uploadBeleg(
   // Validierung - Akzeptiere PDFs und Bilder
   const allowedTypes = ['pdf', 'jpeg', 'jpg', 'png', 'heic', 'heif']
   const fileExtension = file.name.split('.').pop()?.toLowerCase() || ''
-  const isAllowedType = allowedTypes.some(type => 
+  const isAllowedType = allowedTypes.some(type =>
     file.type.includes(type) || fileExtension === type
   )
-  
+
   if (!isAllowedType) {
     throw new Error('Nur PDF oder Foto-Dateien sind erlaubt (PDF, JPG, PNG, HEIC)')
   }
 
-  if (file.size > 10 * 1024 * 1024) { // 10MB
-    throw new Error('Datei zu groß (max. 10MB)')
+  if (file.size > 100 * 1024 * 1024) { // 100MB
+    throw new Error('Datei zu groß (max. 100MB)')
   }
 
   // Generiere eindeutigen Dateinamen mit korrekter Dateiendung

@@ -318,3 +318,23 @@ export async function billMultipleTours(tourIds: number[]) {
   if (error) throw error
   return { success: true, count: tourIds.length, data }
 }
+
+// AUSLAGEN MANAGEMENT
+export async function deleteAuslage(auslagenId: number) {
+  const { error } = await supabase
+    .from('auslagennachweise')
+    .delete()
+    .eq('id', auslagenId)
+  if (error) throw error
+  return { success: true }
+}
+
+export async function billMultipleAuslagen(auslagenIds: number[]) {
+  const { data, error } = await supabase
+    .from('auslagennachweise')
+    .update({ status: 'paid' })
+    .in('id', auslagenIds)
+    .select()
+  if (error) throw error
+  return { success: true, count: auslagenIds.length, data }
+}

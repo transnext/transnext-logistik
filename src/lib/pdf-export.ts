@@ -98,13 +98,13 @@ export function exportTourenPDF(
 }
 
 /**
- * Exportiert Auslagen-Abrechnung als PDF (nur Tabelle, ohne Belege)
+ * Exportiert Auslagen-Abrechnung als PDF mit Belegen
  */
-export function exportAuslagenPDF(
+export async function exportAuslagenPDF(
   auslagen: AuslageForExport[],
   kw: string,
   year: number
-): void {
+): Promise<void> {
   const doc = new jsPDF()
 
   // Header
@@ -169,8 +169,69 @@ export function exportAuslagenPDF(
   doc.text(`€`, 175, finalY + 10)
   doc.text(`${gesamt.toFixed(2)}`, 190, finalY + 10, { align: 'right' })
 
+  // Belege anhängen
+  for (let i = 0; i < auslagen.length; i++) {
+    const auslage = auslagen[i]
+    if (auslage.beleg_url) {
+      try {
+        // Neue Seite für Beleg
+        doc.addPage()
+
+        // Beleg-Header
+        doc.setFontSize(12)
+        doc.setFont('helvetica', 'bold')
+        doc.text(`Beleg ${i + 1}: ${auslage.tour_nr}/${auslage.kennzeichen}`, 14, 15)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(10)
+        doc.text(`Datum: ${new Date(auslage.datum).toLocaleDateString('de-DE')}`, 14, 22)
+        doc.text(`Betrag: ${auslage.kosten.toFixed(2)} €`, 14, 29)
+        doc.text(`Bemerkung: ${auslage.belegart}`, 14, 36)
+
+        // Beleg laden und als Bild einfügen
+        const img = await loadImage(auslage.beleg_url)
+        if (img) {
+          const imgWidth = 180
+          const imgHeight = (img.height * imgWidth) / img.width
+          const maxHeight = 240
+
+          if (imgHeight > maxHeight) {
+            const scaledWidth = (img.width * maxHeight) / img.height
+            doc.addImage(img.src, 'JPEG', 15, 45, scaledWidth, maxHeight)
+          } else {
+            doc.addImage(img.src, 'JPEG', 15, 45, imgWidth, imgHeight)
+          }
+        }
+      } catch (error) {
+        console.error(`Fehler beim Laden des Belegs ${i + 1}:`, error)
+        // Fehlermeldung auf der Seite anzeigen
+        doc.setFontSize(10)
+        doc.text(`Beleg konnte nicht geladen werden.`, 14, 50)
+      }
+    }
+  }
+
   // Download
   doc.save(`Auslagenabrechnung_KW${kw}_${year}.pdf`)
+}
+
+/**
+ * Hilfsfunktion zum Laden von Bildern
+ */
+function loadImage(url: string): Promise<{ src: string; width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+
+    img.onload = () => {
+      resolve({ src: img.src, width: img.width, height: img.height })
+    }
+
+    img.onerror = () => {
+      resolve(null)
+    }
+
+    img.src = url
+  })
 }
 
 /**
