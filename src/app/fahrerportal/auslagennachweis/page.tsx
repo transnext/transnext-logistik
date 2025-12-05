@@ -258,7 +258,7 @@ export default function AuslagennachweisPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="beleg">Beleg hochladen (PDF oder Foto) *</Label>
+                  <Label htmlFor="beleg">Beleg hochladen *</Label>
                   <div className="flex items-center gap-4">
                     <Input
                       id="beleg"
@@ -269,9 +269,6 @@ export default function AuslagennachweisPage() {
                       className="cursor-pointer"
                     />
                   </div>
-                  <p className="text-sm text-gray-500">
-                    📄 PDF oder 📸 Foto akzeptiert (JPG, PNG, HEIC - max. 10 MB)
-                  </p>
                 </div>
 
                 {error && (
