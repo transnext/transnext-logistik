@@ -274,16 +274,23 @@ export default function AuslagennachweisPage() {
                   </p>
                 </div>
 
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-800 text-sm">{error}</p>
+                  </div>
+                )}
+
                 <div className="flex gap-4 pt-4">
                   <Button
                     type="submit"
-                    className="flex-1 bg-primary-blue hover-primary-darken"
+                    disabled={isLoading}
+                    className="flex-1 bg-primary-blue hover:bg-blue-700"
                   >
                     <Upload className="mr-2 h-4 w-4" />
-                    Auslagennachweis hochladen
+                    {isLoading ? "Wird hochgeladen..." : "Auslagennachweis hochladen"}
                   </Button>
                   <Link href="/fahrerportal/dashboard" className="flex-1">
-                    <Button type="button" variant="outline" className="w-full">
+                    <Button type="button" variant="outline" className="w-full" disabled={isLoading}>
                       Abbrechen
                     </Button>
                   </Link>
