@@ -31,7 +31,8 @@ import {
   billMultipleTours,
   deleteAuslage,
   billMultipleAuslagen,
-  markTourAsRuecklaufer
+  markTourAsRuecklaufer,
+  getMonatsueberschuss
 } from "@/lib/admin-api"
 import { exportTourenPDF, exportAuslagenPDF, getWeekNumber } from "@/lib/pdf-export"
 import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout } from "@/lib/salary-calculator"
@@ -104,6 +105,7 @@ export default function AdminDashboardPage() {
   const [selectedFahrerId, setSelectedFahrerId] = useState<number | null>(null)
   const [fahrerTouren, setFahrerTouren] = useState<Tour[]>([])
   const [fahrerAuslagen, setFahrerAuslagen] = useState<Auslage[]>([])
+  const [fahrerVormonatUeberschuss, setFahrerVormonatUeberschuss] = useState(0)
 
   const [newFahrer, setNewFahrer] = useState<Partial<Fahrer>>({
     vorname: "",
@@ -330,19 +332,60 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const loadFahrerAbrechnung = (fahrerId: number) => {
-    setSelectedFahrerId(fahrerId)
+  const loadFahrerAbrechnung = async (fahrerId: number) => {
+  setSelectedFahrerId(fahrerId)
+  // Filter Touren für diesen Fahrer
+  const fahrerName = fahrer.find(f => f.id === fahrerId)
+  if (!fahrerName) return
+  const fahrerTourenFiltered = touren.filter(t => t.fahrer === `${fahrerName.vorname} ${fahrerName.nachname}`)
+  const fahrerAuslagenFiltered = auslagen.filter(a => a.fahrer === `${fahrerName.vorname} ${fahrerName.nachname}`)
+  setFahrerTouren(fahrerTourenFiltered)
+  setFahrerAuslagen(fahrerAuslagenFiltered)
 
-    // Filter Touren für diesen Fahrer
-    const fahrerName = fahrer.find(f => f.id === fahrerId)
-    if (!fahrerName) return
+  // Lade Vormonat-Überschuss
+  try {
+    // Berechne Vormonat (aktuell Dezember 2024, Vormonat = November 2024)
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const [year, month] = currentMonth.split('-')
+    const date = new Date(parseInt(year), parseInt(month) - 2, 1) // -2 weil Monat 0-basiert ist
+    const vormonat = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
-    const fahrerTourenFiltered = touren.filter(t => t.fahrer === `${fahrerName.vorname} ${fahrerName.nachname}`)
-    const fahrerAuslagenFiltered = auslagen.filter(a => a.fahrer === `${fahrerName.vorname} ${fahrerName.nachname}`)
+    // Hole user_id vom Fahrer
+    const fahrerData = await getAllFahrerAdmin()
+    const fahrerInfo = fahrerData.find((f: any) => f.id === fahrerId)
 
-    setFahrerTouren(fahrerTourenFiltered)
-    setFahrerAuslagen(fahrerAuslagenFiltered)
+    if (fahrerInfo && fahrerInfo.user_id) {
+      // Prüfe auf manuellen Überschuss
+      const manuellerUeberschuss = await getMonatsueberschuss(fahrerInfo.user_id, vormonat)
+
+      if (manuellerUeberschuss) {
+        console.log(`Manueller Überschuss für ${fahrerName.vorname} ${fahrerName.nachname} (${vormonat}):`, manuellerUeberschuss.ueberschuss)
+        setFahrerVormonatUeberschuss(manuellerUeberschuss.ueberschuss)
+      } else {
+        // Kein manueller Überschuss, berechne aus Touren
+        const vormonatTouren = touren.filter(t =>
+          t.fahrer === `${fahrerName.vorname} ${fahrerName.nachname}` &&
+          t.datum.startsWith(vormonat)
+        )
+
+        const vormonatGesamt = vormonatTouren.reduce((sum, t) => {
+          const km = parseFloat(t.gefahreneKm) || 0
+          const verdienst = t.istRuecklaufer ? 0 : calculateTourVerdienst(km, t.wartezeit)
+          return sum + verdienst
+        }, 0)
+
+        const { ueberschuss } = calculateMonthlyPayout(vormonatGesamt)
+        setFahrerVormonatUeberschuss(ueberschuss)
+      }
+    } else {
+      setFahrerVormonatUeberschuss(0)
+    }
+  } catch (error) {
+    console.error("Fehler beim Laden des Vormonat-Überschusses:", error)
+    setFahrerVormonatUeberschuss(0)
   }
+}
 
   const handleKlassenChange = (klasse: string, checked: boolean) => {
     const current = newFahrer.fuehrerscheinklassen || []
@@ -1857,7 +1900,7 @@ export default function AdminDashboardPage() {
                             </Badge>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
                             <div className="bg-white p-4 rounded-lg border">
                               <p className="text-sm text-gray-600">Gesamtverdienst</p>
                               <p className="text-2xl font-bold text-green-700">
@@ -1874,6 +1917,12 @@ export default function AdminDashboardPage() {
                               <p className="text-sm text-gray-600">Überschuss</p>
                               <p className="text-2xl font-bold text-orange-700">
                                 {formatCurrency(ueberschuss)}
+                              </p>
+                            </div>
+                            <div className="bg-white p-4 rounded-lg border">
+                              <p className="text-sm text-gray-600">Überschuss Vormonat</p>
+                              <p className="text-2xl font-bold text-amber-700">
+                                {formatCurrency(fahrerVormonatUeberschuss)}
                               </p>
                             </div>
                             <div className="bg-white p-4 rounded-lg border">
