@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
+  // output: 'export', // Disabled for dynamic deployment with Netlify
   allowedDevOrigins: ["*.preview.same-app.com"],
   eslint: {
     ignoreDuringBuilds: true,
