@@ -1,93 +1,41 @@
-# TransNext Logistik - V105: Vollständig funktional ✅
+# TransNext Logistik - V108: Rückläufer/Retour-Feature ✅
 
-## ✅ ALLE FEATURES KOMPLETT IMPLEMENTIERT:
+## ✅ V108 - RÜCKLÄUFER-FEATURE KOMPLETT:
 
-### 🎯 Bulk Tour Management:
-- [x] Checkboxen für jede Tour
-- [x] "Alle auswählen" Checkbox im Table Header
-- [x] Löschen-Button für einzelne Touren
-- [x] Bulk-Abrechnung für mehrere Touren
-- [x] RLS DELETE Policy für Admins aktiviert
-- [x] Echtes Löschen aus Datenbank funktioniert
+### 🔄 Admin Dashboard:
+- [x] Rückläufer-Toggle-Button bei jeder Tour (RefreshCw Icon)
+- [x] Button zeigt oranges Highlighting wenn Tour als Rückläufer markiert
+- [x] toggleRuecklaufer() Funktion nutzt markTourAsRuecklaufer() Backend
+- [x] istRuecklaufer Property im Tour-Interface
 
-### 💰 Lohn-System:
-- [x] Monatliches Verdienst-Limit: 556€ (Minijob)
-- [x] Überschuss-Berechnung implementiert
-- [x] Fahrerportal: Überschuss aus Vormonat anzeigen
-- [x] Fahrerportal: Lohn-Aufteilung (Auszahlung + Überschuss)
-- [x] Admin-Portal: Neuer Tab "Abrechnung"
-- [x] Admin-Portal: Fahrer-Liste mit Statistiken
-- [x] Admin-Portal: Detail-Ansicht pro Fahrer
+### 👨‍✈️ Fahrerportal:
+- [x] "Retour"-Badge bei Rückläufer-Touren (orange)
+- [x] Rückläufer-Touren werden mit 0€ berechnet
+- [x] Gilt für aktuelle Monatsabrechnung
+- [x] Gilt für Vormonat-Überschuss
 
-### 📊 Statistiken & Monatswahl:
-- [x] Gesamtlohn Genehmigt: Inkludiert abgerechnete Touren
-- [x] Monatsumsatz-Berechnung (Kundenpreise)
-- [x] Monatsauswahl für Statistiken (letzte 12 Monate)
-- [x] Dynamische Aktualisierung bei Monatswechsel
+### 💾 TypeScript:
+- [x] ist_ruecklaufer Boolean zu Arbeitsnachweis-Interface hinzugefügt
+- [x] Tour-Interface erweitert um istRuecklaufer Property
+- [x] Kompilierung erfolgreich (keine Fehler)
 
-### 📁 PDF & Datenmanagement:
-- [x] PDF-Upload für Arbeitsnachweise
-- [x] PDF-Upload für Auslagennachweise
-- [x] PDF-Viewer mit Signed URLs
-- [x] KW-Export für Touren (PDF)
-- [x] KW-Export für Auslagen (PDF)
+## 📝 FUNKTIONSWEISE:
 
-### 👥 Fahrer-Verwaltung:
-- [x] Fahrer anlegen mit Edge Function
-- [x] Fahrer bearbeiten (ohne Email/Passwort)
-- [x] Fahrer aktivieren/deaktivieren
-- [x] Vollständige Profildaten (Führerschein, Ausweis, etc.)
+1. **Admin markiert Tour als Rückläufer:**
+   - Klick auf RefreshCw-Button neben der Tour
+   - Button wird orange hinterlegt
+   - DB: `ist_ruecklaufer = true`
 
-## 🚀 DEPLOYMENT STATUS:
-- ✅ App läuft auf https://transnext.de
-- ✅ Supabase Backend konfiguriert
-- ✅ Edge Functions deployed
-- ✅ RLS Policies aktiv
-- ✅ Storage Buckets konfiguriert
+2. **Fahrer sieht im Portal:**
+   - Orange "Retour"-Badge neben Tour-Nr
+   - Verdienst: 0,00€
+   - Wird nicht in Gesamtverdienst eingerechnet
 
-## 📦 LETZTE ÄNDERUNGEN (V105):
-- ✅ Fahrerportal-Seite wiederhergestellt
-- ✅ Alle TypeScript-Fehler in Next.js behoben
-- ✅ Dev Server läuft fehlerfrei
-- ✅ Tour-Löschung funktioniert komplett
-- ✅ Bulk-Abrechnung funktioniert komplett
+## 🚀 DEPLOYMENT:
+- ✅ Zu GitHub gepusht (Commit: 19c25a6)
+- ✅ Netlify Auto-Deploy aktiv
+- ✅ https://transnext.de
 
-## 🎉 VOLLSTÄNDIGES FEATURE-SET:
-
-**Fahrerportal:**
-- ✅ Login & Dashboard
-- ✅ Arbeitsnachweis hochladen (PDF)
-- ✅ Auslagennachweis hochladen (PDF)
-- ✅ Monatsabrechnung mit Überschuss
-- ✅ Auslagenabrechnung
-- ✅ PDF-Viewer für Belege
-
-**Admin-Portal:**
-- ✅ Login & Dashboard
-- ✅ Touren-Verwaltung mit Bulk-Operations
-- ✅ Auslagen-Verwaltung
-- ✅ Fahrer-Verwaltung
-- ✅ KW-Export (PDF)
-- ✅ Statistiken mit Monatswahl
-- ✅ Abrechnung pro Fahrer
-- ✅ Tour-Löschung & Bulk-Abrechnung
-
-## 🔧 TECHNISCHE DETAILS:
-- **Frontend:** Next.js 15.3.2, TypeScript, Tailwind CSS
-- **Backend:** Supabase (Auth, Database, Storage, Edge Functions)
-- **Deployment:** Netlify (Static Site)
-- **PDF:** jsPDF + jspdf-autotable
-- **Security:** RLS Policies, Row Level Security
-
-## ✨ NÄCHSTE MÖGLICHE SCHRITTE:
-1. Weitere UI-Verbesserungen nach Kundenwunsch
-2. Erweiterte Reporting-Funktionen
-3. E-Mail-Benachrichtigungen für Status-Änderungen
-4. Export-Funktionen für Buchhaltung
-5. Mobile App (React Native)
-
----
-
-**Stand:** Version 105
-**Status:** ✅ Produktionsbereit
-**Deployment:** https://transnext.de
+**Stand:** Version 108 ✅
+**Basis:** Commit 0a0554f (stabiler Stand)
+**GitHub:** https://github.com/transnext/transnext-logistik

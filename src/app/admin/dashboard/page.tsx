@@ -416,11 +416,14 @@ export default function AdminDashboardPage() {
 
   const toggleRuecklaufer = async (id: number, currentValue: boolean) => {
     try {
-      await markTourAsRuecklaufer(id, !currentValue)
+      console.log("Toggling Rückläufer:", id, "current:", currentValue, "new:", !currentValue)
+      const result = await markTourAsRuecklaufer(id, !currentValue)
+      console.log("Result:", result)
       await loadAllData() // Reload
+      alert(`Tour erfolgreich als ${!currentValue ? 'Retoure' : 'normale Tour'} markiert`)
     } catch (error) {
       console.error("Fehler beim Rückläufer-Update:", error)
-      alert("Fehler beim Aktualisieren des Rückläufer-Status")
+      alert("Fehler beim Aktualisieren des Rückläufer-Status: " + (error as Error).message)
     }
   }
 
@@ -964,7 +967,14 @@ export default function AdminDashboardPage() {
                               className="rounded border-gray-300 cursor-pointer"
                             />
                           </TableCell>
-                          <TableCell className="font-medium">{tour.tourNr}</TableCell>
+                          <TableCell className="font-medium">
+                            {tour.tourNr}
+                            {tour.istRuecklaufer && (
+                              <Badge variant="outline" className="ml-2 bg-orange-100 text-orange-700 border-orange-300">
+                                Retoure
+                              </Badge>
+                            )}
+                          </TableCell>
                           <TableCell>{tour.fahrer}</TableCell>
                           <TableCell>{formatDate(tour.datum)}</TableCell>
                           <TableCell className="text-right">{tour.gefahreneKm} km</TableCell>
