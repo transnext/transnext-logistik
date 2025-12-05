@@ -32,8 +32,6 @@ import {
   deleteAuslage,
   billMultipleAuslagen
 } from "@/lib/admin-api"
-  billMultipleAuslagen
-} from "@/lib/admin-api"
 import { exportTourenPDF, exportAuslagenPDF, getWeekNumber } from "@/lib/pdf-export"
 import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout } from "@/lib/salary-calculator"
 
