@@ -1915,7 +1915,7 @@ export default function AdminDashboardPage() {
                             </Badge>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                             <div className="bg-white p-4 rounded-lg border">
                               <p className="text-sm text-gray-600">Gesamtverdienst</p>
                               <p className="text-2xl font-bold text-green-700">
@@ -1927,6 +1927,7 @@ export default function AdminDashboardPage() {
                               <p className="text-2xl font-bold text-blue-700">
                                 {formatCurrency(ausgeZahlt)}
                               </p>
+                            </div>
                             <div className="bg-white p-4 rounded-lg border">
                               <p className="text-sm text-gray-600">Überschuss Vormonat</p>
                               <p className="text-2xl font-bold text-amber-700">
