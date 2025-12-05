@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { TransNextLogo } from "@/components/ui/logo"
-import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle } from "lucide-react"
+import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle, RefreshCw } from "lucide-react"
 import { getCurrentUser, getUserProfile, getArbeitsnachweiseByUser } from "@/lib/api"
 import { calculateTourVerdienst, calculateMonthlyPayout, MONTHLY_LIMIT } from "@/lib/salary-calculator"
 
@@ -188,7 +188,17 @@ export default function MonatsabrechnungPage() {
     return map[wartezeit] || wartezeit
   }
 
-  const getStatusBadge = (status?: string) => {
+  const getStatusBadge = (status?: string, istRuecklaufer?: boolean) => {
+    // Retoure hat Priorität über alle anderen Status
+    if (istRuecklaufer) {
+      return (
+        <Badge className="bg-orange-100 text-orange-800 border-orange-200 flex items-center gap-1 w-fit">
+          <RefreshCw className="h-3 w-3" />
+          Retoure
+        </Badge>
+      )
+    }
+
     const currentStatus = status || "pending"
 
     if (currentStatus === "approved") {
@@ -312,14 +322,7 @@ export default function MonatsabrechnungPage() {
                       <TableBody>
                         {touren.map((tour) => (
                           <TableRow key={tour.id}>
-                            <TableCell className="font-medium">
-                              {tour.tourNr}
-                              {tour.istRuecklaufer && (
-                                <Badge variant="outline" className="ml-2 bg-orange-100 text-orange-700 border-orange-300">
-                                  Retour
-                                </Badge>
-                              )}
-                            </TableCell>
+                            <TableCell className="font-medium">{tour.tourNr}</TableCell>
                             <TableCell>{formatDate(tour.datum)}</TableCell>
                             <TableCell className="text-right">{tour.gefahreneKm} km</TableCell>
                             <TableCell>{getWartezeitText(tour.wartezeit)}</TableCell>
@@ -327,7 +330,7 @@ export default function MonatsabrechnungPage() {
                               {formatCurrency(tour.verdienst || 0)}
                             </TableCell>
                             <TableCell>
-                              {getStatusBadge(tour.status)}
+                              {getStatusBadge(tour.status, tour.istRuecklaufer)}
                             </TableCell>
                             <TableCell className="text-center">
                               <Button

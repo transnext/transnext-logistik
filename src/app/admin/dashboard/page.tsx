@@ -476,7 +476,17 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, istRuecklaufer?: boolean) => {
+    // Retoure hat Priorität über alle anderen Status
+    if (istRuecklaufer) {
+      return (
+        <Badge className="bg-orange-100 text-orange-800 border-orange-200 flex items-center gap-1 w-fit">
+          <RefreshCw className="h-3 w-3" />
+          Retoure
+        </Badge>
+      )
+    }
+
     if (status === "approved") {
       return (
         <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center gap-1 w-fit">
@@ -967,14 +977,7 @@ export default function AdminDashboardPage() {
                               className="rounded border-gray-300 cursor-pointer"
                             />
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {tour.tourNr}
-                            {tour.istRuecklaufer && (
-                              <Badge variant="outline" className="ml-2 bg-orange-100 text-orange-700 border-orange-300">
-                                Retoure
-                              </Badge>
-                            )}
-                          </TableCell>
+                          <TableCell className="font-medium">{tour.tourNr}</TableCell>
                           <TableCell>{tour.fahrer}</TableCell>
                           <TableCell>{formatDate(tour.datum)}</TableCell>
                           <TableCell className="text-right">{tour.gefahreneKm} km</TableCell>
@@ -984,7 +987,7 @@ export default function AdminDashboardPage() {
                             {tour.wartezeit === "90-120" && "90-120 Min."}
                             {!tour.wartezeit && "-"}
                           </TableCell>
-                          <TableCell>{getStatusBadge(tour.status)}</TableCell>
+                          <TableCell>{getStatusBadge(tour.status, tour.istRuecklaufer)}</TableCell>
                           <TableCell className="text-sm text-gray-600">
                             {formatDate(tour.erstelltAm)}
                           </TableCell>
