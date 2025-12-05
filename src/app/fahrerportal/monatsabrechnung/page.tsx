@@ -23,6 +23,8 @@ interface Tour {
   verdienst?: number
   status?: string
   belegUrl?: string
+  istRuecklaufer?: boolean
+  istRuecklaufer?: boolean
 }
 
 export default function MonatsabrechnungPage() {
@@ -105,7 +107,7 @@ export default function MonatsabrechnungPage() {
       // Berechne Verdienst für jede Tour mit offizieller KM-Range
       const tourenMitVerdienst = filtered.map((tour) => {
         const km = tour.gefahrene_km || 0
-        const verdienst = calculateTourVerdienst(km, tour.wartezeit)
+        const verdienst = tour.ist_ruecklaufer ? 0 : calculateTourVerdienst(km, tour.wartezeit)
 
         return {
           id: tour.id,
@@ -115,6 +117,8 @@ export default function MonatsabrechnungPage() {
           wartezeit: tour.wartezeit,
           status: tour.status,
           verdienst: verdienst,
+          istRuecklaufer: tour.ist_ruecklaufer,
+          istRuecklaufer: tour.ist_ruecklaufer,
           belegUrl: tour.beleg_url
         }
       })
@@ -300,7 +304,14 @@ export default function MonatsabrechnungPage() {
                               {formatCurrency(tour.verdienst || 0)}
                             </TableCell>
                             <TableCell>
-                              {getStatusBadge(tour.status)}
+                              <div className="flex gap-2 items-center flex-wrap">
+                                {getStatusBadge(tour.status)}
+                                {tour.istRuecklaufer && (
+                                  <Badge variant="outline" className="text-orange-700 border-orange-300 bg-orange-50">
+                                    Rückläufer
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-center">
                               <Button

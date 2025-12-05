@@ -338,3 +338,15 @@ export async function billMultipleAuslagen(auslagenIds: number[]) {
   if (error) throw error
   return { success: true, count: auslagenIds.length, data }
 }
+
+// RÜCKLÄUFER MANAGEMENT
+export async function markTourAsRuecklaufer(tourId: number, istRuecklaufer: boolean) {
+  const { data, error } = await supabase
+    .from('arbeitsnachweise')
+    .update({ ist_ruecklaufer: istRuecklaufer })
+    .eq('id', tourId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
