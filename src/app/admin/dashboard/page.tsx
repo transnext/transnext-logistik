@@ -1827,7 +1827,9 @@ export default function AdminDashboardPage() {
                     .filter(t => t.status === 'approved' || t.status === 'billed')
                     .reduce((sum, t) => {
                       const km = parseFloat(t.gefahreneKm) || 0
-                      return sum + calculateTourVerdienst(km, t.wartezeit)
+                      // Retoure-Touren = 0€
+                      const verdienst = t.istRuecklaufer ? 0 : calculateTourVerdienst(km, t.wartezeit)
+                      return sum + verdienst
                     }, 0)
 
                   const { ausgeZahlt, ueberschuss } = calculateMonthlyPayout(gesamtverdienst)
@@ -1919,7 +1921,8 @@ export default function AdminDashboardPage() {
                                 <TableBody>
                                   {fahrerTouren.map((tour) => {
                                     const km = parseFloat(tour.gefahreneKm) || 0
-                                    const verdienst = calculateTourVerdienst(km, tour.wartezeit)
+                                    // Retoure-Touren = 0€
+                                    const verdienst = tour.istRuecklaufer ? 0 : calculateTourVerdienst(km, tour.wartezeit)
 
                                     return (
                                       <TableRow key={tour.id}>
@@ -1935,7 +1938,7 @@ export default function AdminDashboardPage() {
                                         <TableCell className="text-right font-semibold text-green-700">
                                           {formatCurrency(verdienst)}
                                         </TableCell>
-                                        <TableCell>{getStatusBadge(tour.status)}</TableCell>
+                                        <TableCell>{getStatusBadge(tour.status, tour.istRuecklaufer)}</TableCell>
                                       </TableRow>
                                     )
                                   })}

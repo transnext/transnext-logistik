@@ -1,41 +1,54 @@
-# TransNext Logistik - V108: Rückläufer/Retour-Feature ✅
+# TransNext Logistik - V110: Retoure-Feature PERFEKT ✅
 
-## ✅ V108 - RÜCKLÄUFER-FEATURE KOMPLETT:
+## ✅ V110 - RETOURE-FEATURE KOMPLETT & KORRIGIERT:
 
-### 🔄 Admin Dashboard:
-- [x] Rückläufer-Toggle-Button bei jeder Tour (RefreshCw Icon)
-- [x] Button zeigt oranges Highlighting wenn Tour als Rückläufer markiert
-- [x] toggleRuecklaufer() Funktion nutzt markTourAsRuecklaufer() Backend
-- [x] istRuecklaufer Property im Tour-Interface
+### 🎯 Admin Dashboard:
+- [x] Retoure-Toggle-Button (RefreshCw Icon) bei jeder Tour
+- [x] **"Retoure"-Badge in der Status-Spalte** (nicht bei Tour-Nr)
+- [x] Orange Badge mit Priorität über andere Status
+- [x] Ersetzt "Abgelehnt"-Status wenn Tour als Retoure markiert
 
-### 👨‍✈️ Fahrerportal:
-- [x] "Retour"-Badge bei Rückläufer-Touren (orange)
-- [x] Rückläufer-Touren werden mit 0€ berechnet
-- [x] Gilt für aktuelle Monatsabrechnung
-- [x] Gilt für Vormonat-Überschuss
+### 👨‍✈️ Fahrerportal (Monatsabrechnung):
+- [x] **"Retoure"-Status in Status-Spalte**
+- [x] **0€ Verdienst** für Retoure-Touren
+- [x] Einheitliches Design mit Admin Dashboard
+- [x] Gilt für aktuelle Monatsabrechnung + Vormonat-Überschuss
 
-### 💾 TypeScript:
-- [x] ist_ruecklaufer Boolean zu Arbeitsnachweis-Interface hinzugefügt
-- [x] Tour-Interface erweitert um istRuecklaufer Property
-- [x] Kompilierung erfolgreich (keine Fehler)
+### 💾 Technische Details:
+- [x] `getStatusBadge()` akzeptiert `istRuecklaufer` Parameter
+- [x] Retoure hat Priorität über alle anderen Status
+- [x] `calculateTourVerdienst()` prüft `ist_ruecklaufer` → 0€
+- [x] TypeScript-Kompilierung erfolgreich
 
-## 📝 FUNKTIONSWEISE:
+## 📋 VOLLSTÄNDIGE FUNKTIONSWEISE:
 
-1. **Admin markiert Tour als Rückläufer:**
-   - Klick auf RefreshCw-Button neben der Tour
-   - Button wird orange hinterlegt
-   - DB: `ist_ruecklaufer = true`
+### **1. Admin markiert Tour als Retoure:**
+   ```
+   Klick auf 🔄 Button → toggleRuecklaufer()
+   ↓
+   DB: ist_ruecklaufer = true
+   ↓
+   Status-Spalte: "Retoure" (orange Badge)
+   ```
 
-2. **Fahrer sieht im Portal:**
-   - Orange "Retour"-Badge neben Tour-Nr
-   - Verdienst: 0,00€
-   - Wird nicht in Gesamtverdienst eingerechnet
+### **2. Fahrer sieht im Portal:**
+   ```
+   Status: "Retoure" (🔄 orange Badge)
+   Verdienst: 0,00€
+   ↓
+   Nicht in Gesamtverdienst eingerechnet
+   ```
 
 ## 🚀 DEPLOYMENT:
-- ✅ Zu GitHub gepusht (Commit: 19c25a6)
+- ✅ Zu GitHub gepusht (Commit: 9610ef0)
 - ✅ Netlify Auto-Deploy aktiv
 - ✅ https://transnext.de
 
-**Stand:** Version 108 ✅
-**Basis:** Commit 0a0554f (stabiler Stand)
+## 🎨 DESIGN:
+- **Retoure**: Orange Badge mit RefreshCw Icon
+- **Genehmigt**: Grün mit CheckCircle
+- **Abgelehnt**: Rot mit XCircle
+- **Ausstehend**: Gelb mit Clock
+
+**Stand:** Version 110 ✅
 **GitHub:** https://github.com/transnext/transnext-logistik
