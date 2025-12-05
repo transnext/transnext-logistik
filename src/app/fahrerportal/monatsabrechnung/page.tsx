@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { TransNextLogo } from "@/components/ui/logo"
 import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle } from "lucide-react"
-import { getCurrentUser, getUserProfile, getArbeitsnachweiseByUser, getFahrerByUserId } from "@/lib/api"
+import { getCurrentUser, getUserProfile, getArbeitsnachweiseByUser } from "@/lib/api"
 import { calculateTourVerdienst, calculateMonthlyPayout, MONTHLY_LIMIT } from "@/lib/salary-calculator"
 
 interface Tour {
@@ -23,8 +23,6 @@ interface Tour {
   verdienst?: number
   status?: string
   belegUrl?: string
-  istRuecklaufer?: boolean
-  istRuecklaufer?: boolean
 }
 
 export default function MonatsabrechnungPage() {
@@ -107,7 +105,7 @@ export default function MonatsabrechnungPage() {
       // Berechne Verdienst für jede Tour mit offizieller KM-Range
       const tourenMitVerdienst = filtered.map((tour) => {
         const km = tour.gefahrene_km || 0
-        const verdienst = tour.ist_ruecklaufer ? 0 : calculateTourVerdienst(km, tour.wartezeit)
+        const verdienst = calculateTourVerdienst(km, tour.wartezeit)
 
         return {
           id: tour.id,
@@ -117,8 +115,6 @@ export default function MonatsabrechnungPage() {
           wartezeit: tour.wartezeit,
           status: tour.status,
           verdienst: verdienst,
-          istRuecklaufer: tour.ist_ruecklaufer,
-          istRuecklaufer: tour.ist_ruecklaufer,
           belegUrl: tour.beleg_url
         }
       })
@@ -135,14 +131,30 @@ export default function MonatsabrechnungPage() {
 
   const loadVormonatUeberschuss = async (userId: string, currentMonth: string) => {
     try {
-      // Lade Überschuss aus der Datenbank (Fahrer-Tabelle)
-      const fahrerData = await getFahrerByUserId(userId)
-      const ueberschuss = fahrerData.ueberschuss_vormonat || 0
+      // Berechne Vormonat
+      const [year, month] = currentMonth.split('-')
+      const date = new Date(parseInt(year), parseInt(month) - 2, 1) // -2 weil Monat 0-basiert ist
+      const vormonat = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+
+      const arbeitsnachweise = await getArbeitsnachweiseByUser(userId)
+
+      // Filter nach Vormonat
+      const vormonatTouren = arbeitsnachweise.filter((item) => {
+        return item.datum.startsWith(vormonat)
+      })
+
+      // Berechne Gesamtverdienst des Vormonats
+      const vormonatGesamt = vormonatTouren.reduce((sum, tour) => {
+        const km = tour.gefahrene_km || 0
+        const verdienst = calculateTourVerdienst(km, tour.wartezeit)
+        return sum + verdienst
+      }, 0)
+
+      // Berechne Überschuss
+      const { ueberschuss } = calculateMonthlyPayout(vormonatGesamt)
       setVormonatUeberschuss(ueberschuss)
     } catch (error) {
       console.error("Fehler beim Laden des Vormonat-Überschusses:", error)
-      // Fallback: kein Überschuss
-      setVormonatUeberschuss(0)
     }
   }
 
@@ -304,14 +316,7 @@ export default function MonatsabrechnungPage() {
                               {formatCurrency(tour.verdienst || 0)}
                             </TableCell>
                             <TableCell>
-                              <div className="flex gap-2 items-center flex-wrap">
-                                {getStatusBadge(tour.status)}
-                                {tour.istRuecklaufer && (
-                                  <Badge variant="outline" className="text-orange-700 border-orange-300 bg-orange-50">
-                                    Rückläufer
-                                  </Badge>
-                                )}
-                              </div>
+                              {getStatusBadge(tour.status)}
                             </TableCell>
                             <TableCell className="text-center">
                               <Button

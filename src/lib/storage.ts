@@ -12,10 +12,10 @@ export async function uploadBeleg(
   // Validierung - Akzeptiere PDFs und Bilder
   const allowedTypes = ['pdf', 'jpeg', 'jpg', 'png', 'heic', 'heif']
   const fileExtension = file.name.split('.').pop()?.toLowerCase() || ''
-  const isAllowedType = allowedTypes.some(type =>
+  const isAllowedType = allowedTypes.some(type => 
     file.type.includes(type) || fileExtension === type
   )
-
+  
   if (!isAllowedType) {
     throw new Error('Nur PDF oder Foto-Dateien sind erlaubt (PDF, JPG, PNG, HEIC)')
   }

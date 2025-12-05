@@ -46,7 +46,6 @@ interface Tour {
   status: string
   erstelltAm: string
   belegUrl?: string
-  istRuecklaufer?: boolean
 }
 
 interface Auslage {
@@ -62,7 +61,6 @@ interface Auslage {
   status: string
   erstelltAm: string
   belegUrl?: string
-  istRuecklaufer?: boolean
 }
 
 interface Fahrer {
@@ -100,8 +98,6 @@ export default function AdminDashboardPage() {
   const [showEditFahrer, setShowEditFahrer] = useState(false)
   const [editingFahrer, setEditingFahrer] = useState<Partial<Fahrer> | null>(null)
   const [selectedTourIds, setSelectedTourIds] = useState<number[]>([])
-  const [selectedAuslagenIds, setSelectedAuslagenIds] = useState<number[]>([])
-  const [selectedAuslagenIds, setSelectedAuslagenIds] = useState<number[]>([])
   const [showBelegDialog, setShowBelegDialog] = useState(false)
   const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string; typ: "arbeitsnachweis" | "auslagennachweis"; belegUrl?: string } | null>(null)
   const [selectedFahrerId, setSelectedFahrerId] = useState<number | null>(null)
@@ -200,7 +196,6 @@ export default function AdminDashboardPage() {
         status: t.status,
         erstelltAm: t.created_at,
         belegUrl: t.beleg_url,
-        istRuecklaufer: t.ist_ruecklaufer,
       })))
 
       setAuslagen(auslagenData.map((a) => ({
@@ -416,6 +411,17 @@ export default function AdminDashboardPage() {
     }
   }
 
+
+  const toggleRuecklaufer = async (id: number, currentValue: boolean) => {
+    try {
+      await markTourAsRuecklaufer(id, !currentValue)
+      await loadAllData() // Reload
+    } catch (error) {
+      console.error("Fehler beim Rückläufer-Update:", error)
+      alert("Fehler beim Aktualisieren des Rückläufer-Status")
+    }
+  }
+
   const handleDeleteTour = async (id: number) => {
     if (!confirm("Möchten Sie diese Tour wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.")) {
       return
@@ -439,32 +445,8 @@ export default function AdminDashboardPage() {
       return
     }
     try {
-      // Get selected tours
-      const selectedTours = touren.filter(tour => selectedTourIds.includes(tour.id))
-      
-      // Generate PDF before marking as billed
-      if (selectedTours.length > 0) {
-        // Get current date for filename
-        const now = new Date()
-        const kw = getWeekNumber(now)
-        const year = now.getFullYear()
-        
-        // Convert to format for PDF export
-        const tourenForExport = selectedTours.map(tour => ({
-          tour_nr: tour.tourNr,
-          datum: tour.datum,
-          gefahrene_km: parseFloat(tour.gefahreneKm),
-          wartezeit: tour.wartezeit,
-          fahrer_name: tour.fahrer
-        }))
-        
-        // Export PDF
-        exportTourenPDF(tourenForExport, kw.toString(), year)
-      }
-      
-      // Mark tours as billed
       await billMultipleTours(selectedTourIds)
-      alert(`${selectedTourIds.length} Touren wurden als PDF exportiert und als abgerechnet markiert`)
+      alert(`${selectedTourIds.length} Touren wurden als abgerechnet markiert`)
       setSelectedTourIds([])
       await loadAllData()
     } catch (error) {
@@ -486,172 +468,6 @@ export default function AdminDashboardPage() {
       setSelectedTourIds([])
     } else {
       setSelectedTourIds(filteredTouren.map(tour => tour.id))
-    }
-  }
-
-  // Auslagen Handler Functions
-  const updateAuslageStatus = async (id: number, newStatus: string) => {
-    try {
-      await updateAuslagennachweisStatus(id, newStatus as any)
-      await loadAllData()
-    } catch (error) {
-      console.error("Fehler beim Aktualisieren des Status:", error)
-      alert("Fehler beim Aktualisieren des Status")
-    }
-  }
-
-  const handleDeleteAuslage = async (id: number) => {
-    if (!confirm("Möchten Sie diese Auslage wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.")) {
-      return
-    }
-    try {
-      await deleteAuslage(id)
-      alert("Auslage erfolgreich gelöscht")
-      await loadAllData()
-    } catch (error) {
-      console.error("Fehler beim Löschen:", error)
-      alert("Fehler beim Löschen der Auslage")
-    }
-  }
-
-  const handleBillSelectedAuslagen = async () => {
-    if (selectedAuslagenIds.length === 0) {
-      alert("Bitte wählen Sie mindestens eine Auslage aus")
-      return
-    }
-    if (!confirm(`Möchten Sie ${selectedAuslagenIds.length} Auslagen als überwiesen markieren?`)) {
-      return
-    }
-    try {
-      // Get selected auslagen
-      const selectedAuslagen = auslagen.filter(auslage => selectedAuslagenIds.includes(auslage.id))
-      // Generate PDF before marking as paid
-      if (selectedAuslagen.length > 0) {
-        // Get current date for filename
-        const now = new Date()
-        const kw = getWeekNumber(now)
-        const year = now.getFullYear()
-        // Convert to format for PDF export
-        const auslagenForExport = selectedAuslagen.map(auslage => ({
-          tour_nr: auslage.tourNr,
-          datum: auslage.datum,
-          kennzeichen: auslage.kennzeichen,
-          startort: auslage.startort,
-          zielort: auslage.zielort,
-          belegart: auslage.belegart,
-          kosten: parseFloat(auslage.kosten),
-          fahrer_name: auslage.fahrer
-        }))
-        // Export PDF
-        exportAuslagenPDF(auslagenForExport, kw.toString(), year)
-      }
-      // Mark auslagen as paid
-      await billMultipleAuslagen(selectedAuslagenIds)
-      alert(`${selectedAuslagenIds.length} Auslagen wurden als PDF exportiert und als überwiesen markiert`)
-      setSelectedAuslagenIds([])
-      await loadAllData()
-    } catch (error) {
-      console.error("Fehler beim Abrechnen:", error)
-      alert("Fehler beim Abrechnen der Auslagen")
-    }
-  }
-
-  const toggleAuslageSelection = (id: number) => {
-    if (selectedAuslagenIds.includes(id)) {
-      setSelectedAuslagenIds(selectedAuslagenIds.filter(auslageId => auslageId !== id))
-    } else {
-      setSelectedAuslagenIds([...selectedAuslagenIds, id])
-    }
-  }
-
-  const toggleAllAuslagenSelection = () => {
-    if (selectedAuslagenIds.length === filteredAuslagen.length) {
-      setSelectedAuslagenIds([])
-    } else {
-      setSelectedAuslagenIds(filteredAuslagen.map(auslage => auslage.id))
-    }
-  }
-
-  // Auslagen Handler Functions
-  const updateAuslageStatus = async (id: number, newStatus: string) => {
-    try {
-      await updateAuslagennachweisStatus(id, newStatus as any)
-      await loadAllData()
-    } catch (error) {
-      console.error("Fehler beim Aktualisieren des Status:", error)
-      alert("Fehler beim Aktualisieren des Status")
-    }
-  }
-
-  const handleDeleteAuslage = async (id: number) => {
-    if (!confirm("Möchten Sie diese Auslage wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.")) {
-      return
-    }
-    try {
-      await deleteAuslage(id)
-      alert("Auslage erfolgreich gelöscht")
-      await loadAllData()
-    } catch (error) {
-      console.error("Fehler beim Löschen:", error)
-      alert("Fehler beim Löschen der Auslage")
-    }
-  }
-
-  const handleBillSelectedAuslagen = async () => {
-    if (selectedAuslagenIds.length === 0) {
-      alert("Bitte wählen Sie mindestens eine Auslage aus")
-      return
-    }
-    if (!confirm(`Möchten Sie ${selectedAuslagenIds.length} Auslagen als überwiesen markieren?`)) {
-      return
-    }
-    try {
-      // Get selected auslagen
-      const selectedAuslagen = auslagen.filter(auslage => selectedAuslagenIds.includes(auslage.id))
-      // Generate PDF before marking as paid
-      if (selectedAuslagen.length > 0) {
-        // Get current date for filename
-        const now = new Date()
-        const kw = getWeekNumber(now)
-        const year = now.getFullYear()
-        // Convert to format for PDF export
-        const auslagenForExport = selectedAuslagen.map(auslage => ({
-          tour_nr: auslage.tourNr,
-          datum: auslage.datum,
-          kennzeichen: auslage.kennzeichen,
-          startort: auslage.startort,
-          zielort: auslage.zielort,
-          belegart: auslage.belegart,
-          kosten: parseFloat(auslage.kosten),
-          fahrer_name: auslage.fahrer
-        }))
-        // Export PDF
-        exportAuslagenPDF(auslagenForExport, kw.toString(), year)
-      }
-      // Mark auslagen as paid
-      await billMultipleAuslagen(selectedAuslagenIds)
-      alert(`${selectedAuslagenIds.length} Auslagen wurden als PDF exportiert und als überwiesen markiert`)
-      setSelectedAuslagenIds([])
-      await loadAllData()
-    } catch (error) {
-      console.error("Fehler beim Abrechnen:", error)
-      alert("Fehler beim Abrechnen der Auslagen")
-    }
-  }
-
-  const toggleAuslageSelection = (id: number) => {
-    if (selectedAuslagenIds.includes(id)) {
-      setSelectedAuslagenIds(selectedAuslagenIds.filter(auslageId => auslageId !== id))
-    } else {
-      setSelectedAuslagenIds([...selectedAuslagenIds, id])
-    }
-  }
-
-  const toggleAllAuslagenSelection = () => {
-    if (selectedAuslagenIds.length === filteredAuslagen.length) {
-      setSelectedAuslagenIds([])
-    } else {
-      setSelectedAuslagenIds(filteredAuslagen.map(auslage => auslage.id))
     }
   }
 
@@ -1197,17 +1013,6 @@ export default function AdminDashboardPage() {
                                 <XCircle className="h-3 w-3" />
                               </Button>
                               <Button
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => toggleRuecklaufer(tour.id, tour.istRuecklaufer || false)}
-                                className={tour.istRuecklaufer 
-                                  ? "text-orange-700 border-orange-300 bg-orange-50 hover:bg-orange-100" 
-                                  : "text-gray-700 border-gray-300 hover:bg-gray-50"}
-                                title={tour.istRuecklaufer ? "Als normale Tour markieren" : "Als Rückläufer markieren"}
-                              >
-                                <RefreshCw className="h-3 w-3" />
-                              </Button>
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleDeleteTour(tour.id)}
@@ -1266,52 +1071,10 @@ export default function AdminDashboardPage() {
         {activeTab === "auslagen" && (
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-2xl text-primary-blue">Auslagen-Verwaltung</CardTitle>
-                  <CardDescription>
-                    Alle Auslagennachweise der Fahrer
-                  </CardDescription>
-                </div>
-                {selectedAuslagenIds.length > 0 && (
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleBillSelectedAuslagen}
-                      className="bg-orange-600 hover:bg-orange-700 text-white"
-                    >
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      {selectedAuslagenIds.length} abrechnen
-                    </Button>
-                    <Button
-                      onClick={() => setSelectedAuslagenIds([])}
-                      variant="outline"
-                    >
-                      Auswahl aufheben
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardHeader>
-                  </CardDescription>
-                </div>
-                {selectedAuslagenIds.length > 0 && (
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleBillSelectedAuslagen}
-                      className="bg-orange-600 hover:bg-orange-700 text-white"
-                    >
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      {selectedAuslagenIds.length} abrechnen
-                    </Button>
-                    <Button
-                      onClick={() => setSelectedAuslagenIds([])}
-                      variant="outline"
-                    >
-                      Auswahl aufheben
-                    </Button>
-                  </div>
-                )}
-              </div>
+              <CardTitle className="text-2xl text-primary-blue">Auslagen-Verwaltung</CardTitle>
+              <CardDescription>
+                Alle Auslagennachweise der Fahrer
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {filteredAuslagen.length === 0 ? (
@@ -1331,14 +1094,6 @@ export default function AdminDashboardPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-12">
-                          <input
-                            type="checkbox"
-                            checked={selectedAuslagenIds.length === filteredAuslagen.length && filteredAuslagen.length > 0}
-                            onChange={toggleAllAuslagenSelection}
-                            className="rounded border-gray-300 cursor-pointer"
-                          />
-                        </TableHead>
                         <TableHead>Tour-Nr.</TableHead>
                         <TableHead>Fahrer</TableHead>
                         <TableHead>Datum</TableHead>
@@ -1352,25 +1107,9 @@ export default function AdminDashboardPage() {
                         <TableHead>Aktionen</TableHead>
                       </TableRow>
                     </TableHeader>
-                        <TableHead>Strecke</TableHead>
-                        <TableHead>Belegart</TableHead>
-                        <TableHead className="text-right">Kosten</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Erstellt am</TableHead>
-                        <TableHead>Beleg</TableHead>
-                        <TableHead>Aktionen</TableHead>
-                      </TableRow>
-                    </TableHeader>
                     <TableBody>
+                      {filteredAuslagen.map((auslage) => (
                         <TableRow key={auslage.id}>
-                          <TableCell>
-                            <input
-                              type="checkbox"
-                              checked={selectedAuslagenIds.includes(auslage.id)}
-                              onChange={() => toggleAuslageSelection(auslage.id)}
-                              className="rounded border-gray-300 cursor-pointer"
-                            />
-                          </TableCell>
                           <TableCell className="font-medium">{auslage.tourNr}</TableCell>
                           <TableCell>{auslage.fahrer}</TableCell>
                           <TableCell>{formatDate(auslage.datum)}</TableCell>
@@ -1432,40 +1171,10 @@ export default function AdminDashboardPage() {
                               >
                                 <CreditCard className="h-3 w-3" />
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDeleteAuslage(auslage.id)}
-                                className="text-red-700 border-red-300 hover:bg-red-50"
-                                title="Löschen"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
                       ))}
-                    </TableBody>
-                                className="text-purple-700 border-purple-300 hover:bg-purple-50"
-                                disabled={auslage.status === "paid" || auslage.status === "pending" || auslage.status === "rejected"}
-                                title="Als überwiesen markieren"
-                              >
-                                <CreditCard className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDeleteAuslage(auslage.id)}
-                                className="text-red-700 border-red-300 hover:bg-red-50"
-                                title="Löschen"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
                     </TableBody>
                   </Table>
                 </div>
