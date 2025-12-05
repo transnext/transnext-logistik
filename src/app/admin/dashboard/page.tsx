@@ -66,6 +66,7 @@ interface Auslage {
 }
 
 interface Fahrer {
+  user_id?: string
   id: number
   vorname: string
   nachname: string
@@ -217,8 +218,9 @@ export default function AdminDashboardPage() {
         belegUrl: a.beleg_url,
       })))
 
-      setFahrer(fahrerData.map((f) => ({
+      setFahrer(fahrerData.map((f: any) => ({
         id: f.id,
+        user_id: f.user_id, // NEU: Für Vormonat-Überschuss
         vorname: f.vorname,
         nachname: f.nachname,
         geburtsdatum: f.geburtsdatum,
@@ -1925,13 +1927,6 @@ export default function AdminDashboardPage() {
                               <p className="text-2xl font-bold text-blue-700">
                                 {formatCurrency(ausgeZahlt)}
                               </p>
-                            </div>
-                            <div className="bg-white p-4 rounded-lg border">
-                              <p className="text-sm text-gray-600">Überschuss</p>
-                              <p className="text-2xl font-bold text-orange-700">
-                                {formatCurrency(ueberschuss)}
-                              </p>
-                            </div>
                             <div className="bg-white p-4 rounded-lg border">
                               <p className="text-sm text-gray-600">Überschuss Vormonat</p>
                               <p className="text-2xl font-bold text-amber-700">
