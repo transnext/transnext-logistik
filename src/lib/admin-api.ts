@@ -298,3 +298,23 @@ export async function bulkUpdateAuslagenStatus(
   if (error) throw error
   return data
 }
+
+// TOUR MANAGEMENT
+export async function deleteTour(tourId: number) {
+  const { error } = await supabase
+    .from('arbeitsnachweise')
+    .delete()
+    .eq('id', tourId)
+  if (error) throw error
+  return { success: true }
+}
+
+export async function billMultipleTours(tourIds: number[]) {
+  const { data, error } = await supabase
+    .from('arbeitsnachweise')
+    .update({ status: 'billed' })
+    .in('id', tourIds)
+    .select()
+  if (error) throw error
+  return { success: true, count: tourIds.length, data }
+}
