@@ -1,6 +1,16 @@
-# TransNext Logistik - V99: Lohn-Cap & Abrechnung ✅
+# TransNext Logistik - V105: Vollständig funktional ✅
 
-## ✅ NEUE FEATURES KOMPLETT:
+## ✅ ALLE FEATURES KOMPLETT IMPLEMENTIERT:
+
+### 🎯 Bulk Tour Management:
+- [x] Checkboxen für jede Tour
+- [x] "Alle auswählen" Checkbox im Table Header
+- [x] Löschen-Button für einzelne Touren
+- [x] Bulk-Abrechnung für mehrere Touren
+- [x] RLS DELETE Policy für Admins aktiviert
+- [x] Echtes Löschen aus Datenbank funktioniert
+
+### 💰 Lohn-System:
 - [x] Monatliches Verdienst-Limit: 556€ (Minijob)
 - [x] Überschuss-Berechnung implementiert
 - [x] Fahrerportal: Überschuss aus Vormonat anzeigen
@@ -8,57 +18,39 @@
 - [x] Admin-Portal: Neuer Tab "Abrechnung"
 - [x] Admin-Portal: Fahrer-Liste mit Statistiken
 - [x] Admin-Portal: Detail-Ansicht pro Fahrer
-- [x] Admin-Portal: Touren & Auslagen pro Fahrer
+
+### 📊 Statistiken & Monatswahl:
 - [x] Gesamtlohn Genehmigt: Inkludiert abgerechnete Touren
-- [x] Überschuss-Warnung bei Überschreitung der 556€-Grenze
+- [x] Monatsumsatz-Berechnung (Kundenpreise)
+- [x] Monatsauswahl für Statistiken (letzte 12 Monate)
+- [x] Dynamische Aktualisierung bei Monatswechsel
 
-## 🎯 WIE ES FUNKTIONIERT:
+### 📁 PDF & Datenmanagement:
+- [x] PDF-Upload für Arbeitsnachweise
+- [x] PDF-Upload für Auslagennachweise
+- [x] PDF-Viewer mit Signed URLs
+- [x] KW-Export für Touren (PDF)
+- [x] KW-Export für Auslagen (PDF)
 
-### 💰 Lohn-Cap (556€ Minijob):
-- Fahrer verdienen maximal **556€ pro Monat** (Auszahlung)
-- Alles über 556€ ist **Überschuss** (gehört dem Fahrer)
-- **Beispiel:**
-  - Verdienst: 620€
-  - Auszahlung: 556€
-  - Überschuss: 64€
+### 👥 Fahrer-Verwaltung:
+- [x] Fahrer anlegen mit Edge Function
+- [x] Fahrer bearbeiten (ohne Email/Passwort)
+- [x] Fahrer aktivieren/deaktivieren
+- [x] Vollständige Profildaten (Führerschein, Ausweis, etc.)
 
-### 📊 Fahrerportal - Monatsabrechnung:
-- **Gesamtverdienst** angezeigt
-- **Auszahlung** (max. 556€)
-- **Überschuss** (wenn über 556€)
-- **Überschuss aus Vormonat** (orange Card, nur wenn > 0€)
+## 🚀 DEPLOYMENT STATUS:
+- ✅ App läuft auf https://transnext.de
+- ✅ Supabase Backend konfiguriert
+- ✅ Edge Functions deployed
+- ✅ RLS Policies aktiv
+- ✅ Storage Buckets konfiguriert
 
-### 🧾 Admin-Portal - Abrechnung:
-- **Tab "Abrechnung"** mit allen aktiven Fahrern
-- **Klick auf Fahrer** → Detail-Ansicht
-- **Statistiken pro Fahrer:**
-  - Gesamtverdienst (alle approved + billed Touren)
-  - Auszahlung (max. 556€)
-  - Überschuss (über 556€)
-  - Auslagen-Summe (alle approved + paid Auslagen)
-- **Touren-Tabelle** mit Verdienst pro Tour
-- **Auslagen-Tabelle** mit Kosten
-- **Zurück-Button** zur Fahrer-Übersicht
-
-### 📈 Gesamtlohn Genehmigt:
-- Zählt jetzt **approved + billed** Touren
-- Dient zur Übersicht der Gesamt-Lohnkosten
-- Wird **nicht reduziert** nach Abrechnung
-
-## 📦 IMPLEMENTIERTE DATEIEN:
-- ✅ `src/lib/salary-calculator.ts` - MONTHLY_LIMIT, calculateMonthlyPayout()
-- ✅ `src/lib/admin-api.ts` - Gesamtlohn inkl. billed
-- ✅ `src/app/fahrerportal/monatsabrechnung/page.tsx` - Überschuss-Anzeige
-- ✅ `src/app/admin/dashboard/page.tsx` - Abrechnung-Tab
-
-## 🧪 NÄCHSTE SCHRITTE:
-- [ ] Version 99 erstellen
-- [ ] Linter-Check
-- [ ] Testing durchführen:
-  - [ ] Fahrerportal: Überschuss-Anzeige
-  - [ ] Admin: Abrechnung-Tab
-  - [ ] Admin: Fahrer-Detail-Ansicht
-  - [ ] Gesamtlohn Genehmigt prüfen
+## 📦 LETZTE ÄNDERUNGEN (V105):
+- ✅ Fahrerportal-Seite wiederhergestellt
+- ✅ Alle TypeScript-Fehler in Next.js behoben
+- ✅ Dev Server läuft fehlerfrei
+- ✅ Tour-Löschung funktioniert komplett
+- ✅ Bulk-Abrechnung funktioniert komplett
 
 ## 🎉 VOLLSTÄNDIGES FEATURE-SET:
 
@@ -72,16 +64,30 @@
 
 **Admin-Portal:**
 - ✅ Login & Dashboard
-- ✅ Touren-Verwaltung
+- ✅ Touren-Verwaltung mit Bulk-Operations
 - ✅ Auslagen-Verwaltung
 - ✅ Fahrer-Verwaltung
 - ✅ KW-Export (PDF)
-- ✅ Statistiken
-- ✅ Abrechnung pro Fahrer **NEU!**
+- ✅ Statistiken mit Monatswahl
+- ✅ Abrechnung pro Fahrer
+- ✅ Tour-Löschung & Bulk-Abrechnung
 
-**PDF-System:**
-- ✅ Upload von Belegen
-- ✅ Viewer mit Signed URLs
-- ✅ Download-Funktion
-- ✅ KW-Export für Touren
-- ✅ KW-Export für Auslagen
+## 🔧 TECHNISCHE DETAILS:
+- **Frontend:** Next.js 15.3.2, TypeScript, Tailwind CSS
+- **Backend:** Supabase (Auth, Database, Storage, Edge Functions)
+- **Deployment:** Netlify (Static Site)
+- **PDF:** jsPDF + jspdf-autotable
+- **Security:** RLS Policies, Row Level Security
+
+## ✨ NÄCHSTE MÖGLICHE SCHRITTE:
+1. Weitere UI-Verbesserungen nach Kundenwunsch
+2. Erweiterte Reporting-Funktionen
+3. E-Mail-Benachrichtigungen für Status-Änderungen
+4. Export-Funktionen für Buchhaltung
+5. Mobile App (React Native)
+
+---
+
+**Stand:** Version 105
+**Status:** ✅ Produktionsbereit
+**Deployment:** https://transnext.de
