@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { TransNextLogo } from "@/components/ui/logo"
-import { LogOut, FileText, Search, Clock, CheckCircle, XCircle, TrendingUp, Euro, Download, CreditCard, Users, UserPlus, UserX, Eye, EyeOff, Edit, ArrowLeft } from "lucide-react"
+import { LogOut, FileText, Search, Clock, CheckCircle, XCircle, TrendingUp, Euro, Download, CreditCard, Users, UserPlus, UserX, Eye, EyeOff, Edit, ArrowLeft, Trash2 } from "lucide-react"
 import {
   getCurrentUser,
   getUserProfile,
@@ -26,7 +26,9 @@ import {
   getAdminStatistics,
   createFahrer,
   updateFahrerStatus,
-  updateFahrer
+  updateFahrer,
+  deleteTour,
+  billMultipleTours
 } from "@/lib/admin-api"
 import { exportTourenPDF, exportAuslagenPDF, getWeekNumber } from "@/lib/pdf-export"
 import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout } from "@/lib/salary-calculator"
@@ -92,6 +94,7 @@ export default function AdminDashboardPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showEditFahrer, setShowEditFahrer] = useState(false)
   const [editingFahrer, setEditingFahrer] = useState<Partial<Fahrer> | null>(null)
+  const [selectedTourIds, setSelectedTourIds] = useState<number[]>([])
   const [showBelegDialog, setShowBelegDialog] = useState(false)
   const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string; typ: "arbeitsnachweis" | "auslagennachweis"; belegUrl?: string } | null>(null)
   const [selectedFahrerId, setSelectedFahrerId] = useState<number | null>(null)
@@ -402,6 +405,55 @@ export default function AdminDashboardPage() {
     } catch (error) {
       console.error("Fehler beim Update:", error)
       alert("Fehler beim Aktualisieren des Status")
+    }
+  }
+
+  const handleDeleteTour = async (id: number) => {
+    if (!confirm("Möchten Sie diese Tour wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.")) {
+      return
+    }
+    try {
+      await deleteTour(id)
+      alert("Tour erfolgreich gelöscht")
+      await loadAllData()
+    } catch (error) {
+      console.error("Fehler beim Löschen:", error)
+      alert("Fehler beim Löschen der Tour")
+    }
+  }
+
+  const handleBillSelected = async () => {
+    if (selectedTourIds.length === 0) {
+      alert("Bitte wählen Sie mindestens eine Tour aus")
+      return
+    }
+    if (!confirm(`Möchten Sie ${selectedTourIds.length} Touren als abgerechnet markieren?`)) {
+      return
+    }
+    try {
+      await billMultipleTours(selectedTourIds)
+      alert(`${selectedTourIds.length} Touren wurden als abgerechnet markiert`)
+      setSelectedTourIds([])
+      await loadAllData()
+    } catch (error) {
+      console.error("Fehler beim Abrechnen:", error)
+      alert("Fehler beim Abrechnen der Touren")
+    }
+  }
+
+  const toggleTourSelection = (id: number) => {
+    if (selectedTourIds.includes(id)) {
+      setSelectedTourIds(selectedTourIds.filter(tourId => tourId !== id))
+    } else {
+      setSelectedTourIds([...selectedTourIds, id])
+    }
+  }
+
+  const toggleAllToursSelection = () => {
+    if (selectedTourIds.length === filteredTouren.length) {
+      setSelectedTourIds([])
+    } else {
+      setSelectedTourIds(filteredTouren.map(tour => tour.id))
     }
   }
 
@@ -822,10 +874,31 @@ export default function AdminDashboardPage() {
         {activeTab === "touren" && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl text-primary-blue">Touren-Verwaltung</CardTitle>
-              <CardDescription>
-                Alle Arbeitsnachweise der Fahrer
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-2xl text-primary-blue">Touren-Verwaltung</CardTitle>
+                  <CardDescription>
+                    Alle Arbeitsnachweise der Fahrer
+                  </CardDescription>
+                </div>
+                {selectedTourIds.length > 0 && (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleBillSelected}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      {selectedTourIds.length} abrechnen
+                    </Button>
+                    <Button
+                      onClick={() => setSelectedTourIds([])}
+                      variant="outline"
+                    >
+                      Auswahl aufheben
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {filteredTouren.length === 0 ? (
@@ -845,6 +918,14 @@ export default function AdminDashboardPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedTourIds.length === filteredTouren.length && filteredTouren.length > 0}
+                            onChange={toggleAllToursSelection}
+                            className="rounded border-gray-300 cursor-pointer"
+                          />
+                        </TableHead>
                         <TableHead>Tour-Nr.</TableHead>
                         <TableHead>Fahrer</TableHead>
                         <TableHead>Datum</TableHead>
@@ -859,6 +940,14 @@ export default function AdminDashboardPage() {
                     <TableBody>
                       {filteredTouren.map((tour) => (
                         <TableRow key={tour.id}>
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={selectedTourIds.includes(tour.id)}
+                              onChange={() => toggleTourSelection(tour.id)}
+                              className="rounded border-gray-300 cursor-pointer"
+                            />
+                          </TableCell>
                           <TableCell className="font-medium">{tour.tourNr}</TableCell>
                           <TableCell>{tour.fahrer}</TableCell>
                           <TableCell>{formatDate(tour.datum)}</TableCell>
@@ -895,6 +984,7 @@ export default function AdminDashboardPage() {
                                 onClick={() => updateTourStatus(tour.id, "approved")}
                                 className="text-green-700 border-green-300 hover:bg-green-50"
                                 disabled={tour.status === "approved" || tour.status === "billed"}
+                                title="Genehmigen"
                               >
                                 <CheckCircle className="h-3 w-3" />
                               </Button>
@@ -904,8 +994,18 @@ export default function AdminDashboardPage() {
                                 onClick={() => updateTourStatus(tour.id, "rejected")}
                                 className="text-red-700 border-red-300 hover:bg-red-50"
                                 disabled={tour.status === "rejected" || tour.status === "billed"}
+                                title="Ablehnen"
                               >
                                 <XCircle className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteTour(tour.id)}
+                                className="text-red-700 border-red-300 hover:bg-red-50"
+                                title="Löschen"
+                              >
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
                           </TableCell>
