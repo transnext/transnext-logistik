@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { TransNextLogo } from "@/components/ui/logo"
-import { LogOut, FileText, Search, Clock, CheckCircle, XCircle, TrendingUp, Euro, Download, CreditCard, Users, UserPlus, UserX, Eye, EyeOff, Edit, ArrowLeft, Trash2 } from "lucide-react"
+import { LogOut, FileText, Search, Clock, CheckCircle, XCircle, TrendingUp, Euro, Download, CreditCard, Users, UserPlus, UserX, Eye, EyeOff, Edit, ArrowLeft, Trash2, RefreshCw } from "lucide-react"
 import {
   getCurrentUser,
   getUserProfile,
@@ -30,7 +30,8 @@ import {
   deleteTour,
   billMultipleTours,
   deleteAuslage,
-  billMultipleAuslagen
+  billMultipleAuslagen,
+  markTourAsRuecklaufer
 } from "@/lib/admin-api"
 import { exportTourenPDF, exportAuslagenPDF, getWeekNumber } from "@/lib/pdf-export"
 import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout } from "@/lib/salary-calculator"
@@ -45,6 +46,7 @@ interface Tour {
   status: string
   erstelltAm: string
   belegUrl?: string
+  istRuecklaufer?: boolean
 }
 
 interface Auslage {
@@ -60,6 +62,7 @@ interface Auslage {
   status: string
   erstelltAm: string
   belegUrl?: string
+  istRuecklaufer?: boolean
 }
 
 interface Fahrer {
@@ -197,6 +200,7 @@ export default function AdminDashboardPage() {
         status: t.status,
         erstelltAm: t.created_at,
         belegUrl: t.beleg_url,
+        istRuecklaufer: t.ist_ruecklaufer,
       })))
 
       setAuslagen(auslagenData.map((a) => ({
@@ -1193,6 +1197,17 @@ export default function AdminDashboardPage() {
                                 <XCircle className="h-3 w-3" />
                               </Button>
                               <Button
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => toggleRuecklaufer(tour.id, tour.istRuecklaufer || false)}
+                                className={tour.istRuecklaufer 
+                                  ? "text-orange-700 border-orange-300 bg-orange-50 hover:bg-orange-100" 
+                                  : "text-gray-700 border-gray-300 hover:bg-gray-50"}
+                                title={tour.istRuecklaufer ? "Als normale Tour markieren" : "Als Rückläufer markieren"}
+                              >
+                                <RefreshCw className="h-3 w-3" />
+                              </Button>
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleDeleteTour(tour.id)}
