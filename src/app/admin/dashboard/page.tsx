@@ -46,6 +46,7 @@ interface Tour {
   status: string
   erstelltAm: string
   belegUrl?: string
+  istRuecklaufer?: boolean
 }
 
 interface Auslage {
@@ -196,6 +197,7 @@ export default function AdminDashboardPage() {
         status: t.status,
         erstelltAm: t.created_at,
         belegUrl: t.beleg_url,
+        istRuecklaufer: t.ist_ruecklaufer,
       })))
 
       setAuslagen(auslagenData.map((a) => ({
@@ -1011,6 +1013,15 @@ export default function AdminDashboardPage() {
                                 title="Ablehnen"
                               >
                                 <XCircle className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => toggleRuecklaufer(tour.id, tour.istRuecklaufer || false)}
+                                className={tour.istRuecklaufer ? "text-orange-700 bg-orange-100 border-orange-300" : "text-gray-700 border-gray-300 hover:bg-gray-50"}
+                                title={tour.istRuecklaufer ? "Als normale Tour markieren" : "Als Rückläufer markieren"}
+                              >
+                                <RefreshCw className="h-3 w-3" />
                               </Button>
                               <Button
                                 size="sm"

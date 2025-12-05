@@ -23,6 +23,7 @@ interface Tour {
   verdienst?: number
   status?: string
   belegUrl?: string
+  istRuecklaufer?: boolean
 }
 
 export default function MonatsabrechnungPage() {
@@ -105,7 +106,8 @@ export default function MonatsabrechnungPage() {
       // Berechne Verdienst für jede Tour mit offizieller KM-Range
       const tourenMitVerdienst = filtered.map((tour) => {
         const km = tour.gefahrene_km || 0
-        const verdienst = calculateTourVerdienst(km, tour.wartezeit)
+        // Rückläufer werden mit 0€ berechnet
+        const verdienst = tour.ist_ruecklaufer ? 0 : calculateTourVerdienst(km, tour.wartezeit)
 
         return {
           id: tour.id,
@@ -115,7 +117,8 @@ export default function MonatsabrechnungPage() {
           wartezeit: tour.wartezeit,
           status: tour.status,
           verdienst: verdienst,
-          belegUrl: tour.beleg_url
+          belegUrl: tour.beleg_url,
+          istRuecklaufer: tour.ist_ruecklaufer
         }
       })
 
@@ -146,7 +149,8 @@ export default function MonatsabrechnungPage() {
       // Berechne Gesamtverdienst des Vormonats
       const vormonatGesamt = vormonatTouren.reduce((sum, tour) => {
         const km = tour.gefahrene_km || 0
-        const verdienst = calculateTourVerdienst(km, tour.wartezeit)
+        // Rückläufer werden mit 0€ berechnet
+        const verdienst = tour.ist_ruecklaufer ? 0 : calculateTourVerdienst(km, tour.wartezeit)
         return sum + verdienst
       }, 0)
 
@@ -308,7 +312,14 @@ export default function MonatsabrechnungPage() {
                       <TableBody>
                         {touren.map((tour) => (
                           <TableRow key={tour.id}>
-                            <TableCell className="font-medium">{tour.tourNr}</TableCell>
+                            <TableCell className="font-medium">
+                              {tour.tourNr}
+                              {tour.istRuecklaufer && (
+                                <Badge variant="outline" className="ml-2 bg-orange-100 text-orange-700 border-orange-300">
+                                  Retour
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell>{formatDate(tour.datum)}</TableCell>
                             <TableCell className="text-right">{tour.gefahreneKm} km</TableCell>
                             <TableCell>{getWartezeitText(tour.wartezeit)}</TableCell>

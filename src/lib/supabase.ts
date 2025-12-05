@@ -43,6 +43,7 @@ export interface Arbeitsnachweis {
   wartezeit: '30-60' | '60-90' | '90-120' | 'keine'
   beleg_url?: string
   status: 'pending' | 'approved' | 'rejected' | 'billed'
+  ist_ruecklaufer?: boolean
   created_at: string
   updated_at: string
 }
