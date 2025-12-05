@@ -13,6 +13,7 @@ import { TransNextLogo } from "@/components/ui/logo"
 import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle, RefreshCw } from "lucide-react"
 import { getCurrentUser, getUserProfile, getArbeitsnachweiseByUser } from "@/lib/api"
 import { calculateTourVerdienst, calculateMonthlyPayout, MONTHLY_LIMIT } from "@/lib/salary-calculator"
+import { getMonatsueberschuss } from "@/lib/admin-api"
 
 interface Tour {
   id: number
@@ -139,6 +140,17 @@ export default function MonatsabrechnungPage() {
       const date = new Date(parseInt(year), parseInt(month) - 2, 1) // -2 weil Monat 0-basiert ist
       const vormonat = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
+      // Prüfe zuerst, ob ein manueller Überschuss eingetragen wurde
+      const manuellerUeberschuss = await getMonatsueberschuss(userId, vormonat)
+
+      if (manuellerUeberschuss) {
+        // Verwende den manuell eingetragenen Überschuss
+        console.log(`Manueller Überschuss gefunden für ${vormonat}:`, manuellerUeberschuss.ueberschuss)
+        setVormonatUeberschuss(manuellerUeberschuss.ueberschuss)
+        return
+      }
+
+      // Kein manueller Überschuss -> berechne aus Touren
       const arbeitsnachweise = await getArbeitsnachweiseByUser(userId)
 
       // Filter nach Vormonat

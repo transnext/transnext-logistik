@@ -63,3 +63,13 @@ export interface Auslagennachweis {
   created_at: string
   updated_at: string
 }
+
+export interface Monatsueberschuss {
+  id: number
+  user_id: string
+  monat: string // Format: "2024-11"
+  ueberschuss: number
+  notiz?: string
+  created_at: string
+  updated_at: string
+}

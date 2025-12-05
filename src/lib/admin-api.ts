@@ -349,3 +349,32 @@ export async function markTourAsRuecklaufer(tourId: number, isRuecklaufer: boole
   if (error) throw error
   return { success: true, data }
 }
+
+// MONATLICHER ÜBERSCHUSS MANAGEMENT
+export async function setMonatsueberschuss(userId: string, monat: string, ueberschuss: number, notiz?: string) {
+  const { data, error } = await supabase
+    .from('monatsueberschuss')
+    .upsert({
+      user_id: userId,
+      monat: monat,
+      ueberschuss: ueberschuss,
+      notiz: notiz
+    }, {
+      onConflict: 'user_id,monat'
+    })
+    .select()
+  if (error) throw error
+  return { success: true, data }
+}
+
+export async function getMonatsueberschuss(userId: string, monat: string) {
+  const { data, error } = await supabase
+    .from('monatsueberschuss')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('monat', monat)
+    .single()
+
+  if (error && error.code !== 'PGRST116') throw error // PGRST116 = nicht gefunden
+  return data || null
+}
