@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 
 /**
- * Upload einer PDF-Datei zu Supabase Storage
+ * Upload einer Beleg-Datei (PDF oder Foto) zu Supabase Storage
  */
 export async function uploadBeleg(
   file: File,
@@ -9,19 +9,25 @@ export async function uploadBeleg(
   type: 'arbeitsnachweis' | 'auslagennachweis',
   tourNr: string
 ): Promise<{ url: string; path: string }> {
-  // Validierung
-  if (!file.type.includes('pdf')) {
-    throw new Error('Nur PDF-Dateien sind erlaubt')
+  // Validierung - Akzeptiere PDFs und Bilder
+  const allowedTypes = ['pdf', 'jpeg', 'jpg', 'png', 'heic', 'heif']
+  const fileExtension = file.name.split('.').pop()?.toLowerCase() || ''
+  const isAllowedType = allowedTypes.some(type => 
+    file.type.includes(type) || fileExtension === type
+  )
+  
+  if (!isAllowedType) {
+    throw new Error('Nur PDF oder Foto-Dateien sind erlaubt (PDF, JPG, PNG, HEIC)')
   }
 
   if (file.size > 10 * 1024 * 1024) { // 10MB
     throw new Error('Datei zu groß (max. 10MB)')
   }
 
-  // Generiere eindeutigen Dateinamen
+  // Generiere eindeutigen Dateinamen mit korrekter Dateiendung
   const timestamp = Date.now()
   const sanitizedTourNr = tourNr.replace(/[^a-zA-Z0-9]/g, '_')
-  const fileName = `${sanitizedTourNr}_${timestamp}.pdf`
+  const fileName = `${sanitizedTourNr}_${timestamp}.${fileExtension}`
 
   // Pfad: userId/type/fileName
   const filePath = `${userId}/${type}/${fileName}`
