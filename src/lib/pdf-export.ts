@@ -1,3 +1,4 @@
+import { PDFDocument } from 'pdf-lib'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { calculateCustomerTotal, wartezeitToCode, getWartezeitText } from './customer-pricing'
@@ -219,22 +220,25 @@ export async function exportAuslagenPDF(
  */
 export async function exportAuslagenWithBelege(
   auslagen: AuslageForExport[]
+export async function exportAuslagenWithBelege(
+  auslagen: AuslageForExport[]
 ): Promise<void> {
-  const doc = new jsPDF()
+  // 1. Erstelle Deckblatt mit jsPDF
+  const deckblatt = new jsPDF()
 
   // Header / Deckblatt
-  doc.setFontSize(18)
-  doc.text('TransNext Logistik', 14, 15)
-  doc.setFontSize(12)
-  doc.text(`Nicholas Mandzel & Burak Aydin GbR`, 14, 22)
-  doc.setFontSize(10)
-  doc.text(`Datum: ${new Date().toLocaleDateString('de-DE')}`, 150, 15)
+  deckblatt.setFontSize(18)
+  deckblatt.text('TransNext Logistik', 14, 15)
+  deckblatt.setFontSize(12)
+  deckblatt.text(`Nicholas Mandzel & Burak Aydin GbR`, 14, 22)
+  deckblatt.setFontSize(10)
+  deckblatt.text(`Datum: ${new Date().toLocaleDateString('de-DE')}`, 150, 15)
 
   // Titel
-  doc.setFontSize(16)
-  doc.text(`Auslagenabrechnung`, 14, 35)
-  doc.setFontSize(10)
-  doc.text(`${auslagen.length} Auslagen`, 14, 42)
+  deckblatt.setFontSize(16)
+  deckblatt.text(`Auslagenabrechnung`, 14, 35)
+  deckblatt.setFontSize(10)
+  deckblatt.text(`${auslagen.length} Auslagen`, 14, 42)
 
   // Tabellen-Daten vorbereiten
   const tableData = auslagen.map((auslage) => {
@@ -253,7 +257,7 @@ export async function exportAuslagenWithBelege(
   const gesamt = auslagen.reduce((sum, auslage) => sum + auslage.kosten, 0)
 
   // Tabelle erstellen
-  autoTable(doc, {
+  autoTable(deckblatt, {
     head: [['Tour/ Kennzeichen', 'Datum', 'von', 'nach', 'Bemerkung', '', 'Betrag']],
     body: tableData,
     startY: 50,
@@ -279,86 +283,132 @@ export async function exportAuslagenWithBelege(
   })
 
   // Gesamtsumme
-  const finalY = (doc as any).lastAutoTable.finalY || 50
-  doc.setFontSize(12)
-  doc.setFont('helvetica', 'bold')
-  doc.text(`Summe:`, 150, finalY + 10)
-  doc.text(`€`, 175, finalY + 10)
-  doc.text(`${gesamt.toFixed(2)}`, 190, finalY + 10, { align: 'right' })
+  const finalY = (deckblatt as any).lastAutoTable.finalY || 50
+  deckblatt.setFontSize(12)
+  deckblatt.setFont('helvetica', 'bold')
+  deckblatt.text(`Summe:`, 150, finalY + 10)
+  deckblatt.text(`€`, 175, finalY + 10)
+  deckblatt.text(`${gesamt.toFixed(2)}`, 190, finalY + 10, { align: 'right' })
 
-  // Belege anhängen
+  // 2. Konvertiere Deckblatt zu PDF-Bytes
+  const deckblattPdfBytes = deckblatt.output('arraybuffer')
+  const finalPdf = await PDFDocument.load(deckblattPdfBytes)
+
+  console.log(`Füge ${auslagen.length} Belege hinzu...`)
+
+  // 3. Füge jeden Original-Beleg (JPG/PNG) als PDF-Seite hinzu
   for (let i = 0; i < auslagen.length; i++) {
     const auslage = auslagen[i]
     if (auslage.beleg_url) {
       try {
-        // Neue Seite für Beleg
-        doc.addPage()
-
-        // Beleg-Header
-        doc.setFontSize(12)
-        doc.setFont('helvetica', 'bold')
-        doc.text(`Beleg ${i + 1}: ${auslage.tour_nr}/${auslage.kennzeichen}`, 14, 15)
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(10)
-        doc.text(`Datum: ${new Date(auslage.datum).toLocaleDateString('de-DE')}`, 14, 22)
-        doc.text(`Betrag: ${auslage.kosten.toFixed(2)} €`, 14, 29)
-        doc.text(`Bemerkung: ${auslage.belegart}`, 14, 36)
-
-        // Beleg laden und als Bild einfügen
-        const img = await loadImage(auslage.beleg_url)
-        if (img) {
-          const imgWidth = 180
-          const imgHeight = (img.height * imgWidth) / img.width
-          const maxHeight = 240
-
-          if (imgHeight > maxHeight) {
-            const scaledWidth = (img.width * maxHeight) / img.height
-            doc.addImage(img.src, 'JPEG', 15, 45, scaledWidth, maxHeight)
-          } else {
-            doc.addImage(img.src, 'JPEG', 15, 45, imgWidth, imgHeight)
-          }
+        console.log(`Lade Beleg ${i + 1}/${auslagen.length}:`, auslage.beleg_url)
+        
+        // Lade Bild-Datei (JPG/PNG vom Fahrer hochgeladen)
+        const response = await fetch(auslage.beleg_url)
+        if (!response.ok) throw new Error('Beleg konnte nicht geladen werden')
+        
+        const imageBytes = await response.arrayBuffer()
+        
+        // Erkenne Bildformat
+        const imageType = auslage.beleg_url.toLowerCase().includes('.png') ? 'png' : 'jpg'
+        
+        // Embed Image in neuem PDF
+        let image
+        if (imageType === 'png') {
+          image = await finalPdf.embedPng(imageBytes)
+        } else {
+          image = await finalPdf.embedJpg(imageBytes)
         }
+        
+        // Hole Bild-Dimensionen
+        const imgWidth = image.width
+        const imgHeight = image.height
+        
+        // A4-Größe in Punkten (595 x 842)
+        const pageWidth = 595
+        const pageHeight = 842
+        
+        // Skaliere Bild, um auf A4-Seite zu passen (mit Rand)
+        const margin = 40
+        const maxWidth = pageWidth - (2 * margin)
+        const maxHeight = pageHeight - (2 * margin)
+        
+        let scale = 1
+        if (imgWidth > maxWidth || imgHeight > maxHeight) {
+          const scaleWidth = maxWidth / imgWidth
+          const scaleHeight = maxHeight / imgHeight
+          scale = Math.min(scaleWidth, scaleHeight)
+        }
+        
+        const scaledWidth = imgWidth * scale
+        const scaledHeight = imgHeight * scale
+        
+        // Erstelle neue Seite (A4)
+        const page = finalPdf.addPage([pageWidth, pageHeight])
+        
+        // Zentriere Bild auf Seite
+        const x = (pageWidth - scaledWidth) / 2
+        const y = (pageHeight - scaledHeight) / 2
+        
+        // Zeichne Bild auf Seite
+        page.drawImage(image, {
+          x: x,
+          y: y,
+          width: scaledWidth,
+          height: scaledHeight
+        })
+        
+        console.log(`✓ Beleg ${i + 1} hinzugefügt (${Math.round(scaledWidth)}x${Math.round(scaledHeight)})`)
       } catch (error) {
         console.error(`Fehler beim Laden des Belegs ${i + 1}:`, error)
-        // Fehlermeldung auf der Seite anzeigen
-        doc.setFontSize(10)
-        doc.text(`Beleg konnte nicht geladen werden.`, 14, 50)
+        
+        // Füge Fehlerseite hinzu
+        const errorPage = finalPdf.addPage()
+        errorPage.drawText(`Beleg ${i + 1} konnte nicht geladen werden.`, {
+          x: 50,
+          y: errorPage.getHeight() - 50,
+          size: 12
+        })
+        errorPage.drawText(`${auslage.tour_nr}/${auslage.kennzeichen}`, {
+          x: 50,
+          y: errorPage.getHeight() - 70,
+          size: 10
+        })
+        errorPage.drawText(`Fehler: ${(error as Error).message}`, {
+          x: 50,
+          y: errorPage.getHeight() - 90,
+          size: 9
+        })
       }
+    } else {
+      console.log(`Beleg ${i + 1}: Kein Beleg hochgeladen`)
+      // Füge Info-Seite hinzu wenn kein Beleg vorhanden
+      const infoPage = finalPdf.addPage()
+      infoPage.drawText(`Beleg ${i + 1}: Kein Beleg hochgeladen`, {
+        x: 50,
+        y: infoPage.getHeight() - 50,
+        size: 12
+      })
+      infoPage.drawText(`${auslage.tour_nr}/${auslage.kennzeichen}`, {
+        x: 50,
+        y: infoPage.getHeight() - 70,
+        size: 10
+      })
     }
   }
 
-  // Download
+  // 4. Speichere finales PDF
+  const pdfBytes = await finalPdf.save()
+  const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+  const url = URL.createObjectURL(blob)
+  
+  const link = document.createElement('a')
+  link.href = url
   const datum = new Date().toLocaleDateString('de-DE').replace(/\./g, '-')
-  doc.save(`Auslagenabrechnung_${datum}.pdf`)
-}
-
-/**
- * Hilfsfunktion zum Laden von Bildern
- */
-function loadImage(url: string): Promise<{ src: string; width: number; height: number } | null> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-
-    img.onload = () => {
-      resolve({ src: img.src, width: img.width, height: img.height })
-    }
-
-    img.onerror = () => {
-      resolve(null)
-    }
-
-    img.src = url
-  })
-}
-
-/**
- * Hilfsfunktion: Berechnet KW-Nummer aus Datum
- */
-export function getWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+  link.download = `Auslagenabrechnung_${datum}.pdf`
+  link.click()
+  
+  URL.revokeObjectURL(url)
+  
+  console.log(`✓ PDF erfolgreich erstellt mit ${auslagen.length} Auslagen und Belegen`)
 }
