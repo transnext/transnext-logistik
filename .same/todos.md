@@ -116,6 +116,6 @@ Gesamtverdienst: ohne Retoure-Touren
 - [ ] Export-Funktion für Monatsabrechnungen als PDF
 - [ ] Historische Übersichts-Dashboard für Fahrer
 
-**Stand:** Version 116 ✅
+**Stand:** Version 117 ✅
 **GitHub:** https://github.com/transnext/transnext-logistik
 **Live:** https://transnext.de
