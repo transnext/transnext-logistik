@@ -397,20 +397,30 @@ export default function MonatsabrechnungPage() {
                               <Euro className="h-6 w-6 text-green-700" />
                             </div>
                             <div>
-                              <p className="text-sm text-gray-600">Gesamtverdienst</p>
-                              <p className="text-3xl font-bold text-green-700">
+                              <p className="text-sm text-gray-600">Gesamtverdienst aktueller Monat</p>
+                              <p className="text-2xl font-bold text-green-700">
                                 {formatCurrency(gesamtVerdienst)}
                               </p>
-                              {gesamtVerdienst > MONTHLY_LIMIT && (
-                                <div className="mt-2 text-sm">
-                                  <p className="text-gray-600">
-                                    Auszahlung: <span className="font-semibold text-green-700">{formatCurrency(MONTHLY_LIMIT)}</span>
-                                  </p>
-                                  <p className="text-orange-600">
-                                    Überschuss: <span className="font-semibold">{formatCurrency(gesamtVerdienst - MONTHLY_LIMIT)}</span>
-                                  </p>
-                                </div>
-                              )}
+                              {(() => {
+                                const { ausgeZahlt, ueberschuss } = calculateMonthlyPayout(gesamtVerdienst, vormonatUeberschuss)
+                                return (
+                                  <div className="mt-2 text-sm space-y-1">
+                                    {vormonatUeberschuss > 0 && (
+                                      <p className="text-gray-600">
+                                        + Vormonat: <span className="font-semibold text-amber-700">{formatCurrency(vormonatUeberschuss)}</span>
+                                      </p>
+                                    )}
+                                    <p className="text-blue-600 font-semibold border-t pt-1">
+                                      Auszahlung: <span className="text-lg">{formatCurrency(ausgeZahlt)}</span>
+                                    </p>
+                                    {ueberschuss > 0 && (
+                                      <p className="text-orange-600">
+                                        Überschuss für nächsten Monat: <span className="font-semibold">{formatCurrency(ueberschuss)}</span>
+                                      </p>
+                                    )}
+                                  </div>
+                                )
+                              })()}
                             </div>
                           </div>
                           <div className="text-right text-sm text-gray-600">

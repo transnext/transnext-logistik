@@ -1890,7 +1890,7 @@ export default function AdminDashboardPage() {
                       return sum + verdienst
                     }, 0)
 
-                  const { ausgeZahlt, ueberschuss } = calculateMonthlyPayout(gesamtverdienst)
+                  const { ausgeZahlt, ueberschuss } = calculateMonthlyPayout(gesamtverdienst, fahrerVormonatUeberschuss)
 
                   const auslagenSumme = fahrerAuslagen
                     .filter(a => a.status === 'approved' || a.status === 'paid')

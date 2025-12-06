@@ -76,22 +76,29 @@ export function calculateTourVerdienst(km: number, wartezeit?: string): number {
 
 /**
  * Berechnet den Monatsverdienst mit 556€ Cap
+ * Berücksichtigt auch den Überschuss aus dem Vormonat
  * Gibt zurück: { ausgeZahlt: number, ueberschuss: number }
  */
-export function calculateMonthlyPayout(totalVerdienst: number): {
+export function calculateMonthlyPayout(
+  totalVerdienst: number,
+  vormonatUeberschuss: number = 0
+): {
   ausgeZahlt: number
   ueberschuss: number
 } {
-  if (totalVerdienst <= MONTHLY_LIMIT) {
+  // Gesamt verfügbar = aktueller Verdienst + Überschuss Vormonat
+  const gesamtVerfuegbar = totalVerdienst + vormonatUeberschuss
+
+  if (gesamtVerfuegbar <= MONTHLY_LIMIT) {
     return {
-      ausgeZahlt: totalVerdienst,
+      ausgeZahlt: gesamtVerfuegbar,
       ueberschuss: 0
     }
   }
 
   return {
     ausgeZahlt: MONTHLY_LIMIT,
-    ueberschuss: totalVerdienst - MONTHLY_LIMIT
+    ueberschuss: gesamtVerfuegbar - MONTHLY_LIMIT
   }
 }
 
