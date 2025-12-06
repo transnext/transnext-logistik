@@ -591,11 +591,11 @@ export default function AdminDashboardPage() {
       setSelectedAuslagenIds([])
       await loadAllData()
     } catch (error) {
-      console.error("Fehler beim Abrechnen:", error)
-      alert("Fehler beim Abrechnen der Auslagen")
+      console.error("❌ Fehler beim Abrechnen:", error)
+      console.error("Error-Details:", (error as Error).message, (error as Error).stack)
+      alert(`Fehler beim Abrechnen:\n\n${(error as Error).message}`)
     }
   }
-
   const toggleAuslagenSelection = (id: number) => {
     if (selectedAuslagenIds.includes(id)) {
       setSelectedAuslagenIds(selectedAuslagenIds.filter(auslagenId => auslagenId !== id))

@@ -299,15 +299,29 @@ export async function exportAuslagenWithBelege(
   // 3. Füge jeden Original-Beleg (JPG/PNG) als PDF-Seite hinzu
   for (let i = 0; i < auslagen.length; i++) {
     const auslage = auslagen[i]
+    console.log(`Verarbeite Auslage ${i + 1}:`, { 
+      tour_nr: auslage.tour_nr, 
+      beleg_url: auslage.beleg_url,
+      has_url: !!auslage.beleg_url 
+    })
+    
     if (auslage.beleg_url) {
       try {
         console.log(`Lade Beleg ${i + 1}/${auslagen.length}:`, auslage.beleg_url)
         
-        // Lade Bild-Datei (JPG/PNG vom Fahrer hochgeladen)
-        const response = await fetch(auslage.beleg_url)
-        if (!response.ok) throw new Error('Beleg konnte nicht geladen werden')
+        // Lade Bild mit CORS-Modus
+        const response = await fetch(auslage.beleg_url, {
+          mode: 'cors',
+          credentials: 'omit'
+        })
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
         
         const imageBytes = await response.arrayBuffer()
+        console.log(`Bild geladen: ${imageBytes.byteLength} bytes`)
+        
         
         // Erkenne Bildformat
         const imageType = auslage.beleg_url.toLowerCase().includes('.png') ? 'png' : 'jpg'
