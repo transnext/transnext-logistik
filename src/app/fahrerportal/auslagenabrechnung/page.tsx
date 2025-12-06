@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { TransNextLogo } from "@/components/ui/logo"
-import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle } from "lucide-react"
+import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle, CreditCard } from "lucide-react"
 import { getCurrentUser, getUserProfile, getAuslagennachweiseByUser } from "@/lib/api"
 
 interface Auslage {
@@ -162,7 +162,17 @@ export default function AuslagenabrechnungPage() {
 
   const getStatusBadge = (status?: string) => {
     const currentStatus = status || "pending"
-
+    
+    // Für Fahrer: "billed" und "paid" beide als "Überwiesen" anzeigen
+    if (currentStatus === "paid" || currentStatus === "billed") {
+      return (
+        <Badge className="bg-purple-100 text-purple-800 border-purple-200 flex items-center gap-1 w-fit">
+          <CreditCard className="h-3 w-3" />
+          Überwiesen
+        </Badge>
+      )
+    }
+    
     if (currentStatus === "approved") {
       return (
         <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center gap-1 w-fit">
@@ -171,7 +181,7 @@ export default function AuslagenabrechnungPage() {
         </Badge>
       )
     }
-
+    
     if (currentStatus === "rejected") {
       return (
         <Badge className="bg-red-100 text-red-800 border-red-200 flex items-center gap-1 w-fit">
@@ -180,7 +190,7 @@ export default function AuslagenabrechnungPage() {
         </Badge>
       )
     }
-
+    
     return (
       <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 flex items-center gap-1 w-fit">
         <Clock className="h-3 w-3" />

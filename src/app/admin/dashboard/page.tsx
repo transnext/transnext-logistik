@@ -34,7 +34,7 @@ import {
   markTourAsRuecklaufer,
   getMonatsueberschuss
 } from "@/lib/admin-api"
-import { exportTourenPDF, exportAuslagenPDF, getWeekNumber } from "@/lib/pdf-export"
+import { exportTourenPDF, exportAuslagenPDF, exportAuslagenWithBelege, getWeekNumber } from "@/lib/pdf-export"
 import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout } from "@/lib/salary-calculator"
 
 interface Tour {
@@ -101,6 +101,7 @@ export default function AdminDashboardPage() {
   const [showEditFahrer, setShowEditFahrer] = useState(false)
   const [editingFahrer, setEditingFahrer] = useState<Partial<Fahrer> | null>(null)
   const [selectedTourIds, setSelectedTourIds] = useState<number[]>([])
+  const [selectedAuslagenIds, setSelectedAuslagenIds] = useState<number[]>([])
   const [showBelegDialog, setShowBelegDialog] = useState(false)
   const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string; typ: "arbeitsnachweis" | "auslagennachweis"; belegUrl?: string } | null>(null)
   const [selectedFahrerId, setSelectedFahrerId] = useState<number | null>(null)
@@ -531,6 +532,83 @@ export default function AdminDashboardPage() {
       setSelectedTourIds([])
     } else {
       setSelectedTourIds(filteredTouren.map(tour => tour.id))
+    }
+  }
+
+
+  // AUSLAGEN BULK OPERATIONS
+  const handleDeleteSelectedAuslagen = async () => {
+    if (selectedAuslagenIds.length === 0) {
+      alert("Bitte wählen Sie mindestens eine Auslage aus")
+      return
+    }
+    if (!confirm(`Möchten Sie ${selectedAuslagenIds.length} Auslagen wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) {
+      return
+    }
+    try {
+      for (const id of selectedAuslagenIds) {
+        await deleteAuslage(id)
+      }
+      alert(`${selectedAuslagenIds.length} Auslagen wurden gelöscht`)
+      setSelectedAuslagenIds([])
+      await loadAllData()
+    } catch (error) {
+      console.error("Fehler beim Löschen:", error)
+      alert("Fehler beim Löschen der Auslagen")
+    }
+  }
+
+  const handleBillSelectedAuslagen = async () => {
+    if (selectedAuslagenIds.length === 0) {
+      alert("Bitte wählen Sie mindestens eine Auslage aus")
+      return
+    }
+    if (!confirm(`Möchten Sie ${selectedAuslagenIds.length} Auslagen als abgerechnet markieren und PDF exportieren?`)) {
+      return
+    }
+    try {
+      // Hole die ausgewählten Auslagen
+      const selectedAuslagen = auslagen.filter(a => selectedAuslagenIds.includes(a.id))
+
+      // Konvertiere zu Format für PDF-Export
+      const auslagenForExport = selectedAuslagen.map(a => ({
+        tour_nr: a.tourNr,
+        kennzeichen: a.kennzeichen,
+        datum: a.datum,
+        startort: a.startort,
+        zielort: a.zielort,
+        belegart: a.belegart,
+        kosten: parseFloat(a.kosten),
+        beleg_url: a.belegUrl
+      }))
+
+      // Erstelle PDF mit Belegen
+      await exportAuslagenWithBelege(auslagenForExport)
+
+      // Markiere als "billed"
+      await billMultipleAuslagen(selectedAuslagenIds)
+      alert(`${selectedAuslagenIds.length} Auslagen wurden als abgerechnet markiert und PDF exportiert`)
+      setSelectedAuslagenIds([])
+      await loadAllData()
+    } catch (error) {
+      console.error("Fehler beim Abrechnen:", error)
+      alert("Fehler beim Abrechnen der Auslagen")
+    }
+  }
+
+  const toggleAuslagenSelection = (id: number) => {
+    if (selectedAuslagenIds.includes(id)) {
+      setSelectedAuslagenIds(selectedAuslagenIds.filter(auslagenId => auslagenId !== id))
+    } else {
+      setSelectedAuslagenIds([...selectedAuslagenIds, id])
+    }
+  }
+
+  const toggleAllAuslagenSelection = () => {
+    if (selectedAuslagenIds.length === filteredAuslagen.length) {
+      setSelectedAuslagenIds([])
+    } else {
+      setSelectedAuslagenIds(filteredAuslagen.map(auslage => auslage.id))
     }
   }
 
@@ -1153,10 +1231,39 @@ export default function AdminDashboardPage() {
         {activeTab === "auslagen" && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl text-primary-blue">Auslagen-Verwaltung</CardTitle>
-              <CardDescription>
-                Alle Auslagennachweise der Fahrer
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-2xl text-primary-blue">Auslagen-Verwaltung</CardTitle>
+                  <CardDescription>
+                    Alle Auslagennachweise der Fahrer
+                  </CardDescription>
+                </div>
+                {selectedAuslagenIds.length > 0 && (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleBillSelectedAuslagen}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      {selectedAuslagenIds.length} abrechnen & PDF
+                    </Button>
+                    <Button
+                      onClick={handleDeleteSelectedAuslagen}
+                      variant="outline"
+                      className="text-red-600 border-red-300 hover:bg-red-50"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Löschen
+                    </Button>
+                    <Button
+                      onClick={() => setSelectedAuslagenIds([])}
+                      variant="outline"
+                    >
+                      Auswahl aufheben
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {filteredAuslagen.length === 0 ? (
@@ -1176,6 +1283,14 @@ export default function AdminDashboardPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedAuslagenIds.length === filteredAuslagen.length && filteredAuslagen.length > 0}
+                            onChange={toggleAllAuslagenSelection}
+                            className="rounded border-gray-300 cursor-pointer"
+                          />
+                        </TableHead>
                         <TableHead>Tour-Nr.</TableHead>
                         <TableHead>Fahrer</TableHead>
                         <TableHead>Datum</TableHead>
@@ -1192,6 +1307,14 @@ export default function AdminDashboardPage() {
                     <TableBody>
                       {filteredAuslagen.map((auslage) => (
                         <TableRow key={auslage.id}>
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={selectedAuslagenIds.includes(auslage.id)}
+                              onChange={() => toggleAuslagenSelection(auslage.id)}
+                              className="rounded border-gray-300 cursor-pointer"
+                            />
+                          </TableCell>
                           <TableCell className="font-medium">{auslage.tourNr}</TableCell>
                           <TableCell>{auslage.fahrer}</TableCell>
                           <TableCell>{formatDate(auslage.datum)}</TableCell>

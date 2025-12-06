@@ -215,6 +215,124 @@ export async function exportAuslagenPDF(
 }
 
 /**
+ * Exportiert ausgewählte Auslagen als PDF mit Belegen (ohne KW-Zuordnung)
+ */
+export async function exportAuslagenWithBelege(
+  auslagen: AuslageForExport[]
+): Promise<void> {
+  const doc = new jsPDF()
+
+  // Header / Deckblatt
+  doc.setFontSize(18)
+  doc.text('TransNext Logistik', 14, 15)
+  doc.setFontSize(12)
+  doc.text(`Nicholas Mandzel & Burak Aydin GbR`, 14, 22)
+  doc.setFontSize(10)
+  doc.text(`Datum: ${new Date().toLocaleDateString('de-DE')}`, 150, 15)
+
+  // Titel
+  doc.setFontSize(16)
+  doc.text(`Auslagenabrechnung`, 14, 35)
+  doc.setFontSize(10)
+  doc.text(`${auslagen.length} Auslagen`, 14, 42)
+
+  // Tabellen-Daten vorbereiten
+  const tableData = auslagen.map((auslage) => {
+    return [
+      `${auslage.tour_nr}/${auslage.kennzeichen}`,
+      new Date(auslage.datum).toLocaleDateString('de-DE'),
+      auslage.startort || '-',
+      auslage.zielort || '-',
+      auslage.belegart,
+      `€`,
+      `${auslage.kosten.toFixed(2)}`
+    ]
+  })
+
+  // Gesamtsumme berechnen
+  const gesamt = auslagen.reduce((sum, auslage) => sum + auslage.kosten, 0)
+
+  // Tabelle erstellen
+  autoTable(doc, {
+    head: [['Tour/ Kennzeichen', 'Datum', 'von', 'nach', 'Bemerkung', '', 'Betrag']],
+    body: tableData,
+    startY: 50,
+    theme: 'grid',
+    headStyles: {
+      fillColor: [1, 90, 164], // TransNext Blau
+      textColor: 255,
+      fontStyle: 'bold'
+    },
+    styles: {
+      fontSize: 9,
+      cellPadding: 2
+    },
+    columnStyles: {
+      0: { cellWidth: 35 },
+      1: { cellWidth: 25 },
+      2: { cellWidth: 25 },
+      3: { cellWidth: 25 },
+      4: { cellWidth: 40 },
+      5: { cellWidth: 10, halign: 'center' },
+      6: { cellWidth: 25, halign: 'right' }
+    }
+  })
+
+  // Gesamtsumme
+  const finalY = (doc as any).lastAutoTable.finalY || 50
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'bold')
+  doc.text(`Summe:`, 150, finalY + 10)
+  doc.text(`€`, 175, finalY + 10)
+  doc.text(`${gesamt.toFixed(2)}`, 190, finalY + 10, { align: 'right' })
+
+  // Belege anhängen
+  for (let i = 0; i < auslagen.length; i++) {
+    const auslage = auslagen[i]
+    if (auslage.beleg_url) {
+      try {
+        // Neue Seite für Beleg
+        doc.addPage()
+
+        // Beleg-Header
+        doc.setFontSize(12)
+        doc.setFont('helvetica', 'bold')
+        doc.text(`Beleg ${i + 1}: ${auslage.tour_nr}/${auslage.kennzeichen}`, 14, 15)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(10)
+        doc.text(`Datum: ${new Date(auslage.datum).toLocaleDateString('de-DE')}`, 14, 22)
+        doc.text(`Betrag: ${auslage.kosten.toFixed(2)} €`, 14, 29)
+        doc.text(`Bemerkung: ${auslage.belegart}`, 14, 36)
+
+        // Beleg laden und als Bild einfügen
+        const img = await loadImage(auslage.beleg_url)
+        if (img) {
+          const imgWidth = 180
+          const imgHeight = (img.height * imgWidth) / img.width
+          const maxHeight = 240
+
+          if (imgHeight > maxHeight) {
+            const scaledWidth = (img.width * maxHeight) / img.height
+            doc.addImage(img.src, 'JPEG', 15, 45, scaledWidth, maxHeight)
+          } else {
+            doc.addImage(img.src, 'JPEG', 15, 45, imgWidth, imgHeight)
+          }
+        }
+      } catch (error) {
+        console.error(`Fehler beim Laden des Belegs ${i + 1}:`, error)
+        // Fehlermeldung auf der Seite anzeigen
+        doc.setFontSize(10)
+        doc.text(`Beleg konnte nicht geladen werden.`, 14, 50)
+      }
+    }
+  }
+
+  // Download
+  const datum = new Date().toLocaleDateString('de-DE').replace(/\./g, '-')
+  doc.save(`Auslagenabrechnung_${datum}.pdf`)
+}
+
+/**
  * Hilfsfunktion zum Laden von Bildern
  */
 function loadImage(url: string): Promise<{ src: string; width: number; height: number } | null> {

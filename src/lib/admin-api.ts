@@ -332,7 +332,7 @@ export async function deleteAuslage(auslagenId: number) {
 export async function billMultipleAuslagen(auslagenIds: number[]) {
   const { data, error } = await supabase
     .from('auslagennachweise')
-    .update({ status: 'paid' })
+    .update({ status: 'billed' })
     .in('id', auslagenIds)
     .select()
   if (error) throw error

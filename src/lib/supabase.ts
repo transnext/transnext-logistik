@@ -59,7 +59,7 @@ export interface Auslagennachweis {
   belegart: 'tankbeleg' | 'waschbeleg' | 'bahnticket' | 'bc50' | 'taxi' | 'uber'
   kosten: number
   beleg_url?: string
-  status: 'pending' | 'approved' | 'rejected' | 'paid'
+  status: 'pending' | 'approved' | 'rejected' | 'paid' | 'billed'
   created_at: string
   updated_at: string
 }
