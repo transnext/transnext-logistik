@@ -34,7 +34,7 @@ import {
   markTourAsRuecklaufer,
   getMonatsueberschuss
 } from "@/lib/admin-api"
-import { exportTourenPDF, exportAuslagenPDF, exportAuslagenWithBelege, getWeekNumber } from "@/lib/pdf-export"
+import { exportTourenPDF, exportAuslagenPDF, exportAuslagenWithBelege } from "@/lib/pdf-export"
 import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout } from "@/lib/salary-calculator"
 
 interface Tour {
@@ -95,7 +95,6 @@ export default function AdminDashboardPage() {
   const [fahrer, setFahrer] = useState<Fahrer[]>([])
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedKW, setSelectedKW] = useState<string>("")
   const [showAddFahrer, setShowAddFahrer] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showEditFahrer, setShowEditFahrer] = useState(false)
@@ -505,12 +504,44 @@ export default function AdminDashboardPage() {
       alert("Bitte wählen Sie mindestens eine Tour aus")
       return
     }
-    if (!confirm(`Möchten Sie ${selectedTourIds.length} Touren als abgerechnet markieren?`)) {
+    if (!confirm(`Möchten Sie ${selectedTourIds.length} Touren als abgerechnet markieren und PDF exportieren?`)) {
       return
     }
     try {
+      // Hole die ausgewählten Touren
+      const selectedTouren = touren.filter(t => selectedTourIds.includes(t.id))
+      
+      // Gruppiere nach KW
+      const tourenByKW = new Map<string, typeof selectedTouren>()
+      selectedTouren.forEach(tour => {
+        const kw = getKWFromDate(tour.datum)
+        if (!tourenByKW.has(kw)) {
+          tourenByKW.set(kw, [])
+        }
+        tourenByKW.get(kw)!.push(tour)
+      })
+      
+      // Erstelle PDFs für jede KW
+      tourenByKW.forEach((kwTouren, kw) => {
+        const [year, kwPart] = kw.split('-KW')
+        const kwNumber = parseInt(kwPart)
+        
+        // Konvertiere zu Format für PDF-Export
+        const tourenForExport = kwTouren.map(tour => ({
+          tour_nr: tour.tourNr,
+          datum: tour.datum,
+          gefahrene_km: parseFloat(tour.gefahreneKm),
+          wartezeit: tour.wartezeit,
+          fahrer_name: tour.fahrer
+        }))
+        
+        // PDF exportieren
+        exportTourenPDF(tourenForExport, kwNumber.toString(), parseInt(year))
+      })
+      
+      // Markiere als abgerechnet
       await billMultipleTours(selectedTourIds)
-      alert(`${selectedTourIds.length} Touren wurden als abgerechnet markiert`)
+      alert(`${selectedTourIds.length} Touren wurden als PDF exportiert und als abgerechnet markiert`)
       setSelectedTourIds([])
       await loadAllData()
     } catch (error) {
@@ -698,107 +729,6 @@ export default function AdminDashboardPage() {
     const year = date.getFullYear()
     const kw = getWeekNumber(date)
     return `${year}-KW${kw.toString().padStart(2, '0')}`
-  }
-
-  // Verfügbare KWs aus Touren generieren
-  const getAvailableKWs = () => {
-    const kws = new Set<string>()
-    touren.forEach(tour => {
-      kws.add(getKWFromDate(tour.datum))
-    })
-    return Array.from(kws).sort().reverse()
-  }
-
-  // KW-Export-Funktion
-  const exportKW = async () => {
-    if (!selectedKW) {
-      alert("Bitte wählen Sie eine Kalenderwoche aus")
-      return
-    }
-
-    const kwTouren = touren.filter(tour =>
-      getKWFromDate(tour.datum) === selectedKW && tour.status === "approved"
-    )
-
-    if (kwTouren.length === 0) {
-      alert("Keine genehmigten Touren für diese KW gefunden")
-      return
-    }
-
-    // Parse KW (Format: "2025-KW48")
-    const [year, kwPart] = selectedKW.split('-KW')
-    const kw = parseInt(kwPart)
-
-    // Konvertiere zu Format für PDF-Export
-    const tourenForExport = kwTouren.map(tour => ({
-      tour_nr: tour.tourNr,
-      datum: tour.datum,
-      gefahrene_km: parseFloat(tour.gefahreneKm),
-      wartezeit: tour.wartezeit,
-      fahrer_name: tour.fahrer
-    }))
-
-    // PDF exportieren
-    exportTourenPDF(tourenForExport, kw.toString(), parseInt(year))
-
-    // Touren als "abgerechnet" markieren
-    try {
-      for (const tour of kwTouren) {
-        await updateTourStatus(tour.id, "billed")
-      }
-      await loadAllData() // Reload
-      alert(`${kwTouren.length} Touren wurden als PDF exportiert und als abgerechnet markiert`)
-    } catch (error) {
-      console.error("Fehler beim Markieren der Touren:", error)
-      alert("PDF wurde erstellt, aber Fehler beim Markieren der Touren")
-    }
-  }
-
-  const exportAuslagenKW = async () => {
-    if (!selectedKW) {
-      alert("Bitte wählen Sie eine Kalenderwoche aus")
-      return
-    }
-
-    const kwAuslagen = auslagen.filter(auslage =>
-      getKWFromDate(auslage.datum) === selectedKW && auslage.status === "approved"
-    )
-
-    if (kwAuslagen.length === 0) {
-      alert("Keine genehmigten Auslagen für diese KW gefunden")
-      return
-    }
-
-    // Parse KW (Format: "2025-KW48")
-    const [year, kwPart] = selectedKW.split('-KW')
-    const kw = parseInt(kwPart)
-
-    // Konvertiere zu Format für PDF-Export
-    const auslagenForExport = kwAuslagen.map(auslage => ({
-      tour_nr: auslage.tourNr,
-      kennzeichen: auslage.kennzeichen,
-      datum: auslage.datum,
-      startort: auslage.startort,
-      zielort: auslage.zielort,
-      belegart: auslage.belegart,
-      kosten: parseFloat(auslage.kosten),
-      beleg_url: auslage.belegUrl
-    }))
-
-    // PDF exportieren
-    exportAuslagenPDF(auslagenForExport, kw.toString(), parseInt(year))
-
-    // Auslagen als "überwiesen" markieren
-    try {
-      for (const auslage of kwAuslagen) {
-        await updateAuslageStatus(auslage.id, "paid")
-      }
-      await loadAllData() // Reload
-      alert(`${kwAuslagen.length} Auslagen wurden als PDF exportiert und als überwiesen markiert`)
-    } catch (error) {
-      console.error("Fehler beim Markieren der Auslagen:", error)
-      alert("PDF wurde erstellt, aber Fehler beim Markieren der Auslagen")
-    }
   }
 
   // Filter Touren
@@ -1001,40 +931,6 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* KW-Export für Touren */}
-        {activeTab === "touren" && (
-          <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row md:items-end gap-4">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-primary-blue mb-2">Wochenabrechnung exportieren</h3>
-                  <p className="text-sm text-gray-600">Wählen Sie eine Kalenderwoche, um alle genehmigten Touren zu exportieren und als abgerechnet zu markieren.</p>
-                </div>
-                <div className="flex gap-2">
-                  <Select value={selectedKW} onValueChange={setSelectedKW}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="KW wählen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getAvailableKWs().map(kw => (
-                        <SelectItem key={kw} value={kw}>{kw}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    onClick={exportKW}
-                    className="bg-primary-blue hover:bg-blue-700"
-                    disabled={!selectedKW}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Exportieren
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Touren Tabelle */}
         {activeTab === "touren" && (
           <Card>
@@ -1193,39 +1089,6 @@ export default function AdminDashboardPage() {
           </Card>
         )}
 
-        {/* KW-Export für Auslagen */}
-        {activeTab === "auslagen" && (
-          <Card className="mb-6 bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row md:items-end gap-4">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-primary-blue mb-2">Auslagenabrechnung exportieren</h3>
-                  <p className="text-sm text-gray-600">Wählen Sie eine Kalenderwoche, um alle genehmigten Auslagen als PDF zu exportieren und als überwiesen zu markieren.</p>
-                </div>
-                <div className="flex gap-2">
-                  <Select value={selectedKW} onValueChange={setSelectedKW}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="KW wählen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getAvailableKWs().map(kw => (
-                        <SelectItem key={kw} value={kw}>{kw}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    onClick={exportAuslagenKW}
-                    className="bg-orange-600 hover:bg-orange-700 text-white"
-                    disabled={!selectedKW}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    PDF Exportieren
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Auslagen Tabelle */}
         {activeTab === "auslagen" && (

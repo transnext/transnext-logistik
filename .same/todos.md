@@ -119,3 +119,11 @@ Gesamtverdienst: ohne Retoure-Touren
 **Stand:** Version 117 ✅
 **GitHub:** https://github.com/transnext/transnext-logistik
 **Live:** https://transnext.de
+
+## Todos
+
+## Aktuell
+- [x] KW-Export-Absatz bei Touren entfernen (Zeilen 1003-1035)
+- [x] KW-Export-Absatz bei Auslagen entfernen (Zeilen 1195-1227)
+- [x] handleBillSelected Funktion anpassen: PDF-Download für ausgewählte Touren hinzufügen
+- [ ] Testen und Git commit/push
