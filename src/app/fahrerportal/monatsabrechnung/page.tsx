@@ -40,6 +40,7 @@ export default function MonatsabrechnungPage() {
   const [showBelegDialog, setShowBelegDialog] = useState(false)
   const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string; belegUrl?: string } | null>(null)
   const [zeitmodell, setZeitmodell] = useState<string>('minijob')
+  const [festesGehalt, setFestesGehalt] = useState<number>(0)
   const [zeiterfassungen, setZeiterfassungen] = useState<Zeiterfassung[]>([])
 
   useEffect(() => {
@@ -63,6 +64,8 @@ export default function MonatsabrechnungPage() {
 
       setFahrerName(profile.full_name)
       setZeitmodell(profile.zeitmodell || 'minijob')
+      setFestesGehalt(profile.festes_gehalt || 0)
+      setFestesGehalt(profile.festes_gehalt || 0)
 
       // Setze aktuellen Monat als Standard
       const now = new Date()
@@ -197,7 +200,10 @@ export default function MonatsabrechnungPage() {
 
 
   const berechneGesamtverdienst = () => {
-    if (zeitmodell === 'werkstudent' || zeitmodell === 'teilzeit') {
+    if (zeitmodell === 'geschaeftsfuehrer') {
+      // Für Geschäftsführer: Festes monatliches Gehalt
+      return festesGehalt
+    } else if (zeitmodell === 'werkstudent' || zeitmodell === 'teilzeit') {
       // Für Werkstudent/Teilzeit: Nur Zeiterfassungen zählen
       return zeiterfassungen.reduce((sum, z) => {
         const arbeitszeit = berechneArbeitszeit(z)
@@ -212,7 +218,10 @@ export default function MonatsabrechnungPage() {
 
 
   const berechneGesamtverdienst = () => {
-    if (zeitmodell === 'werkstudent' || zeitmodell === 'teilzeit') {
+    if (zeitmodell === 'geschaeftsfuehrer') {
+      // Für Geschäftsführer: Festes monatliches Gehalt
+      return festesGehalt
+    } else if (zeitmodell === 'werkstudent' || zeitmodell === 'teilzeit') {
       // Für Werkstudent/Teilzeit: Nur Zeiterfassungen zählen
       return zeiterfassungen.reduce((sum, z) => {
         const arbeitszeit = berechneArbeitszeit(z)
@@ -540,6 +549,12 @@ export default function MonatsabrechnungPage() {
                     )}
                     {zeitmodell === 'vollzeit' && (
                       <p>Deine Vergütung erfolgt nach individueller Vereinbarung.</p>
+                    )}
+                    {zeitmodell === 'geschaeftsfuehrer' && (
+                      <p>Als Geschäftsführer erhältst du ein festes monatliches Gehalt. Hochgeladene Touren dienen nur der Dokumentation und zählen nicht zum Gehalt.</p>
+                    )}
+                    {zeitmodell === 'geschaeftsfuehrer' && (
+                      <p>Als Geschäftsführer erhältst du ein festes monatliches Gehalt. Hochgeladene Touren dienen nur der Dokumentation und zählen nicht zum Gehalt.</p>
                     )}
                   </div>
                 </div>
