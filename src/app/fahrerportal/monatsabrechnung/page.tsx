@@ -14,6 +14,8 @@ import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle, RefreshCw } fro
 import { getCurrentUser, getUserProfile, getArbeitsnachweiseByUser } from "@/lib/api"
 import { calculateTourVerdienst, calculateMonthlyPayout, MONTHLY_LIMIT } from "@/lib/salary-calculator"
 import { getMonatsueberschuss } from "@/lib/admin-api"
+import { ZeiterfassungWidget } from "@/components/zeiterfassung-widget"
+import { getZeiterfassungByMonth, berechneArbeitszeit, berechneVerguetung, type Zeiterfassung } from "@/lib/zeiterfassung-api"
 
 interface Tour {
   id: number
@@ -37,6 +39,8 @@ export default function MonatsabrechnungPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [showBelegDialog, setShowBelegDialog] = useState(false)
   const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string; belegUrl?: string } | null>(null)
+  const [zeitmodell, setZeitmodell] = useState<string>('minijob')
+  const [zeiterfassungen, setZeiterfassungen] = useState<Zeiterfassung[]>([])
 
   useEffect(() => {
     checkAuthAndLoadData()
@@ -58,6 +62,7 @@ export default function MonatsabrechnungPage() {
       }
 
       setFahrerName(profile.full_name)
+      setZeitmodell(profile.zeitmodell || 'minijob')
 
       // Setze aktuellen Monat als Standard
       const now = new Date()
@@ -66,6 +71,9 @@ export default function MonatsabrechnungPage() {
 
       // Lade Touren des aktuellen Monats
       await loadTouren(user.id, currentMonth)
+
+      // Lade Zeiterfassungen (falls Werkstudent/Teilzeit)
+      await loadZeiterfassungen(user.id, currentMonth)
 
       // Berechne Überschuss des Vormonats
       await loadVormonatUeberschuss(user.id, currentMonth)
@@ -89,6 +97,7 @@ export default function MonatsabrechnungPage() {
       const user = await getCurrentUser()
       if (user) {
         await loadTouren(user.id, selectedMonth)
+        await loadZeiterfassungen(user.id, selectedMonth)
       }
     } catch (error) {
       console.error("Fehler beim Neuladen:", error)
@@ -125,7 +134,7 @@ export default function MonatsabrechnungPage() {
 
       setTouren(tourenMitVerdienst)
 
-      // Berechne Gesamtverdienst
+      // Berechne Gesamtverdienst (wird später mit Zeiterfassungen kombiniert)
       const gesamt = tourenMitVerdienst.reduce((sum, tour) => sum + (tour.verdienst || 0), 0)
       setGesamtVerdienst(gesamt)
     } catch (error) {
@@ -171,6 +180,48 @@ export default function MonatsabrechnungPage() {
       setVormonatUeberschuss(ueberschuss)
     } catch (error) {
       console.error("Fehler beim Laden des Vormonat-Überschusses:", error)
+    }
+  }
+
+
+  const loadZeiterfassungen = async (userId: string, month: string) => {
+    if (zeitmodell !== 'werkstudent' && zeitmodell !== 'teilzeit') return
+    
+    try {
+      const data = await getZeiterfassungByMonth(userId, month)
+      setZeiterfassungen(data.filter(z => z.status === 'beendet'))
+    } catch (error) {
+      console.error("Fehler beim Laden der Zeiterfassungen:", error)
+    }
+  }
+
+
+  const berechneGesamtverdienst = () => {
+    if (zeitmodell === 'werkstudent' || zeitmodell === 'teilzeit') {
+      // Für Werkstudent/Teilzeit: Nur Zeiterfassungen zählen
+      return zeiterfassungen.reduce((sum, z) => {
+        const arbeitszeit = berechneArbeitszeit(z)
+        const verguetung = berechneVerguetung(arbeitszeit)
+        return sum + verguetung
+      }, 0)
+    } else {
+      // Für Minijob: Touren-basierter Verdienst
+      return gesamtVerdienst
+    }
+  }
+
+
+  const berechneGesamtverdienst = () => {
+    if (zeitmodell === 'werkstudent' || zeitmodell === 'teilzeit') {
+      // Für Werkstudent/Teilzeit: Nur Zeiterfassungen zählen
+      return zeiterfassungen.reduce((sum, z) => {
+        const arbeitszeit = berechneArbeitszeit(z)
+        const verguetung = berechneVerguetung(arbeitszeit)
+        return sum + verguetung
+      }, 0)
+    } else {
+      // Für Minijob: Touren-basierter Verdienst
+      return gesamtVerdienst
     }
   }
 
@@ -306,6 +357,13 @@ export default function MonatsabrechnungPage() {
               </div>
             </CardHeader>
             <CardContent>
+              {/* Zeiterfassung Widget (nur für Werkstudent/Teilzeit) */}
+              {(zeitmodell === 'werkstudent' || zeitmodell === 'teilzeit') && (
+                <div className="mb-6">
+                  <ZeiterfassungWidget />
+                </div>
+              )}
+              
               {touren.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
@@ -363,6 +421,46 @@ export default function MonatsabrechnungPage() {
                     </Table>
                   </div>
 
+                  
+                  {/* Arbeitstage-Tabelle (nur für Werkstudent/Teilzeit) */}
+                  {(zeitmodell === 'werkstudent' || zeitmodell === 'teilzeit') && zeiterfassungen.length > 0 && (
+                    <div className="border-t pt-6">
+                      <h3 className="text-lg font-semibold text-primary-blue mb-4">Arbeitstage mit Zeiterfassung</h3>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Datum</TableHead>
+                              <TableHead>Startzeit</TableHead>
+                              <TableHead>Endzeit</TableHead>
+                              <TableHead className="text-right">Pausenzeit</TableHead>
+                              <TableHead className="text-right">Arbeitszeit</TableHead>
+                              <TableHead className="text-right">Vergütung (12,82€/h)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {zeiterfassungen.map((z) => {
+                              const arbeitszeit = berechneArbeitszeit(z)
+                              const verguetung = berechneVerguetung(arbeitszeit)
+                              return (
+                                <TableRow key={z.id}>
+                                  <TableCell className="font-medium">{formatDate(z.datum)}</TableCell>
+                                  <TableCell>{z.start_zeit ? new Date(z.start_zeit).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '-'}</TableCell>
+                                  <TableCell>{z.ende_zeit ? new Date(z.ende_zeit).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '-'}</TableCell>
+                                  <TableCell className="text-right">{z.pause_minuten} Min</TableCell>
+                                  <TableCell className="text-right">{arbeitszeit.toFixed(2)} h</TableCell>
+                                  <TableCell className="text-right font-semibold text-green-700">
+                                    {formatCurrency(verguetung)}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Überschuss Vormonat */}
                   {vormonatUeberschuss > 0 && (
                     <div className="border-t pt-6">
@@ -399,10 +497,10 @@ export default function MonatsabrechnungPage() {
                             <div>
                               <p className="text-sm text-gray-600">Gesamtverdienst aktueller Monat</p>
                               <p className="text-2xl font-bold text-green-700">
-                                {formatCurrency(gesamtVerdienst)}
+                                {formatCurrency(berechneGesamtverdienst())}
                               </p>
                               {(() => {
-                                const { ausgeZahlt, ueberschuss } = calculateMonthlyPayout(gesamtVerdienst, vormonatUeberschuss)
+                                const { ausgeZahlt, ueberschuss } = calculateMonthlyPayout(berechneGesamtverdienst(), vormonatUeberschuss)
                                 return (
                                   <div className="mt-2 text-sm space-y-1">
                                     {vormonatUeberschuss > 0 && (
@@ -434,7 +532,15 @@ export default function MonatsabrechnungPage() {
 
                   <div className="text-sm text-gray-500 mt-4 p-4 bg-blue-50 rounded-lg">
                     <p className="font-medium text-gray-700 mb-2">Hinweis zur Berechnung:</p>
-                    <p>Der angezeigte Verdienst wird nach der offiziellen KM-Range-Tabelle berechnet. Wartezeiten werden zusätzlich vergütet (10€ pro Stunde: 30-60 Min: +10€, 60-90 Min: +15€, 90-120 Min: +20€).</p>
+                    {zeitmodell === 'minijob' && (
+                      <p>Der angezeigte Verdienst wird nach der offiziellen KM-Range-Tabelle berechnet. Wartezeiten werden zusätzlich vergütet (10€ pro Stunde: 30-60 Min: +10€, 60-90 Min: +15€, 90-120 Min: +20€).</p>
+                    )}
+                    {(zeitmodell === 'werkstudent' || zeitmodell === 'teilzeit') && (
+                      <p>Dein Verdienst wird auf Stundenbasis berechnet (12,82€/Stunde). Erfasse deine Arbeitszeit täglich über die Zeiterfassung. Pausenzeiten werden automatisch abgezogen.</p>
+                    )}
+                    {zeitmodell === 'vollzeit' && (
+                      <p>Deine Vergütung erfolgt nach individueller Vereinbarung.</p>
+                    )}
                   </div>
                 </div>
               )}
