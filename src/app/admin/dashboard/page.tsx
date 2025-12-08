@@ -83,6 +83,7 @@ interface Fahrer {
   benutzername: string
   passwort: string
   status: 'aktiv' | 'inaktiv'
+  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'
   erstelltAm: string
 }
 
@@ -123,7 +124,8 @@ export default function AdminDashboardPage() {
     ausweisAblauf: "",
     benutzername: "",
     passwort: "",
-    status: "aktiv"
+    status: "aktiv",
+    zeitmodell: "minijob"
   })
 
   const [isLoading, setIsLoading] = useState(true)
@@ -286,6 +288,7 @@ export default function AdminDashboardPage() {
         fuehrerscheinklassen: newFahrer.fuehrerscheinklassen || [],
         ausweisnummer: newFahrer.ausweisnummer || "",
         ausweis_ablauf: newFahrer.ausweisAblauf || "",
+        zeitmodell: newFahrer.zeitmodell || 'minijob',
       })
 
       alert(`Fahrer ${newFahrer.vorname} ${newFahrer.nachname} erfolgreich angelegt!`)
@@ -306,7 +309,8 @@ export default function AdminDashboardPage() {
         ausweisAblauf: "",
         benutzername: "",
         passwort: "",
-        status: "aktiv"
+        status: "aktiv",
+        zeitmodell: "minijob"
       })
       setShowAddFahrer(false)
 
@@ -510,7 +514,7 @@ export default function AdminDashboardPage() {
     try {
       // Hole die ausgewählten Touren
       const selectedTouren = touren.filter(t => selectedTourIds.includes(t.id))
-      
+
       // Gruppiere nach KW
       const tourenByKW = new Map<string, typeof selectedTouren>()
       selectedTouren.forEach(tour => {
@@ -520,12 +524,12 @@ export default function AdminDashboardPage() {
         }
         tourenByKW.get(kw)!.push(tour)
       })
-      
+
       // Erstelle PDFs für jede KW
       tourenByKW.forEach((kwTouren, kw) => {
         const [year, kwPart] = kw.split('-KW')
         const kwNumber = parseInt(kwPart)
-        
+
         // Konvertiere zu Format für PDF-Export
         const tourenForExport = kwTouren.map(tour => ({
           tour_nr: tour.tourNr,
@@ -534,11 +538,11 @@ export default function AdminDashboardPage() {
           wartezeit: tour.wartezeit,
           fahrer_name: tour.fahrer
         }))
-        
+
         // PDF exportieren
         exportTourenPDF(tourenForExport, kwNumber.toString(), parseInt(year))
       })
-      
+
       // Markiere als abgerechnet
       await billMultipleTours(selectedTourIds)
       alert(`${selectedTourIds.length} Touren wurden als PDF exportiert und als abgerechnet markiert`)
@@ -1621,6 +1625,37 @@ export default function AdminDashboardPage() {
                               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
                           </div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Zeitmodell */}
+                    <div className="border-b pb-6">
+                      <h3 className="font-semibold text-lg mb-4 text-primary-blue">Beschäftigungsart</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="zeitmodell">Zeitmodell *</Label>
+                          <Select
+                            value={newFahrer.zeitmodell || 'minijob'}
+                            onValueChange={(value) => setNewFahrer({...newFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Zeitmodell wählen" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="minijob">Minijob</SelectItem>
+                              <SelectItem value="werkstudent">Werkstudent</SelectItem>
+                              <SelectItem value="teilzeit">Teilzeit</SelectItem>
+                              <SelectItem value="vollzeit">Vollzeit</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-end">
+                          <p className="text-sm text-gray-600">
+                            {newFahrer.zeitmodell === 'minijob' && 'Abrechnung nach KM-Range-Tabelle'}
+                            {newFahrer.zeitmodell === 'werkstudent' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
+                            {newFahrer.zeitmodell === 'teilzeit' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
+                            {newFahrer.zeitmodell === 'vollzeit' && 'Gehalt nach Vereinbarung'}
+                          </p>
                         </div>
                       </div>
                     </div>

@@ -26,6 +26,7 @@ export async function createFahrer(data: {
   fuehrerscheinklassen: string[]
   ausweisnummer: string
   ausweis_ablauf: string
+  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'
 }) {
   // Rufe Supabase Edge Function auf (läuft mit SERVICE_ROLE_KEY)
   const { data: result, error } = await supabase.functions.invoke('create-fahrer', {
@@ -60,6 +61,7 @@ export async function updateFahrer(fahrerId: number, data: {
   ausweisnummer?: string
   ausweis_ablauf?: string
   status?: 'aktiv' | 'inaktiv'
+  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'
 }) {
   const { data: result, error } = await supabase
     .from('fahrer')
