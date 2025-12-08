@@ -94,6 +94,12 @@ export function exportTourenPDF(
   doc.text(`Gesamt:`, 120, finalY + 10)
   doc.text(`${gesamt.toFixed(2)} €`, 155, finalY + 10, { align: 'right' })
 
+  // Disclaimer
+  doc.setFontSize(7)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 100, 100)
+  doc.text('Dieses Dokument wurde automatisiert erstellt.', 14, finalY + 25)
+
   // Download
   doc.save(`Tourenabrechnung_KW${kw}_${year}.pdf`)
 }
@@ -170,6 +176,12 @@ export async function exportAuslagenPDF(
   doc.text(`€`, 175, finalY + 10)
   doc.text(`${gesamt.toFixed(2)}`, 190, finalY + 10, { align: 'right' })
 
+  // Disclaimer
+  doc.setFontSize(7)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 100, 100)
+  doc.text('Dieses Dokument wurde automatisiert erstellt.', 14, finalY + 25)
+
   // Belege anhängen
   for (let i = 0; i < auslagen.length; i++) {
     const auslage = auslagen[i]
@@ -218,8 +230,6 @@ export async function exportAuslagenPDF(
 /**
  * Exportiert ausgewählte Auslagen als PDF mit Belegen (ohne KW-Zuordnung)
  */
-export async function exportAuslagenWithBelege(
-  auslagen: AuslageForExport[]
 export async function exportAuslagenWithBelege(
   auslagen: AuslageForExport[]
 ): Promise<void> {
@@ -290,6 +300,12 @@ export async function exportAuslagenWithBelege(
   deckblatt.text(`€`, 175, finalY + 10)
   deckblatt.text(`${gesamt.toFixed(2)}`, 190, finalY + 10, { align: 'right' })
 
+  // Disclaimer
+  deckblatt.setFontSize(7)
+  deckblatt.setFont('helvetica', 'normal')
+  deckblatt.setTextColor(100, 100, 100)
+  deckblatt.text('Dieses Dokument wurde automatisiert erstellt.', 14, finalY + 25)
+
   // 2. Konvertiere Deckblatt zu PDF-Bytes
   const deckblattPdfBytes = deckblatt.output('arraybuffer')
   const finalPdf = await PDFDocument.load(deckblattPdfBytes)
@@ -299,33 +315,33 @@ export async function exportAuslagenWithBelege(
   // 3. Füge jeden Original-Beleg (JPG/PNG) als PDF-Seite hinzu
   for (let i = 0; i < auslagen.length; i++) {
     const auslage = auslagen[i]
-    console.log(`Verarbeite Auslage ${i + 1}:`, { 
-      tour_nr: auslage.tour_nr, 
+    console.log(`Verarbeite Auslage ${i + 1}:`, {
+      tour_nr: auslage.tour_nr,
       beleg_url: auslage.beleg_url,
-      has_url: !!auslage.beleg_url 
+      has_url: !!auslage.beleg_url
     })
-    
+
     if (auslage.beleg_url) {
       try {
         console.log(`Lade Beleg ${i + 1}/${auslagen.length}:`, auslage.beleg_url)
-        
+
         // Lade Bild mit CORS-Modus
         const response = await fetch(auslage.beleg_url, {
           mode: 'cors',
           credentials: 'omit'
         })
-        
+
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
         }
-        
+
         const imageBytes = await response.arrayBuffer()
         console.log(`Bild geladen: ${imageBytes.byteLength} bytes`)
-        
-        
+
+
         // Erkenne Bildformat
         const imageType = auslage.beleg_url.toLowerCase().includes('.png') ? 'png' : 'jpg'
-        
+
         // Embed Image in neuem PDF
         let image
         if (imageType === 'png') {
@@ -333,37 +349,37 @@ export async function exportAuslagenWithBelege(
         } else {
           image = await finalPdf.embedJpg(imageBytes)
         }
-        
+
         // Hole Bild-Dimensionen
         const imgWidth = image.width
         const imgHeight = image.height
-        
+
         // A4-Größe in Punkten (595 x 842)
         const pageWidth = 595
         const pageHeight = 842
-        
+
         // Skaliere Bild, um auf A4-Seite zu passen (mit Rand)
         const margin = 40
         const maxWidth = pageWidth - (2 * margin)
         const maxHeight = pageHeight - (2 * margin)
-        
+
         let scale = 1
         if (imgWidth > maxWidth || imgHeight > maxHeight) {
           const scaleWidth = maxWidth / imgWidth
           const scaleHeight = maxHeight / imgHeight
           scale = Math.min(scaleWidth, scaleHeight)
         }
-        
+
         const scaledWidth = imgWidth * scale
         const scaledHeight = imgHeight * scale
-        
+
         // Erstelle neue Seite (A4)
         const page = finalPdf.addPage([pageWidth, pageHeight])
-        
+
         // Zentriere Bild auf Seite
         const x = (pageWidth - scaledWidth) / 2
         const y = (pageHeight - scaledHeight) / 2
-        
+
         // Zeichne Bild auf Seite
         page.drawImage(image, {
           x: x,
@@ -371,11 +387,11 @@ export async function exportAuslagenWithBelege(
           width: scaledWidth,
           height: scaledHeight
         })
-        
+
         console.log(`✓ Beleg ${i + 1} hinzugefügt (${Math.round(scaledWidth)}x${Math.round(scaledHeight)})`)
       } catch (error) {
         console.error(`Fehler beim Laden des Belegs ${i + 1}:`, error)
-        
+
         // Füge Fehlerseite hinzu
         const errorPage = finalPdf.addPage()
         errorPage.drawText(`Beleg ${i + 1} konnte nicht geladen werden.`, {
@@ -415,14 +431,27 @@ export async function exportAuslagenWithBelege(
   const pdfBytes = await finalPdf.save()
   const blob = new Blob([pdfBytes], { type: 'application/pdf' })
   const url = URL.createObjectURL(blob)
-  
+
   const link = document.createElement('a')
   link.href = url
   const datum = new Date().toLocaleDateString('de-DE').replace(/\./g, '-')
   link.download = `Auslagenabrechnung_${datum}.pdf`
   link.click()
-  
+
   URL.revokeObjectURL(url)
-  
+
   console.log(`✓ PDF erfolgreich erstellt mit ${auslagen.length} Auslagen und Belegen`)
+}
+
+/**
+ * Helper: Lädt ein Bild von einer URL
+ */
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = url
+  })
 }
