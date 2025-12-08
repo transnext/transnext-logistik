@@ -26,7 +26,7 @@ export async function createFahrer(data: {
   fuehrerscheinklassen: string[]
   ausweisnummer: string
   ausweis_ablauf: string
-  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'
+  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer' | 'geschaeftsfuehrer'
 }) {
   // Rufe Supabase Edge Function auf (läuft mit SERVICE_ROLE_KEY)
   const { data: result, error } = await supabase.functions.invoke('create-fahrer', {
@@ -61,7 +61,7 @@ export async function updateFahrer(fahrerId: number, data: {
   ausweisnummer?: string
   ausweis_ablauf?: string
   status?: 'aktiv' | 'inaktiv'
-  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'
+  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer' | 'geschaeftsfuehrer'
 }) {
   const { data: result, error } = await supabase
     .from('fahrer')
@@ -152,19 +152,27 @@ export async function getAllFahrerAdmin() {
 // =====================================================
 
 export async function getAdminStatistics() {
-  const [arbeitsnachweiseData, auslagennachweiseData, fahrerData] = await Promise.all([
-    supabase.from('arbeitsnachweise').select('status, gefahrene_km, wartezeit, datum'),
+  const [arbeitsnachweiseData, auslagennachweiseData, fahrerData, profilesData] = await Promise.all([
+    supabase.from('arbeitsnachweise').select('status, gefahrene_km, wartezeit, datum, user_id, ist_ruecklaufer'),
     supabase.from('auslagennachweise').select('status, kosten'),
     supabase.from('fahrer').select('status'),
+    supabase.from('profiles').select('id, zeitmodell'),
   ])
 
   if (arbeitsnachweiseData.error) throw arbeitsnachweiseData.error
   if (auslagennachweiseData.error) throw auslagennachweiseData.error
   if (fahrerData.error) throw fahrerData.error
+  if (profilesData.error) throw profilesData.error
 
   const arbeitsnachweise = arbeitsnachweiseData.data
   const auslagennachweise = auslagennachweiseData.data
   const fahrer = fahrerData.data
+  const profiles = profilesData.data
+
+  // Erstelle Map für Geschäftsführer-Check
+  const geschaeftsfuehrerIds = new Set(
+    profiles.filter(p => p.zeitmodell === 'geschaeftsfuehrer').map(p => p.id)
+  )
 
   // Aktueller Monat
   const now = new Date()
@@ -173,11 +181,18 @@ export async function getAdminStatistics() {
   // Touren des aktuellen Monats
   const currentMonthTouren = arbeitsnachweise.filter(t => t.datum.startsWith(currentMonth))
 
-  // Gesamtlohn genehmigte Touren (approved + billed)
-  const approvedTouren = arbeitsnachweise.filter(t => t.status === 'approved')
-  const approvedAndBilledTouren = arbeitsnachweise.filter(t => t.status === 'approved' || t.status === 'billed')
+  // Gesamtlohn genehmigte Touren (approved + billed) - OHNE Geschäftsführer und Rückläufer
+  const approvedTouren = arbeitsnachweise.filter(t => 
+    t.status === 'approved' && !geschaeftsfuehrerIds.has(t.user_id)
+  )
+  const approvedAndBilledTouren = arbeitsnachweise.filter(t => 
+    (t.status === 'approved' || t.status === 'billed') && 
+    !geschaeftsfuehrerIds.has(t.user_id)
+  )
   const gesamtlohnGenehmigt = approvedAndBilledTouren.reduce((sum, t) => {
-    return sum + calculateTourVerdienst(t.gefahrene_km || 0, t.wartezeit)
+    // Rückläufer werden mit 0€ berechnet
+    const verdienst = t.ist_ruecklaufer ? 0 : calculateTourVerdienst(t.gefahrene_km || 0, t.wartezeit)
+    return sum + verdienst
   }, 0)
 
   // Monatsumsatz (alle Touren des Monats mit Kunden-Preisen)

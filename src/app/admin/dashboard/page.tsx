@@ -83,7 +83,8 @@ interface Fahrer {
   benutzername: string
   passwort: string
   status: 'aktiv' | 'inaktiv'
-  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'
+  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer'
+  festesGehalt?: number
   erstelltAm: string
 }
 
@@ -125,6 +126,7 @@ export default function AdminDashboardPage() {
     benutzername: "",
     passwort: "",
     status: "aktiv",
+    festesGehalt: 0
     zeitmodell: "minijob"
   })
 
@@ -311,6 +313,7 @@ export default function AdminDashboardPage() {
         passwort: "",
         status: "aktiv",
         zeitmodell: "minijob"
+        festesGehalt: 0
       })
       setShowAddFahrer(false)
 
@@ -1426,7 +1429,7 @@ export default function AdminDashboardPage() {
                           <Label htmlFor="edit-zeitmodell">Zeitmodell *</Label>
                           <Select
                             value={editingFahrer.zeitmodell || 'minijob'}
-                            onValueChange={(value) => setEditingFahrer({...editingFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'})}
+                            onValueChange={(value) => setEditingFahrer({...editingFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer' | 'geschaeftsfuehrer'})}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Zeitmodell wählen" />
@@ -1436,6 +1439,7 @@ export default function AdminDashboardPage() {
                               <SelectItem value="werkstudent">Werkstudent</SelectItem>
                               <SelectItem value="teilzeit">Teilzeit</SelectItem>
                               <SelectItem value="vollzeit">Vollzeit</SelectItem>
+                              <SelectItem value="geschaeftsfuehrer">Geschäftsführer</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1445,6 +1449,7 @@ export default function AdminDashboardPage() {
                             {editingFahrer.zeitmodell === 'werkstudent' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
                             {editingFahrer.zeitmodell === 'teilzeit' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
                             {editingFahrer.zeitmodell === 'vollzeit' && 'Gehalt nach Vereinbarung'}
+                            {editingFahrer.zeitmodell === 'geschaeftsfuehrer' && 'Festes monatliches Gehalt (Touren zählen nicht zum Lohn)'}
                           </p>
                         </div>
                       </div>
@@ -1668,7 +1673,7 @@ export default function AdminDashboardPage() {
                           <Label htmlFor="zeitmodell">Zeitmodell *</Label>
                           <Select
                             value={newFahrer.zeitmodell || 'minijob'}
-                            onValueChange={(value) => setNewFahrer({...newFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'})}
+                            onValueChange={(value) => setNewFahrer({...newFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer' | 'geschaeftsfuehrer'})}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Zeitmodell wählen" />
@@ -1678,6 +1683,7 @@ export default function AdminDashboardPage() {
                               <SelectItem value="werkstudent">Werkstudent</SelectItem>
                               <SelectItem value="teilzeit">Teilzeit</SelectItem>
                               <SelectItem value="vollzeit">Vollzeit</SelectItem>
+                              <SelectItem value="geschaeftsfuehrer">Geschäftsführer</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1687,10 +1693,26 @@ export default function AdminDashboardPage() {
                             {newFahrer.zeitmodell === 'werkstudent' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
                             {newFahrer.zeitmodell === 'teilzeit' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
                             {newFahrer.zeitmodell === 'vollzeit' && 'Gehalt nach Vereinbarung'}
+                            {newFahrer.zeitmodell === 'geschaeftsfuehrer' && 'Festes monatliches Gehalt (Touren zählen nicht zum Lohn)'}
                           </p>
                         </div>
                       </div>
                     </div>
+                      {/* Festes Gehalt (nur für Geschäftsführer/Vollzeit) */}
+                      {(newFahrer.zeitmodell === 'geschaeftsfuehrer' || newFahrer.zeitmodell === 'vollzeit') && (
+                        <div className="mt-4">
+                          <Label htmlFor="festesGehalt">Festes monatliches Gehalt (€) *</Label>
+                          <Input
+                            id="festesGehalt"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="z.B. 1500"
+                            value={newFahrer.festesGehalt || 0}
+                            onChange={(e) => setNewFahrer({...newFahrer, festesGehalt: parseFloat(e.target.value) || 0})}
+                          />
+                        </div>
+                      )}
 
                     <div className="flex gap-4">
                       <Button type="submit" className="bg-primary-blue hover:bg-blue-700">
@@ -1778,12 +1800,14 @@ export default function AdminDashboardPage() {
                                 f.zeitmodell === 'minijob' ? 'bg-blue-100 text-blue-800' :
                                 f.zeitmodell === 'werkstudent' ? 'bg-purple-100 text-purple-800' :
                                 f.zeitmodell === 'teilzeit' ? 'bg-orange-100 text-orange-800' :
+                                f.zeitmodell === 'geschaeftsfuehrer' ? 'bg-green-100 text-green-800' :
                                 'bg-gray-100 text-gray-800'
                               }`}>
                                 {f.zeitmodell === 'minijob' && 'Minijob'}
                                 {f.zeitmodell === 'werkstudent' && 'Werkstudent'}
                                 {f.zeitmodell === 'teilzeit' && 'Teilzeit'}
                                 {f.zeitmodell === 'vollzeit' && 'Vollzeit'}
+                                {f.zeitmodell === 'geschaeftsfuehrer' && 'Geschäftsführer'}
                                 {!f.zeitmodell && 'Minijob'}
                               </Badge>
                             </TableCell>
