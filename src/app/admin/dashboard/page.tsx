@@ -240,6 +240,8 @@ export default function AdminDashboardPage() {
         benutzername: '', // Wird nicht mehr verwendet
         passwort: '', // Wird nicht mehr verwendet
         status: f.status,
+        zeitmodell: f.zeitmodell || 'minijob',
+        festesGehalt: f.festes_gehalt || 0,
         erstelltAm: f.created_at || new Date().toISOString(),
       })))
 
@@ -1882,12 +1884,15 @@ export default function AdminDashboardPage() {
                       const fahrerTourenCount = touren.filter(t => t.fahrer === fahrerName).length
                       const fahrerAuslagenCount = auslagen.filter(a => a.fahrer === fahrerName).length
 
-                      const fahrerGesamtverdienst = touren
-                        .filter(t => t.fahrer === fahrerName && (t.status === 'approved' || t.status === 'billed'))
-                        .reduce((sum, t) => {
-                          const km = parseFloat(t.gefahreneKm) || 0
-                          return sum + calculateTourVerdienst(km, t.wartezeit)
-                        }, 0)
+                      // Berechne Verdienst basierend auf Zeitmodell
+                      const fahrerGesamtverdienst = f.zeitmodell === 'geschaeftsfuehrer' 
+                        ? (f.festesGehalt || 0)  // Geschäftsführer: Festes Gehalt
+                        : touren
+                            .filter(t => t.fahrer === fahrerName && (t.status === 'approved' || t.status === 'billed'))
+                            .reduce((sum, t) => {
+                              const km = parseFloat(t.gefahreneKm) || 0
+                              return sum + calculateTourVerdienst(km, t.wartezeit)
+                            }, 0)
 
                       const fahrerAuslagenSumme = auslagen
                         .filter(a => a.fahrer === fahrerName && (a.status === 'approved' || a.status === 'paid'))
