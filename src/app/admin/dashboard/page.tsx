@@ -443,6 +443,7 @@ export default function AdminDashboardPage() {
         fuehrerscheinklassen: editingFahrer.fuehrerscheinklassen,
         ausweisnummer: editingFahrer.ausweisnummer,
         ausweis_ablauf: editingFahrer.ausweisAblauf,
+        zeitmodell: editingFahrer.zeitmodell,
       })
 
       alert(`Fahrer ${editingFahrer.vorname} ${editingFahrer.nachname} erfolgreich aktualisiert!`)
@@ -1417,6 +1418,37 @@ export default function AdminDashboardPage() {
                           />
                         </div>
                       </div>
+                    {/* Zeitmodell */}
+                    <div className="border-b pb-6">
+                      <h3 className="font-semibold text-lg mb-4 text-primary-blue">Beschäftigungsart</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="edit-zeitmodell">Zeitmodell *</Label>
+                          <Select
+                            value={editingFahrer.zeitmodell || 'minijob'}
+                            onValueChange={(value) => setEditingFahrer({...editingFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Zeitmodell wählen" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="minijob">Minijob</SelectItem>
+                              <SelectItem value="werkstudent">Werkstudent</SelectItem>
+                              <SelectItem value="teilzeit">Teilzeit</SelectItem>
+                              <SelectItem value="vollzeit">Vollzeit</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-end">
+                          <p className="text-sm text-gray-600">
+                            {editingFahrer.zeitmodell === 'minijob' && 'Abrechnung nach KM-Range-Tabelle'}
+                            {editingFahrer.zeitmodell === 'werkstudent' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
+                            {editingFahrer.zeitmodell === 'teilzeit' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
+                            {editingFahrer.zeitmodell === 'vollzeit' && 'Gehalt nach Vereinbarung'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                     </div>
 
                     <div className="flex gap-4">
@@ -1705,6 +1737,7 @@ export default function AdminDashboardPage() {
                           <TableHead>Geburtsdatum</TableHead>
                           <TableHead>Adresse</TableHead>
                           <TableHead>Führerschein</TableHead>
+                          <TableHead>Zeitmodell</TableHead>
                           <TableHead>Klassen</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Erstellt am</TableHead>
@@ -1740,6 +1773,20 @@ export default function AdminDashboardPage() {
                                   Inaktiv
                                 </Badge>
                               )}
+                            <TableCell>
+                              <Badge className={`border-0 ${
+                                f.zeitmodell === 'minijob' ? 'bg-blue-100 text-blue-800' :
+                                f.zeitmodell === 'werkstudent' ? 'bg-purple-100 text-purple-800' :
+                                f.zeitmodell === 'teilzeit' ? 'bg-orange-100 text-orange-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {f.zeitmodell === 'minijob' && 'Minijob'}
+                                {f.zeitmodell === 'werkstudent' && 'Werkstudent'}
+                                {f.zeitmodell === 'teilzeit' && 'Teilzeit'}
+                                {f.zeitmodell === 'vollzeit' && 'Vollzeit'}
+                                {!f.zeitmodell && 'Minijob'}
+                              </Badge>
+                            </TableCell>
                             </TableCell>
                             <TableCell className="text-sm text-gray-600">
                               {formatDate(f.erstelltAm)}
