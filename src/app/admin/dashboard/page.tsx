@@ -50,7 +50,44 @@ interface Tour {
   istRuecklaufer?: boolean
   zeitmodell?: string
   festes_gehalt?: number
+}
+
+interface Auslage {
+  id: number
+  tourNr: string
+  kennzeichen: string
+  datum: string
+  startort: string
+  zielort: string
+  belegart: string
+  kosten: string
+  fahrer: string
+  status: string
   erstelltAm: string
+  belegUrl?: string
+}
+
+interface Fahrer {
+  id: number
+  vorname: string
+  nachname: string
+  geburtsdatum: string
+  adresse: string
+  plz: string
+  ort: string
+  fuehrerscheinNr: string
+  fuehrerscheinDatum: string
+  ausstellendeBehoerde: string
+  fuehrerscheinklassen: string[]
+  ausweisnummer: string
+  ausweisAblauf: string
+  benutzername: string
+  status: string
+  erstelltAm: string
+  zeitmodell?: string
+  festes_gehalt?: number
+  passwort?: string
+  festesGehalt?: number
 }
 
 export default function AdminDashboardPage() {
@@ -158,8 +195,7 @@ export default function AdminDashboardPage() {
         getAdminStatistics()
       ])
 
-      // Konvertiere Daten ins alte Format für minimale Änderungen
-      setTouren(tourenData.map((t) => ({
+      setTouren(tourenData.map((t: any) => ({
         id: t.id,
         tourNr: t.tour_nr,
         datum: t.datum,
@@ -171,8 +207,43 @@ export default function AdminDashboardPage() {
         belegUrl: t.beleg_url,
         istRuecklaufer: t.ist_ruecklaufer,
         zeitmodell: t.zeitmodell,
-        festes_gehalt: t.festes_gehalt,
-        erstelltAm: f.created_at || new Date().toISOString(),
+        festes_gehalt: t.festes_gehalt
+      })))
+
+      setAuslagen(auslagenData.map((a: any) => ({
+        id: a.id,
+        tourNr: a.tour_nr,
+        kennzeichen: a.kennzeichen,
+        datum: a.datum,
+        startort: a.startort,
+        zielort: a.zielort,
+        belegart: a.belegart,
+        kosten: a.kosten.toString(),
+        fahrer: a.fahrer_name,
+        status: a.status,
+        erstelltAm: a.created_at,
+        belegUrl: a.beleg_url
+      })))
+
+      setFahrer(fahrerData.map((f: any) => ({
+        id: f.id,
+        vorname: f.vorname,
+        nachname: f.nachname,
+        geburtsdatum: f.geburtsdatum,
+        adresse: f.adresse,
+        plz: f.plz,
+        ort: f.ort,
+        fuehrerscheinNr: f.fuehrerschein_nr,
+        fuehrerscheinDatum: f.fuehrerschein_datum,
+        ausstellendeBehoerde: f.ausstellende_behoerde,
+        fuehrerscheinklassen: f.fuehrerscheinklassen,
+        ausweisnummer: f.ausweisnummer,
+        ausweisAblauf: f.ausweis_ablauf,
+        benutzername: f.profiles?.email || '',
+        status: f.status,
+        erstelltAm: f.created_at,
+        zeitmodell: f.zeitmodell,
+        festes_gehalt: f.festes_gehalt
       })))
 
       setStats(statistiken)
@@ -346,7 +417,7 @@ export default function AdminDashboardPage() {
     if (checked) {
       setNewFahrer({ ...newFahrer, fuehrerscheinklassen: [...current, klasse] })
     } else {
-      setNewFahrer({ ...newFahrer, fuehrerscheinklassen: current.filter(k => k !== klasse) })
+      setNewFahrer({ ...newFahrer, fuehrerscheinklassen: current.filter((k: string) => k !== klasse) })
     }
   }
 
@@ -356,7 +427,7 @@ export default function AdminDashboardPage() {
     if (checked) {
       setEditingFahrer({ ...editingFahrer, fuehrerscheinklassen: [...current, klasse] })
     } else {
-      setEditingFahrer({ ...editingFahrer, fuehrerscheinklassen: current.filter(k => k !== klasse) })
+      setEditingFahrer({ ...editingFahrer, fuehrerscheinklassen: current.filter((k: string) => k !== klasse) })
     }
   }
 
