@@ -111,7 +111,7 @@ export function exportTourenPDF(
     doc.addPage()
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
-    doc.text(`Gesamt:`, 120, 20)
+    doc.text(`Gesamt: `, 120, 20)
     doc.text(`${gesamt.toFixed(2)} €`, 155, 20, { align: 'right' })
 
     // Disclaimer
@@ -122,7 +122,7 @@ export function exportTourenPDF(
   } else {
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
-    doc.text(`Gesamt:`, 120, finalY + 10)
+    doc.text(`Gesamt: `, 120, finalY + 10)
     doc.text(`${gesamt.toFixed(2)} €`, 155, finalY + 10, { align: 'right' })
 
     // Disclaimer

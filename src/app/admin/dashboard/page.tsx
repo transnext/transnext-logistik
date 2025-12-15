@@ -613,8 +613,13 @@ export default function AdminDashboardPage() {
       // Hole die ausgewählten Auslagen
       const selectedAuslagen = auslagen.filter(a => selectedAuslagenIds.includes(a.id))
 
+      // Sortiere ALLE Auslagen nach Datum AUFSTEIGEND (älteste zuerst)
+      const sortedAuslagen = [...selectedAuslagen].sort((a, b) => {
+        return new Date(a.datum).getTime() - new Date(b.datum).getTime()
+      })
+
       // Konvertiere zu Format für PDF-Export
-      const auslagenForExport = selectedAuslagen.map(a => ({
+      const auslagenForExport = sortedAuslagen.map(a => ({
         tour_nr: a.tourNr,
         kennzeichen: a.kennzeichen,
         datum: a.datum,
