@@ -26,11 +26,7 @@ export async function createFahrer(data: {
   fuehrerscheinklassen: string[]
   ausweisnummer: string
   ausweis_ablauf: string
-<<<<<<< HEAD
   zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer'
-=======
-  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer' | 'geschaeftsfuehrer'
->>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
 }) {
   // Rufe Supabase Edge Function auf (läuft mit SERVICE_ROLE_KEY)
   const { data: result, error } = await supabase.functions.invoke('create-fahrer', {
@@ -65,11 +61,7 @@ export async function updateFahrer(fahrerId: number, data: {
   ausweisnummer?: string
   ausweis_ablauf?: string
   status?: 'aktiv' | 'inaktiv'
-<<<<<<< HEAD
   zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer'
-=======
-  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer' | 'geschaeftsfuehrer'
->>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
 }) {
   const { data: result, error } = await supabase
     .from('fahrer')
@@ -102,13 +94,9 @@ export async function getAllArbeitsnachweiseAdmin() {
     .select(`
       *,
       profiles!arbeitsnachweise_user_id_fkey (
-<<<<<<< HEAD
         full_name,
         zeitmodell,
         festes_gehalt
-=======
-        full_name
->>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
       )
     `)
     .order('datum', { ascending: false })
@@ -117,13 +105,9 @@ export async function getAllArbeitsnachweiseAdmin() {
 
   return data.map(item => ({
     ...item,
-<<<<<<< HEAD
     fahrer_name: item.profiles?.full_name || 'Unbekannt',
     zeitmodell: item.profiles?.zeitmodell,
     festes_gehalt: item.profiles?.festes_gehalt
-=======
-    fahrer_name: item.profiles?.full_name || 'Unbekannt'
->>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
   }))
 }
 
@@ -158,28 +142,20 @@ export async function getAllFahrerAdmin() {
     .select(`
       *,
       profiles!fahrer_user_id_fkey (
-<<<<<<< HEAD
         full_name,
         zeitmodell,
         festes_gehalt
-=======
-        full_name
->>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
       )
     `)
     .order('nachname', { ascending: true })
 
   if (error) throw error
-<<<<<<< HEAD
 
   return data.map(item => ({
     ...item,
     zeitmodell: item.profiles?.zeitmodell || 'minijob',
     festes_gehalt: item.profiles?.festes_gehalt
   }))
-=======
-  return data
->>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
 }
 
 // =====================================================
@@ -187,7 +163,6 @@ export async function getAllFahrerAdmin() {
 // =====================================================
 
 export async function getAdminStatistics() {
-<<<<<<< HEAD
   // Lade Touren MIT Profil-Informationen (zeitmodell)
   const [arbeitsnachweiseData, auslagennachweiseData, fahrerData] = await Promise.all([
     supabase.from('arbeitsnachweise').select(`
@@ -203,35 +178,15 @@ export async function getAdminStatistics() {
     `),
     supabase.from('auslagennachweise').select('status, kosten'),
     supabase.from('fahrer').select('status'),
-=======
-  const [arbeitsnachweiseData, auslagennachweiseData, fahrerData, profilesData] = await Promise.all([
-    supabase.from('arbeitsnachweise').select('status, gefahrene_km, wartezeit, datum, user_id, ist_ruecklaufer'),
-    supabase.from('auslagennachweise').select('status, kosten'),
-    supabase.from('fahrer').select('status'),
-    supabase.from('profiles').select('id, zeitmodell'),
->>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
   ])
 
   if (arbeitsnachweiseData.error) throw arbeitsnachweiseData.error
   if (auslagennachweiseData.error) throw auslagennachweiseData.error
   if (fahrerData.error) throw fahrerData.error
-<<<<<<< HEAD
-=======
-  if (profilesData.error) throw profilesData.error
->>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
 
   const arbeitsnachweise = arbeitsnachweiseData.data
   const auslagennachweise = auslagennachweiseData.data
   const fahrer = fahrerData.data
-<<<<<<< HEAD
-=======
-  const profiles = profilesData.data
-
-  // Erstelle Map für Geschäftsführer-Check
-  const geschaeftsfuehrerIds = new Set(
-    profiles.filter(p => p.zeitmodell === 'geschaeftsfuehrer').map(p => p.id)
-  )
->>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
 
   // Aktueller Monat
   const now = new Date()
@@ -240,7 +195,6 @@ export async function getAdminStatistics() {
   // Touren des aktuellen Monats
   const currentMonthTouren = arbeitsnachweise.filter(t => t.datum.startsWith(currentMonth))
 
-<<<<<<< HEAD
   // Gesamtlohn genehmigte Touren (approved + billed) - OHNE Geschäftsführer
   const approvedTouren = arbeitsnachweise.filter(t => t.status === 'approved')
   const approvedAndBilledTouren = arbeitsnachweise.filter(t => t.status === 'approved' || t.status === 'billed')
@@ -252,20 +206,6 @@ export async function getAdminStatistics() {
       return sum
     }
     return sum + calculateTourVerdienst(t.gefahrene_km || 0, t.wartezeit)
-=======
-  // Gesamtlohn genehmigte Touren (approved + billed) - OHNE Geschäftsführer und Rückläufer
-  const approvedTouren = arbeitsnachweise.filter(t => 
-    t.status === 'approved' && !geschaeftsfuehrerIds.has(t.user_id)
-  )
-  const approvedAndBilledTouren = arbeitsnachweise.filter(t => 
-    (t.status === 'approved' || t.status === 'billed') && 
-    !geschaeftsfuehrerIds.has(t.user_id)
-  )
-  const gesamtlohnGenehmigt = approvedAndBilledTouren.reduce((sum, t) => {
-    // Rückläufer werden mit 0€ berechnet
-    const verdienst = t.ist_ruecklaufer ? 0 : calculateTourVerdienst(t.gefahrene_km || 0, t.wartezeit)
-    return sum + verdienst
->>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
   }, 0)
 
   // Monatsumsatz (alle Touren des Monats mit Kunden-Preisen)
