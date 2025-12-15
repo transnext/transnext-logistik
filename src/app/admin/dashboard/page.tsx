@@ -244,7 +244,7 @@ export default function AdminDashboardPage() {
         benutzername: "",
         passwort: "",
         status: "aktiv",
-        zeitmodell: "minijob"
+        zeitmodell: "minijob",
         festesGehalt: 0
       })
       setShowAddFahrer(false)
