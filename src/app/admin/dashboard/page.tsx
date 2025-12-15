@@ -293,7 +293,7 @@ export default function AdminDashboardPage() {
         fuehrerscheinklassen: newFahrer.fuehrerscheinklassen || [],
         ausweisnummer: newFahrer.ausweisnummer || "",
         ausweis_ablauf: newFahrer.ausweisAblauf || "",
-        zeitmodell: newFahrer.zeitmodell || 'minijob',
+        zeitmodell: (newFahrer.zeitmodell || 'minijob') as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer',
       })
 
       alert(`Fahrer ${newFahrer.vorname} ${newFahrer.nachname} erfolgreich angelegt!`)
