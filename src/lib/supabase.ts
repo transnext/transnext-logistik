@@ -10,6 +10,11 @@ export interface Profile {
   id: string
   role: 'fahrer' | 'admin'
   full_name: string
+<<<<<<< HEAD
+  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer'
+  festes_gehalt?: number
+=======
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
   created_at: string
   updated_at: string
 }

@@ -63,7 +63,11 @@ export function exportTourenPDF(
     return sum + calculateCustomerTotal(tour.gefahrene_km, tour.wartezeit)
   }, 0)
 
+<<<<<<< HEAD
+  // Tabelle erstellen (mit automatischem Seitenumbruch)
+=======
   // Tabelle erstellen
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
   autoTable(doc, {
     head: [['TourNr.', 'Datum', 'KM', 'Wartezeit', 'Betrag']],
     body: tableData,
@@ -84,6 +88,55 @@ export function exportTourenPDF(
       2: { cellWidth: 20, halign: 'right' },
       3: { cellWidth: 25, halign: 'center' },
       4: { cellWidth: 35, halign: 'right' }
+<<<<<<< HEAD
+    },
+    // Wichtig: Ermöglicht mehrere Seiten
+    showHead: 'everyPage',
+    margin: { top: 45, bottom: 20 },
+    didDrawPage: (data) => {
+      // Header auf jeder Seite
+      if (data.pageNumber > 1) {
+        doc.setFontSize(18)
+        doc.text('TransNext Logistik', 14, 15)
+        doc.setFontSize(12)
+        doc.text(`Nicholas Mandzel & Burak Aydin GbR`, 14, 22)
+        doc.setFontSize(10)
+        doc.text(`Datum: ${new Date().toLocaleDateString('de-DE')}`, 150, 15)
+        doc.setFontSize(16)
+        doc.text(`Tourenabrechnung KW ${kw}-${year}`, 14, 35)
+      }
+    }
+  })
+
+  // Gesamtsumme auf der letzten Seite
+  const finalY = (doc as any).lastAutoTable.finalY || 45
+
+  // Prüfe ob genug Platz auf der Seite ist (max 280mm)
+  if (finalY > 260) {
+    doc.addPage()
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Gesamt:`, 120, 20)
+    doc.text(`${gesamt.toFixed(2)} €`, 155, 20, { align: 'right' })
+
+    // Disclaimer
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100, 100, 100)
+    doc.text('Dieses Dokument wurde automatisiert erstellt.', 14, 35)
+  } else {
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Gesamt:`, 120, finalY + 10)
+    doc.text(`${gesamt.toFixed(2)} €`, 155, finalY + 10, { align: 'right' })
+
+    // Disclaimer
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100, 100, 100)
+    doc.text('Dieses Dokument wurde automatisiert erstellt.', 14, finalY + 25)
+  }
+=======
     }
   })
 
@@ -99,6 +152,7 @@ export function exportTourenPDF(
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(100, 100, 100)
   doc.text('Dieses Dokument wurde automatisiert erstellt.', 14, finalY + 25)
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
 
   // Download
   doc.save(`Tourenabrechnung_KW${kw}_${year}.pdf`)

@@ -48,6 +48,11 @@ interface Tour {
   erstelltAm: string
   belegUrl?: string
   istRuecklaufer?: boolean
+<<<<<<< HEAD
+  zeitmodell?: string
+  festes_gehalt?: number
+=======
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
 }
 
 interface Auslage {
@@ -84,7 +89,11 @@ interface Fahrer {
   passwort: string
   status: 'aktiv' | 'inaktiv'
   zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer'
+<<<<<<< HEAD
+  festes_gehalt?: number
+=======
   festesGehalt?: number
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
   erstelltAm: string
 }
 
@@ -126,7 +135,10 @@ export default function AdminDashboardPage() {
     benutzername: "",
     passwort: "",
     status: "aktiv",
+<<<<<<< HEAD
+=======
     festesGehalt: 0
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
     zeitmodell: "minijob"
   })
 
@@ -205,6 +217,11 @@ export default function AdminDashboardPage() {
         erstelltAm: t.created_at,
         belegUrl: t.beleg_url,
         istRuecklaufer: t.ist_ruecklaufer,
+<<<<<<< HEAD
+        zeitmodell: t.zeitmodell,
+        festes_gehalt: t.festes_gehalt,
+=======
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
       })))
 
       setAuslagen(auslagenData.map((a) => ({
@@ -241,7 +258,11 @@ export default function AdminDashboardPage() {
         passwort: '', // Wird nicht mehr verwendet
         status: f.status,
         zeitmodell: f.zeitmodell || 'minijob',
+<<<<<<< HEAD
+        festes_gehalt: f.festes_gehalt,
+=======
         festesGehalt: f.festes_gehalt || 0,
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
         erstelltAm: f.created_at || new Date().toISOString(),
       })))
 
@@ -315,7 +336,10 @@ export default function AdminDashboardPage() {
         passwort: "",
         status: "aktiv",
         zeitmodell: "minijob"
+<<<<<<< HEAD
+=======
         festesGehalt: 0
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
       })
       setShowAddFahrer(false)
 
@@ -448,7 +472,10 @@ export default function AdminDashboardPage() {
         fuehrerscheinklassen: editingFahrer.fuehrerscheinklassen,
         ausweisnummer: editingFahrer.ausweisnummer,
         ausweis_ablauf: editingFahrer.ausweisAblauf,
+<<<<<<< HEAD
+=======
         zeitmodell: editingFahrer.zeitmodell,
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
       })
 
       alert(`Fahrer ${editingFahrer.vorname} ${editingFahrer.nachname} erfolgreich aktualisiert!`)
@@ -521,6 +548,37 @@ export default function AdminDashboardPage() {
       // Hole die ausgewählten Touren
       const selectedTouren = touren.filter(t => selectedTourIds.includes(t.id))
 
+<<<<<<< HEAD
+      console.log('=== PDF EXPORT DEBUG ===')
+      console.log('Anzahl ausgewählte Tour-IDs:', selectedTourIds.length)
+      console.log('Anzahl gefundene Touren:', selectedTouren.length)
+      console.log('Touren:', selectedTouren.map(t => ({ nr: t.tourNr, datum: t.datum })))
+
+      // Sortiere ALLE Touren nach Datum AUFSTEIGEND (älteste zuerst - vom 01.12 aufsteigend)
+      const sortedTouren = [...selectedTouren].sort((a, b) => {
+        return new Date(a.datum).getTime() - new Date(b.datum).getTime()
+      })
+
+      // Konvertiere zu Format für PDF-Export
+      const tourenForExport = sortedTouren.map(tour => ({
+        tour_nr: tour.tourNr,
+        datum: tour.datum,
+        gefahrene_km: parseFloat(tour.gefahreneKm),
+        wartezeit: tour.wartezeit,
+        fahrer_name: tour.fahrer
+      }))
+
+      // Ermittle KW und Jahr vom ERSTEN Datum (älteste Tour)
+      const erstesDatum = sortedTouren[0].datum
+      const kw = getKWFromDate(erstesDatum)
+      const [year, kwPart] = kw.split('-KW')
+      const kwNumber = parseInt(kwPart)
+
+      // Erstelle EIN PDF mit ALLEN ausgewählten Touren
+      console.log('Exportiere PDF mit', tourenForExport.length, 'Touren')
+      console.log('Sortierte Reihenfolge:', tourenForExport.map(t => t.datum))
+      exportTourenPDF(tourenForExport, kwNumber.toString(), parseInt(year))
+=======
       // Gruppiere nach KW
       const tourenByKW = new Map<string, typeof selectedTouren>()
       selectedTouren.forEach(tour => {
@@ -548,6 +606,7 @@ export default function AdminDashboardPage() {
         // PDF exportieren
         exportTourenPDF(tourenForExport, kwNumber.toString(), parseInt(year))
       })
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
 
       // Markiere als abgerechnet
       await billMultipleTours(selectedTourIds)
@@ -1423,6 +1482,8 @@ export default function AdminDashboardPage() {
                           />
                         </div>
                       </div>
+<<<<<<< HEAD
+=======
                     {/* Zeitmodell */}
                     <div className="border-b pb-6">
                       <h3 className="font-semibold text-lg mb-4 text-primary-blue">Beschäftigungsart</h3>
@@ -1456,6 +1517,7 @@ export default function AdminDashboardPage() {
                         </div>
                       </div>
                     </div>
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
                     </div>
 
                     <div className="flex gap-4">
@@ -1675,7 +1737,11 @@ export default function AdminDashboardPage() {
                           <Label htmlFor="zeitmodell">Zeitmodell *</Label>
                           <Select
                             value={newFahrer.zeitmodell || 'minijob'}
+<<<<<<< HEAD
+                            onValueChange={(value) => setNewFahrer({...newFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer'})}
+=======
                             onValueChange={(value) => setNewFahrer({...newFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer' | 'geschaeftsfuehrer'})}
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Zeitmodell wählen" />
@@ -1695,11 +1761,17 @@ export default function AdminDashboardPage() {
                             {newFahrer.zeitmodell === 'werkstudent' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
                             {newFahrer.zeitmodell === 'teilzeit' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
                             {newFahrer.zeitmodell === 'vollzeit' && 'Gehalt nach Vereinbarung'}
+<<<<<<< HEAD
+                            {newFahrer.zeitmodell === 'geschaeftsfuehrer' && 'Festes monatliches Gehalt'}
+=======
                             {newFahrer.zeitmodell === 'geschaeftsfuehrer' && 'Festes monatliches Gehalt (Touren zählen nicht zum Lohn)'}
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
                           </p>
                         </div>
                       </div>
                     </div>
+<<<<<<< HEAD
+=======
                       {/* Festes Gehalt (nur für Geschäftsführer/Vollzeit) */}
                       {(newFahrer.zeitmodell === 'geschaeftsfuehrer' || newFahrer.zeitmodell === 'vollzeit') && (
                         <div className="mt-4">
@@ -1715,6 +1787,7 @@ export default function AdminDashboardPage() {
                           />
                         </div>
                       )}
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
 
                     <div className="flex gap-4">
                       <Button type="submit" className="bg-primary-blue hover:bg-blue-700">
@@ -1761,7 +1834,10 @@ export default function AdminDashboardPage() {
                           <TableHead>Geburtsdatum</TableHead>
                           <TableHead>Adresse</TableHead>
                           <TableHead>Führerschein</TableHead>
+<<<<<<< HEAD
+=======
                           <TableHead>Zeitmodell</TableHead>
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
                           <TableHead>Klassen</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Erstellt am</TableHead>
@@ -1797,6 +1873,8 @@ export default function AdminDashboardPage() {
                                   Inaktiv
                                 </Badge>
                               )}
+<<<<<<< HEAD
+=======
                             <TableCell>
                               <Badge className={`border-0 ${
                                 f.zeitmodell === 'minijob' ? 'bg-blue-100 text-blue-800' :
@@ -1813,6 +1891,7 @@ export default function AdminDashboardPage() {
                                 {!f.zeitmodell && 'Minijob'}
                               </Badge>
                             </TableCell>
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
                             </TableCell>
                             <TableCell className="text-sm text-gray-600">
                               {formatDate(f.erstelltAm)}
@@ -1884,9 +1963,16 @@ export default function AdminDashboardPage() {
                       const fahrerTourenCount = touren.filter(t => t.fahrer === fahrerName).length
                       const fahrerAuslagenCount = auslagen.filter(a => a.fahrer === fahrerName).length
 
+<<<<<<< HEAD
+                      // WICHTIG: Unterscheide zwischen Geschäftsführer (festes Gehalt) und anderen (Touren-Lohn)
+                      const isGeschaeftsfuehrer = f.zeitmodell === 'geschaeftsfuehrer'
+                      const fahrerGesamtverdienst = isGeschaeftsfuehrer
+                        ? (f.festes_gehalt || 0)
+=======
                       // Berechne Verdienst basierend auf Zeitmodell
                       const fahrerGesamtverdienst = f.zeitmodell === 'geschaeftsfuehrer' 
                         ? (f.festesGehalt || 0)  // Geschäftsführer: Festes Gehalt
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
                         : touren
                             .filter(t => t.fahrer === fahrerName && (t.status === 'approved' || t.status === 'billed'))
                             .reduce((sum, t) => {
@@ -1913,6 +1999,14 @@ export default function AdminDashboardPage() {
                                   {f.vorname} {f.nachname}
                                 </h3>
                                 <p className="text-sm text-gray-500">{f.plz} {f.ort}</p>
+<<<<<<< HEAD
+                                {isGeschaeftsfuehrer && (
+                                  <Badge className="bg-purple-100 text-purple-800 border-purple-200 mt-1">
+                                    Geschäftsführer
+                                  </Badge>
+                                )}
+=======
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
                               </div>
                               <Badge className="bg-green-100 text-green-800 border-green-200">
                                 Aktiv
@@ -1929,7 +2023,11 @@ export default function AdminDashboardPage() {
                                 <span className="font-semibold">{fahrerAuslagenCount}</span>
                               </div>
                               <div className="flex justify-between border-t pt-2">
+<<<<<<< HEAD
+                                <span className="text-gray-600">{isGeschaeftsfuehrer ? 'Festes Gehalt:' : 'Verdienst:'}</span>
+=======
                                 <span className="text-gray-600">Verdienst:</span>
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
                                 <span className="font-semibold text-green-700">
                                   {formatCurrency(fahrerGesamtverdienst)}
                                 </span>
@@ -1976,6 +2074,35 @@ export default function AdminDashboardPage() {
                   if (!selectedFahrerData) return null
 
                   const fahrerName = `${selectedFahrerData.vorname} ${selectedFahrerData.nachname}`
+<<<<<<< HEAD
+                  const isGeschaeftsfuehrer = selectedFahrerData.zeitmodell === 'geschaeftsfuehrer'
+
+                  // Berechne Gesamtverdienst
+                  // Bei Geschäftsführern: Festes Gehalt
+                  // Bei anderen: Touren-Lohn
+                  const gesamtverdienst = isGeschaeftsfuehrer
+                    ? (selectedFahrerData.festes_gehalt || 0)
+                    : fahrerTouren
+                        .filter(t => t.status === 'approved' || t.status === 'billed')
+                        .reduce((sum, t) => {
+                          const km = parseFloat(t.gefahreneKm) || 0
+                          // Retoure-Touren = 0€
+                          const verdienst = t.istRuecklaufer ? 0 : calculateTourVerdienst(km, t.wartezeit)
+                          return sum + verdienst
+                        }, 0)
+
+                  console.log('=== AUSZAHLUNGS-BERECHNUNG ===')
+                  console.log('Fahrer:', fahrerName)
+                  console.log('Zeitmodell:', selectedFahrerData.zeitmodell)
+                  console.log('Gesamtverdienst:', gesamtverdienst)
+                  console.log('Vormonat-Überschuss:', fahrerVormonatUeberschuss)
+
+                  // Für Geschäftsführer: Keine Minijob-Logik
+                  const { ausgeZahlt, ueberschuss } = isGeschaeftsfuehrer
+                    ? { ausgeZahlt: gesamtverdienst, ueberschuss: 0 }
+                    : calculateMonthlyPayout(gesamtverdienst, fahrerVormonatUeberschuss)
+
+=======
 
                   // Berechne Gesamtverdienst
                   const gesamtverdienst = fahrerTouren
@@ -1991,6 +2118,7 @@ export default function AdminDashboardPage() {
                   console.log('Gesamtverdienst:', gesamtverdienst)
                   console.log('Vormonat-Überschuss:', fahrerVormonatUeberschuss)
                   const { ausgeZahlt, ueberschuss } = calculateMonthlyPayout(gesamtverdienst, fahrerVormonatUeberschuss)
+>>>>>>> e9786e26e1ef9cc56d17cd87225577c4cb212886
                   console.log('Berechnete Auszahlung:', ausgeZahlt)
                   console.log('Neuer Überschuss:', ueberschuss)
 
