@@ -1,6 +1,7 @@
 /**
- * Kunden-Preisberechnung (10% Aufschlag auf Fahrerlohn)
- * Für Abrechnungen an Kunden
+ * Kunden-Preisberechnung
+ * Smart and Care: Standard-Tabelle
+ * Onlogist: Eigene Tabelle mit anderen Preisen
  */
 
 export interface CustomerKmRange {
@@ -8,8 +9,11 @@ export interface CustomerKmRange {
   kundenpreis: number
 }
 
-// Kunden-KM-Range mit 10% Aufschlag (gerundet)
-export const CUSTOMER_KM_RANGES: CustomerKmRange[] = [
+// Auftraggeber-Typen
+export type Auftraggeber = 'onlogist' | 'smartandcare'
+
+// Smart and Care - Standard KM-Tabelle (bisherige Tabelle)
+export const SMARTANDCARE_KM_RANGES: CustomerKmRange[] = [
   { maxKm: 10, kundenpreis: 19 },
   { maxKm: 20, kundenpreis: 23 },
   { maxKm: 30, kundenpreis: 39 },
@@ -28,21 +32,65 @@ export const CUSTOMER_KM_RANGES: CustomerKmRange[] = [
   { maxKm: 1000, kundenpreis: 319 },
 ]
 
+// Onlogist - Eigene KM-Tabelle
+export const ONLOGIST_KM_RANGES: CustomerKmRange[] = [
+  { maxKm: 10, kundenpreis: 19.57 },
+  { maxKm: 20, kundenpreis: 23.01 },
+  { maxKm: 30, kundenpreis: 35.65 },
+  { maxKm: 50, kundenpreis: 48.67 },
+  { maxKm: 100, kundenpreis: 62.80 },
+  { maxKm: 150, kundenpreis: 73.87 },
+  { maxKm: 200, kundenpreis: 97.20 },
+  { maxKm: 250, kundenpreis: 106.73 },
+  { maxKm: 300, kundenpreis: 119.33 },
+  { maxKm: 350, kundenpreis: 121.20 },
+  { maxKm: 400, kundenpreis: 143.00 },
+  { maxKm: 450, kundenpreis: 144.87 },
+  { maxKm: 500, kundenpreis: 175.87 },
+  { maxKm: 550, kundenpreis: 177.73 },
+  { maxKm: 600, kundenpreis: 207.20 },
+  { maxKm: 650, kundenpreis: 209.07 },
+  { maxKm: 700, kundenpreis: 221.67 },
+  { maxKm: 750, kundenpreis: 222.33 },
+  { maxKm: 800, kundenpreis: 251.47 },
+  { maxKm: 850, kundenpreis: 251.47 },
+  { maxKm: 900, kundenpreis: 280.60 },
+  { maxKm: 950, kundenpreis: 280.60 },
+  { maxKm: 1000, kundenpreis: 308.20 },
+]
+
+// Alias für Rückwärtskompatibilität
+export const CUSTOMER_KM_RANGES = SMARTANDCARE_KM_RANGES
+
+/**
+ * Gibt die passende KM-Tabelle für einen Auftraggeber zurück
+ */
+export function getCustomerKmRangesForAuftraggeber(auftraggeber?: Auftraggeber): CustomerKmRange[] {
+  if (auftraggeber === 'onlogist') {
+    return ONLOGIST_KM_RANGES
+  }
+  return SMARTANDCARE_KM_RANGES
+}
+
 /**
  * Berechnet den Kundenpreis basierend auf gefahrenen Kilometern
+ * Optional: auftraggeber für auftraggeberspezifische Tabellen
  */
-export function calculateCustomerPrice(km: number): number {
+export function calculateCustomerPrice(km: number, auftraggeber?: Auftraggeber): number {
   if (km <= 0) return 0
 
+  const ranges = getCustomerKmRangesForAuftraggeber(auftraggeber)
+  const maxPrice = ranges[ranges.length - 1].kundenpreis
+
   // Finde die passende Range
-  for (const range of CUSTOMER_KM_RANGES) {
+  for (const range of ranges) {
     if (km <= range.maxKm) {
       return range.kundenpreis
     }
   }
 
-  // Über 1000 km: 319€ (höchster Preis)
-  return 319
+  // Über max km: höchster Preis der jeweiligen Tabelle
+  return maxPrice
 }
 
 /**
@@ -85,9 +133,10 @@ export function wartezeitToCode(wartezeit?: string): number {
 
 /**
  * Berechnet den Gesamtpreis für Kunden (KM + Wartezeit)
+ * Optional: auftraggeber für auftraggeberspezifische Tabellen
  */
-export function calculateCustomerTotal(km: number, wartezeit?: string): number {
-  const kmPrice = calculateCustomerPrice(km)
+export function calculateCustomerTotal(km: number, wartezeit?: string, auftraggeber?: Auftraggeber): number {
+  const kmPrice = calculateCustomerPrice(km, auftraggeber)
   const wartezeitCode = wartezeitToCode(wartezeit)
   const waitingPrice = calculateCustomerWaitingTime(wartezeitCode)
 
