@@ -199,13 +199,20 @@ export async function getAdminStatistics() {
   const approvedTouren = arbeitsnachweise.filter(t => t.status === 'approved')
   const approvedAndBilledTouren = arbeitsnachweise.filter(t => t.status === 'approved' || t.status === 'billed')
 
+  // Lade Fahrernamen für die Berechnung
+  const { data: profilesData } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+  const profilesMap = new Map(profilesData?.map(p => [p.id, p.full_name]) || [])
+
   // WICHTIG: Filtere Geschäftsführer-Touren aus der Lohn-Berechnung
   const gesamtlohnGenehmigt = approvedAndBilledTouren.reduce((sum, t: any) => {
     // Überspringe Touren von Geschäftsführern
     if (t.profiles?.zeitmodell === 'geschaeftsfuehrer') {
       return sum
     }
-    return sum + calculateTourVerdienst(t.gefahrene_km || 0, t.wartezeit)
+    const fahrerName = profilesMap.get(t.user_id) || undefined
+    return sum + calculateTourVerdienst(t.gefahrene_km || 0, t.wartezeit, fahrerName)
   }, 0)
 
   // Monatsumsatz (alle Touren des Monats mit Kunden-Preisen)

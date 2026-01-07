@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { PDFViewerDialog } from "@/components/pdf-viewer-dialog"
 import { Button } from "@/components/ui/button"
@@ -23,7 +23,6 @@ import {
   getAllArbeitsnachweiseAdmin,
   getAllAuslagennachweiseAdmin,
   getAllFahrerAdmin,
-  getAdminStatistics,
   createFahrer,
   updateFahrerStatus,
   updateFahrer,
@@ -36,6 +35,31 @@ import {
 } from "@/lib/admin-api"
 import { exportTourenPDF, exportAuslagenPDF, exportAuslagenWithBelege } from "@/lib/pdf-export"
 import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout } from "@/lib/salary-calculator"
+import { calculateCustomerTotal } from "@/lib/customer-pricing"
+
+/**
+ * Vergleicht zwei Namen unabhängig von der Reihenfolge (Vorname Nachname vs. Nachname Vorname)
+ * z.B. "Hicham Salmi" === "Salmi Hicham"
+ */
+function namesMatch(name1: string, name2: string): boolean {
+  if (!name1 || !name2) return false
+
+  // Direkter Vergleich (case-insensitive)
+  if (name1.toLowerCase().trim() === name2.toLowerCase().trim()) return true
+
+  // Vergleiche die Namen in beiden Reihenfolgen
+  const parts1 = name1.trim().split(/\s+/)
+  const parts2 = name2.trim().split(/\s+/)
+
+  // Wenn unterschiedliche Anzahl von Teilen, kein Match
+  if (parts1.length !== parts2.length) return false
+
+  // Prüfe ob alle Teile in beiden Namen vorkommen (unabhängig von der Reihenfolge)
+  const sortedParts1 = parts1.map(p => p.toLowerCase()).sort().join(' ')
+  const sortedParts2 = parts2.map(p => p.toLowerCase()).sort().join(' ')
+
+  return sortedParts1 === sortedParts2
+}
 
 interface Tour {
   id: number
@@ -90,12 +114,27 @@ interface Fahrer {
   festesGehalt?: number
 }
 
+// Hilfsfunktion: Generiere Monatsliste (letzte 12 Monate + aktueller Monat)
+function generateMonthOptions(): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = []
+  const now = new Date()
+
+  for (let i = 0; i < 13; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    const label = date.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+    options.push({ value, label })
+  }
+
+  return options
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter()
   const [adminName, setAdminName] = useState("")
   const [activeTab, setActiveTab] = useState<"touren" | "auslagen" | "fahrer" | "abrechnung">("touren")
-  const [touren, setTouren] = useState<Tour[]>([])
-  const [auslagen, setAuslagen] = useState<Auslage[]>([])
+  const [allTouren, setAllTouren] = useState<Tour[]>([]) // Alle Touren (ungefiltert)
+  const [allAuslagen, setAllAuslagen] = useState<Auslage[]>([]) // Alle Auslagen (ungefiltert)
   const [fahrer, setFahrer] = useState<Fahrer[]>([])
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
@@ -111,6 +150,16 @@ export default function AdminDashboardPage() {
   const [fahrerTouren, setFahrerTouren] = useState<Tour[]>([])
   const [fahrerAuslagen, setFahrerAuslagen] = useState<Auslage[]>([])
   const [fahrerVormonatUeberschuss, setFahrerVormonatUeberschuss] = useState(0)
+
+  // Monat-Filter
+  const now = new Date()
+  const currentMonthValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthValue)
+  const monthOptions = generateMonthOptions()
+
+  // Gefilterte Daten nach ausgewähltem Monat
+  const touren = allTouren.filter(t => t.datum.startsWith(selectedMonth))
+  const auslagen = allAuslagen.filter(a => a.datum.startsWith(selectedMonth))
 
   const [newFahrer, setNewFahrer] = useState<Partial<Fahrer>>({
     vorname: "",
@@ -133,26 +182,68 @@ export default function AdminDashboardPage() {
   })
 
   const [isLoading, setIsLoading] = useState(true)
-  const [stats, setStats] = useState<{
-    totalTouren: number
-    pendingTouren: number
-    approvedTouren: number
-    billedTouren: number
-    rejectedTouren: number
-    totalKilometers: number
-    totalAuslagen: number
-    pendingAuslagen: number
-    approvedAuslagen: number
-    paidAuslagen: number
-    rejectedAuslagen: number
-    openAuslagenAmount: number
-    paidAuslagenAmount: number
-    totalFahrer: number
-    activeFahrer: number
-    inactiveFahrer: number
-    gesamtlohnGenehmigt: number
-    monatsumsatz: number
-  } | null>(null)
+
+  // Berechne Statistiken basierend auf den gefilterten Daten (nach Monat)
+  const stats = useMemo(() => {
+    if (allTouren.length === 0 && allAuslagen.length === 0 && fahrer.length === 0) {
+      return null
+    }
+
+    // Gefilterte Touren und Auslagen nach Monat
+    const monthTouren = allTouren.filter(t => t.datum.startsWith(selectedMonth))
+    const monthAuslagen = allAuslagen.filter(a => a.datum.startsWith(selectedMonth))
+
+    // Genehmigte + Abgerechnete Touren (ohne Geschäftsführer)
+    const approvedAndBilledTouren = monthTouren.filter(t =>
+      (t.status === 'approved' || t.status === 'billed') &&
+      t.zeitmodell !== 'geschaeftsfuehrer'
+    )
+
+    // Berechne Gesamtlohn
+    const gesamtlohnGenehmigt = approvedAndBilledTouren.reduce((sum, t) => {
+      const km = parseFloat(t.gefahreneKm) || 0
+      if (t.istRuecklaufer) return sum
+      return sum + calculateTourVerdienst(km, t.wartezeit, t.fahrer)
+    }, 0)
+
+    // Monatsumsatz (Kundenpreise)
+    const monatsumsatz = monthTouren.reduce((sum, t) => {
+      const km = parseFloat(t.gefahreneKm) || 0
+      return sum + calculateCustomerTotal(km, t.wartezeit)
+    }, 0)
+
+    return {
+      // Touren
+      totalTouren: monthTouren.length,
+      pendingTouren: monthTouren.filter(t => t.status === 'pending').length,
+      approvedTouren: monthTouren.filter(t => t.status === 'approved').length,
+      billedTouren: monthTouren.filter(t => t.status === 'billed').length,
+      rejectedTouren: monthTouren.filter(t => t.status === 'rejected').length,
+      totalKilometers: monthTouren.reduce((sum, t) => sum + (parseFloat(t.gefahreneKm) || 0), 0),
+
+      // Auslagen
+      totalAuslagen: monthAuslagen.length,
+      pendingAuslagen: monthAuslagen.filter(e => e.status === 'pending').length,
+      approvedAuslagen: monthAuslagen.filter(e => e.status === 'approved').length,
+      paidAuslagen: monthAuslagen.filter(e => e.status === 'paid').length,
+      rejectedAuslagen: monthAuslagen.filter(e => e.status === 'rejected').length,
+      openAuslagenAmount: monthAuslagen
+        .filter(e => e.status !== 'paid')
+        .reduce((sum, e) => sum + (parseFloat(e.kosten) || 0), 0),
+      paidAuslagenAmount: monthAuslagen
+        .filter(e => e.status === 'paid')
+        .reduce((sum, e) => sum + (parseFloat(e.kosten) || 0), 0),
+
+      // Fahrer (nicht nach Monat gefiltert)
+      totalFahrer: fahrer.length,
+      activeFahrer: fahrer.filter(f => f.status === 'aktiv').length,
+      inactiveFahrer: fahrer.filter(f => f.status === 'inaktiv').length,
+
+      // Lohn & Umsatz
+      gesamtlohnGenehmigt: gesamtlohnGenehmigt,
+      monatsumsatz: monatsumsatz,
+    }
+  }, [allTouren, allAuslagen, fahrer, selectedMonth])
 
   useEffect(() => {
     checkAuthAndLoadData()
@@ -188,14 +279,13 @@ export default function AdminDashboardPage() {
 
   const loadAllData = async () => {
     try {
-      const [tourenData, auslagenData, fahrerData, statistiken] = await Promise.all([
+      const [tourenData, auslagenData, fahrerData] = await Promise.all([
         getAllArbeitsnachweiseAdmin(),
         getAllAuslagennachweiseAdmin(),
-        getAllFahrerAdmin(),
-        getAdminStatistics()
+        getAllFahrerAdmin()
       ])
 
-      setTouren(tourenData.map((t: any) => ({
+      setAllTouren(tourenData.map((t: any) => ({
         id: t.id,
         tourNr: t.tour_nr,
         datum: t.datum,
@@ -210,7 +300,7 @@ export default function AdminDashboardPage() {
         festes_gehalt: t.festes_gehalt
       })))
 
-      setAuslagen(auslagenData.map((a: any) => ({
+      setAllAuslagen(auslagenData.map((a: any) => ({
         id: a.id,
         tourNr: a.tour_nr,
         kennzeichen: a.kennzeichen,
@@ -245,8 +335,7 @@ export default function AdminDashboardPage() {
         zeitmodell: f.zeitmodell,
         festes_gehalt: f.festes_gehalt
       })))
-
-      setStats(statistiken)
+      // Stats werden jetzt automatisch durch useMemo berechnet
     } catch (error) {
       console.error("Fehler beim Laden der Daten:", error)
     }
@@ -352,8 +441,10 @@ export default function AdminDashboardPage() {
     const fahrerData = fahrer.find(f => f.id === fahrerId)
     if (!fahrerData) return
 
-    const fahrerTourenFiltered = touren.filter(t => t.fahrer === `${fahrerData.vorname} ${fahrerData.nachname}`)
-    const fahrerAuslagenFiltered = auslagen.filter(a => a.fahrer === `${fahrerData.vorname} ${fahrerData.nachname}`)
+    const fahrerFullName = `${fahrerData.vorname} ${fahrerData.nachname}`
+    // Verwende namesMatch() um auch "Nachname Vorname" Format zu erkennen
+    const fahrerTourenFiltered = touren.filter(t => namesMatch(t.fahrer, fahrerFullName))
+    const fahrerAuslagenFiltered = auslagen.filter(a => namesMatch(a.fahrer, fahrerFullName))
     setFahrerTouren(fahrerTourenFiltered)
     setFahrerAuslagen(fahrerAuslagenFiltered)
 
@@ -386,15 +477,19 @@ export default function AdminDashboardPage() {
         } else {
           console.log('ℹ️ Kein manueller Überschuss, berechne aus Touren')
           // Kein manueller Überschuss, berechne aus Touren
-          const vormonatTouren = touren.filter(t =>
-            t.fahrer === `${fahrerData.vorname} ${fahrerData.nachname}` &&
+          // WICHTIG: Verwende allTouren (nicht gefiltert), um Vormonat-Touren zu finden
+          // Verwende namesMatch() um auch "Nachname Vorname" Format zu erkennen
+          const fahrerName = `${fahrerData.vorname} ${fahrerData.nachname}`
+          const vormonatTouren = allTouren.filter(t =>
+            namesMatch(t.fahrer, fahrerName) &&
             t.datum.startsWith(vormonat)
           )
           console.log('Vormonat-Touren gefunden:', vormonatTouren.length)
 
+          const fahrerFullName = `${fahrerData.vorname} ${fahrerData.nachname}`
           const vormonatGesamt = vormonatTouren.reduce((sum, t) => {
             const km = parseFloat(t.gefahreneKm) || 0
-            const verdienst = t.istRuecklaufer ? 0 : calculateTourVerdienst(km, t.wartezeit)
+            const verdienst = t.istRuecklaufer ? 0 : calculateTourVerdienst(km, t.wartezeit, fahrerFullName)
             return sum + verdienst
           }, 0)
 
@@ -803,6 +898,36 @@ export default function AdminDashboardPage() {
           </Button>
         </div>
 
+        {/* Monatsauswahl */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <Label htmlFor="month-select" className="text-sm font-medium text-gray-700">
+                  Monat auswählen:
+                </Label>
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger id="month-select" className="w-[200px]">
+                    <SelectValue placeholder="Monat wählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-gray-500">
+                Zeigt Daten für: <span className="font-medium text-gray-900">
+                  {monthOptions.find(o => o.value === selectedMonth)?.label || selectedMonth}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Statistiken - Zeile 1 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <Card className="border-2 border-yellow-200 bg-yellow-50">
@@ -851,7 +976,7 @@ export default function AdminDashboardPage() {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Gesamtlohn Genehmigt</p>
                   <p className="text-2xl font-bold text-green-700">{formatCurrency(stats?.gesamtlohnGenehmigt || 0)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Alle genehmigten Touren</p>
+                  <p className="text-xs text-gray-500 mt-1">Genehmigt + Abgerechnet im gewählten Monat</p>
                 </div>
                 <CheckCircle className="h-10 w-10 text-green-600" />
               </div>
@@ -864,7 +989,7 @@ export default function AdminDashboardPage() {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Monatsumsatz</p>
                   <p className="text-2xl font-bold text-purple-700">{formatCurrency(stats?.monatsumsatz || 0)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Laufender Monat (Kundenpreise)</p>
+                  <p className="text-xs text-gray-500 mt-1">Kundenpreise im gewählten Monat</p>
                 </div>
                 <TrendingUp className="h-10 w-10 text-purple-600" />
               </div>
@@ -1887,22 +2012,23 @@ export default function AdminDashboardPage() {
                     {fahrer.filter(f => f.status === 'aktiv').map((f) => {
                       // Berechne Statistiken für diesen Fahrer
                       const fahrerName = `${f.vorname} ${f.nachname}`
-                      const fahrerTourenCount = touren.filter(t => t.fahrer === fahrerName).length
-                      const fahrerAuslagenCount = auslagen.filter(a => a.fahrer === fahrerName).length
+                      // Verwende namesMatch() um auch "Nachname Vorname" Format zu erkennen
+                      const fahrerTourenCount = touren.filter(t => namesMatch(t.fahrer, fahrerName)).length
+                      const fahrerAuslagenCount = auslagen.filter(a => namesMatch(a.fahrer, fahrerName)).length
 
                       // WICHTIG: Unterscheide zwischen Geschäftsführer (festes Gehalt) und anderen (Touren-Lohn)
                       const isGeschaeftsfuehrer = f.zeitmodell === 'geschaeftsfuehrer'
                       const fahrerGesamtverdienst = isGeschaeftsfuehrer
                         ? (f.festes_gehalt || 0)
                         : touren
-                            .filter(t => t.fahrer === fahrerName && (t.status === 'approved' || t.status === 'billed'))
+                            .filter(t => namesMatch(t.fahrer, fahrerName) && (t.status === 'approved' || t.status === 'billed'))
                             .reduce((sum, t) => {
                               const km = parseFloat(t.gefahreneKm) || 0
-                              return sum + calculateTourVerdienst(km, t.wartezeit)
+                              return sum + calculateTourVerdienst(km, t.wartezeit, fahrerName)
                             }, 0)
 
                       const fahrerAuslagenSumme = auslagen
-                        .filter(a => a.fahrer === fahrerName && (a.status === 'approved' || a.status === 'paid'))
+                        .filter(a => namesMatch(a.fahrer, fahrerName) && (a.status === 'approved' || a.status === 'paid'))
                         .reduce((sum, a) => sum + parseFloat(a.kosten), 0)
 
                       return (
@@ -1983,7 +2109,7 @@ export default function AdminDashboardPage() {
                         .reduce((sum, t) => {
                           const km = parseFloat(t.gefahreneKm) || 0
                           // Retoure-Touren = 0€
-                          const verdienst = t.istRuecklaufer ? 0 : calculateTourVerdienst(km, t.wartezeit)
+                          const verdienst = t.istRuecklaufer ? 0 : calculateTourVerdienst(km, t.wartezeit, fahrerName)
                           return sum + verdienst
                         }, 0)
 
@@ -2089,7 +2215,7 @@ export default function AdminDashboardPage() {
                                   {fahrerTouren.map((tour) => {
                                     const km = parseFloat(tour.gefahreneKm) || 0
                                     // Retoure-Touren = 0€
-                                    const verdienst = tour.istRuecklaufer ? 0 : calculateTourVerdienst(km, tour.wartezeit)
+                                    const verdienst = tour.istRuecklaufer ? 0 : calculateTourVerdienst(km, tour.wartezeit, fahrerName)
 
                                     return (
                                       <TableRow key={tour.id}>

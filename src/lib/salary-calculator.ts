@@ -11,6 +11,7 @@ export interface KmRange {
 // Monatliches Verdienst-Limit für Fahrer (Minijob)
 export const MONTHLY_LIMIT = 556
 
+// Standard KM-Tabelle für alle Fahrer
 export const KM_RANGES: KmRange[] = [
   { maxKm: 10, verguetung: 10 },
   { maxKm: 20, verguetung: 12 },
@@ -30,21 +31,87 @@ export const KM_RANGES: KmRange[] = [
   { maxKm: 1000, verguetung: 181 },
 ]
 
+// Spezielle KM-Tabelle für Phillip Sander
+export const PHILLIP_SANDER_KM_RANGES: KmRange[] = [
+  { maxKm: 10, verguetung: 12 },
+  { maxKm: 20, verguetung: 14 },
+  { maxKm: 30, verguetung: 22 },
+  { maxKm: 40, verguetung: 27 },
+  { maxKm: 50, verguetung: 32 },
+  { maxKm: 60, verguetung: 36 },
+  { maxKm: 70, verguetung: 40 },
+  { maxKm: 80, verguetung: 44 },
+  { maxKm: 90, verguetung: 48 },
+  { maxKm: 100, verguetung: 52 },
+  { maxKm: 120, verguetung: 56 },
+  { maxKm: 140, verguetung: 60 },
+  { maxKm: 160, verguetung: 64 },
+  { maxKm: 180, verguetung: 68 },
+  { maxKm: 200, verguetung: 72 },
+  { maxKm: 220, verguetung: 76 },
+  { maxKm: 240, verguetung: 80 },
+  { maxKm: 260, verguetung: 84 },
+  { maxKm: 280, verguetung: 88 },
+  { maxKm: 300, verguetung: 92 },
+  { maxKm: 320, verguetung: 96 },
+  { maxKm: 340, verguetung: 100 },
+  { maxKm: 360, verguetung: 105 },
+  { maxKm: 380, verguetung: 110 },
+  { maxKm: 400, verguetung: 115 },
+  { maxKm: 450, verguetung: 120 },
+  { maxKm: 500, verguetung: 125 },
+  { maxKm: 550, verguetung: 130 },
+  { maxKm: 600, verguetung: 140 },
+  { maxKm: 650, verguetung: 150 },
+  { maxKm: 700, verguetung: 160 },
+  { maxKm: 750, verguetung: 170 },
+  { maxKm: 800, verguetung: 180 },
+  { maxKm: 900, verguetung: 195 },
+  { maxKm: 1000, verguetung: 210 },
+]
+
+// Fahrernamen die die spezielle Tabelle nutzen
+const SPECIAL_RATE_DRIVERS = ["Phillip Sander", "phillip sander"]
+
+/**
+ * Prüft ob ein Fahrer die spezielle KM-Tabelle nutzt
+ */
+export function usesSpecialKmTable(fahrerName?: string): boolean {
+  if (!fahrerName) return false
+  return SPECIAL_RATE_DRIVERS.some(name =>
+    fahrerName.toLowerCase().trim() === name.toLowerCase().trim()
+  )
+}
+
+/**
+ * Gibt die passende KM-Tabelle für einen Fahrer zurück
+ */
+export function getKmRangesForDriver(fahrerName?: string): KmRange[] {
+  if (usesSpecialKmTable(fahrerName)) {
+    return PHILLIP_SANDER_KM_RANGES
+  }
+  return KM_RANGES
+}
+
 /**
  * Berechnet die Vergütung basierend auf gefahrenen Kilometern
+ * Optional: fahrerName für fahrerspezifische Tabellen
  */
-export function calculateVerguetung(km: number): number {
+export function calculateVerguetung(km: number, fahrerName?: string): number {
   if (km <= 0) return 0
 
+  const ranges = getKmRangesForDriver(fahrerName)
+  const maxVerguetung = ranges[ranges.length - 1].verguetung
+
   // Finde die passende Range
-  for (const range of KM_RANGES) {
+  for (const range of ranges) {
     if (km <= range.maxKm) {
       return range.verguetung
     }
   }
 
-  // Über 1000 km: 181€ (höchste Vergütung)
-  return 181
+  // Über max km: höchste Vergütung der jeweiligen Tabelle
+  return maxVerguetung
 }
 
 /**
@@ -67,9 +134,10 @@ export function calculateWartezeitBonus(wartezeit?: string): number {
 
 /**
  * Berechnet den Gesamtverdienst für eine Tour
+ * Optional: fahrerName für fahrerspezifische Tabellen
  */
-export function calculateTourVerdienst(km: number, wartezeit?: string): number {
-  const baseVerguetung = calculateVerguetung(km)
+export function calculateTourVerdienst(km: number, wartezeit?: string, fahrerName?: string): number {
+  const baseVerguetung = calculateVerguetung(km, fahrerName)
   const wartezeitBonus = calculateWartezeitBonus(wartezeit)
   return baseVerguetung + wartezeitBonus
 }
@@ -104,15 +172,19 @@ export function calculateMonthlyPayout(
 
 /**
  * Gibt die KM-Range als Text zurück
+ * Optional: fahrerName für fahrerspezifische Tabellen
  */
-export function getKmRangeText(km: number): string {
+export function getKmRangeText(km: number, fahrerName?: string): string {
   if (km <= 0) return "-"
 
-  for (const range of KM_RANGES) {
+  const ranges = getKmRangesForDriver(fahrerName)
+  const maxKm = ranges[ranges.length - 1].maxKm
+
+  for (const range of ranges) {
     if (km <= range.maxKm) {
       return `bis ${range.maxKm} km`
     }
   }
 
-  return "über 1000 km"
+  return `über ${maxKm} km`
 }

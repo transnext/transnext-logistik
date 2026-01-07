@@ -69,11 +69,11 @@ export default function MonatsabrechnungPage() {
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       setSelectedMonth(currentMonth)
 
-      // Lade Touren des aktuellen Monats
-      await loadTouren(user.id, currentMonth)
+      // Lade Touren des aktuellen Monats (mit Fahrername für spezielle KM-Tabellen)
+      await loadTouren(user.id, currentMonth, profile.full_name)
 
-      // Berechne Überschuss des Vormonats
-      await loadVormonatUeberschuss(user.id, currentMonth)
+      // Berechne Überschuss des Vormonats (mit Fahrername für spezielle KM-Tabellen)
+      await loadVormonatUeberschuss(user.id, currentMonth, profile.full_name)
 
       // Lade Zeiterfassungen für Werkstudenten/Teilzeit
       if (profile.zeitmodell === 'werkstudent' || profile.zeitmodell === 'teilzeit') {
@@ -109,7 +109,7 @@ export default function MonatsabrechnungPage() {
     }
   }
 
-  const loadTouren = async (userId: string, month: string) => {
+  const loadTouren = async (userId: string, month: string, driverName?: string) => {
     try {
       const arbeitsnachweise = await getArbeitsnachweiseByUser(userId)
 
@@ -119,10 +119,12 @@ export default function MonatsabrechnungPage() {
       })
 
       // Berechne Verdienst für jede Tour mit offizieller KM-Range
+      // Verwende driverName oder fahrerName aus State für fahrerspezifische Tabellen
+      const nameForCalc = driverName || fahrerName
       const tourenMitVerdienst = filtered.map((tour) => {
         const km = tour.gefahrene_km || 0
         // Rückläufer werden mit 0€ berechnet
-        const verdienst = tour.ist_ruecklaufer ? 0 : calculateTourVerdienst(km, tour.wartezeit)
+        const verdienst = tour.ist_ruecklaufer ? 0 : calculateTourVerdienst(km, tour.wartezeit, nameForCalc)
 
         return {
           id: tour.id,
@@ -147,7 +149,7 @@ export default function MonatsabrechnungPage() {
     }
   }
 
-  const loadVormonatUeberschuss = async (userId: string, currentMonth: string) => {
+  const loadVormonatUeberschuss = async (userId: string, currentMonth: string, driverName?: string) => {
     try {
       // Berechne Vormonat
       const [year, month] = currentMonth.split('-')
@@ -172,11 +174,12 @@ export default function MonatsabrechnungPage() {
         return item.datum.startsWith(vormonat)
       })
 
-      // Berechne Gesamtverdienst des Vormonats
+      // Berechne Gesamtverdienst des Vormonats (mit Fahrernamen für spezielle Tabellen)
+      const nameForCalc = driverName || fahrerName
       const vormonatGesamt = vormonatTouren.reduce((sum, tour) => {
         const km = tour.gefahrene_km || 0
         // Rückläufer werden mit 0€ berechnet
-        const verdienst = tour.ist_ruecklaufer ? 0 : calculateTourVerdienst(km, tour.wartezeit)
+        const verdienst = tour.ist_ruecklaufer ? 0 : calculateTourVerdienst(km, tour.wartezeit, nameForCalc)
         return sum + verdienst
       }, 0)
 
