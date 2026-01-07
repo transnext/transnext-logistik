@@ -46,6 +46,7 @@ export interface Arbeitsnachweis {
   beleg_url?: string
   status: 'pending' | 'approved' | 'rejected' | 'billed'
   ist_ruecklaufer?: boolean
+  auftraggeber?: 'onlogist' | 'smartandcare'
   created_at: string
   updated_at: string
 }
