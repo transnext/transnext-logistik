@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { TransNextLogo } from "@/components/ui/logo"
 import { ArrowLeft, Upload, CheckCircle } from "lucide-react"
 import { getCurrentUser, getUserProfile, createArbeitsnachweis } from "@/lib/api"
@@ -24,7 +25,9 @@ export default function ArbeitsnachweiPage() {
     datum: "",
     gefahreneKm: "",
     wartezeit: "keine" as "30-60" | "60-90" | "90-120" | "keine",
-    beleg: null as File | null
+    beleg: null as File | null,
+    auftraggeber: "" as "onlogist" | "smartandcare" | "",
+    istRuecklaufer: false
   })
 
   useEffect(() => {
@@ -75,13 +78,20 @@ export default function ArbeitsnachweiPage() {
         belegUrl = url
       }
 
+      // Prüfe ob Auftraggeber ausgewählt wurde
+      if (!formData.auftraggeber) {
+        throw new Error('Bitte wählen Sie einen Auftraggeber aus')
+      }
+
       // Erstelle Arbeitsnachweis mit Beleg-URL
       await createArbeitsnachweis({
         tour_nr: formData.tourNr,
         datum: formData.datum,
         gefahrene_km: parseFloat(formData.gefahreneKm),
         wartezeit: formData.wartezeit,
-        beleg_url: belegUrl
+        beleg_url: belegUrl,
+        auftraggeber: formData.auftraggeber,
+        ist_ruecklaufer: formData.istRuecklaufer
       })
 
       setSaved(true)
@@ -92,7 +102,9 @@ export default function ArbeitsnachweiPage() {
           datum: "",
           gefahreneKm: "",
           wartezeit: "keine",
-          beleg: null
+          beleg: null,
+          auftraggeber: "",
+          istRuecklaufer: false
         })
         setIsLoading(false)
       }, 2000)
@@ -207,6 +219,82 @@ export default function ArbeitsnachweiPage() {
                         <SelectItem value="90-120">90-120 Min.</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                {/* Auftraggeber Auswahl */}
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Auftraggeber *</Label>
+                  <p className="text-sm text-gray-500">Bitte wählen Sie den Auftraggeber dieser Tour</p>
+                  <div className="flex gap-6">
+                    <div
+                      className={`flex-1 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        formData.auftraggeber === 'onlogist'
+                          ? 'border-primary-blue bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setFormData({ ...formData, auftraggeber: 'onlogist' })}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          formData.auftraggeber === 'onlogist'
+                            ? 'border-primary-blue'
+                            : 'border-gray-300'
+                        }`}>
+                          {formData.auftraggeber === 'onlogist' && (
+                            <div className="w-3 h-3 rounded-full bg-primary-blue" />
+                          )}
+                        </div>
+                        <span className={`font-medium ${
+                          formData.auftraggeber === 'onlogist' ? 'text-primary-blue' : 'text-gray-700'
+                        }`}>
+                          Onlogist
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`flex-1 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        formData.auftraggeber === 'smartandcare'
+                          ? 'border-primary-blue bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setFormData({ ...formData, auftraggeber: 'smartandcare' })}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          formData.auftraggeber === 'smartandcare'
+                            ? 'border-primary-blue'
+                            : 'border-gray-300'
+                        }`}>
+                          {formData.auftraggeber === 'smartandcare' && (
+                            <div className="w-3 h-3 rounded-full bg-primary-blue" />
+                          )}
+                        </div>
+                        <span className={`font-medium ${
+                          formData.auftraggeber === 'smartandcare' ? 'text-primary-blue' : 'text-gray-700'
+                        }`}>
+                          Smart and Care
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Rückläufer Checkbox */}
+                <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <Checkbox
+                    id="istRuecklaufer"
+                    checked={formData.istRuecklaufer}
+                    onCheckedChange={(checked: boolean) => setFormData({ ...formData, istRuecklaufer: checked })}
+                  />
+                  <div className="flex flex-col">
+                    <Label htmlFor="istRuecklaufer" className="font-medium cursor-pointer">
+                      Diese Tour ist ein Rückläufer
+                    </Label>
+                    <p className="text-sm text-gray-500">
+                      Markieren Sie diese Option, wenn es sich um eine Rückläufer-Tour handelt (wird mit 0€ berechnet)
+                    </p>
                   </div>
                 </div>
 

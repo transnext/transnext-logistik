@@ -73,4 +73,4 @@
 
 ## Warten auf Bestätigung
 
-- [ ] Code noch nicht gepusht (auf Anweisung warten)
+- [x] Code gepusht

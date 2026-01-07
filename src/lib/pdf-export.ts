@@ -1,7 +1,7 @@
 import { PDFDocument } from 'pdf-lib'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { calculateCustomerTotal, wartezeitToCode, getWartezeitText } from './customer-pricing'
+import { calculateCustomerTotal, wartezeitToCode, getWartezeitText, type Auftraggeber } from './customer-pricing'
 
 interface TourForExport {
   tour_nr: string
@@ -9,6 +9,7 @@ interface TourForExport {
   gefahrene_km: number
   wartezeit: string
   fahrer_name: string
+  auftraggeber?: Auftraggeber
 }
 
 interface AuslageForExport {
@@ -44,10 +45,10 @@ export function exportTourenPDF(
   doc.setFontSize(16)
   doc.text(`Tourenabrechnung KW ${kw}-${year}`, 14, 35)
 
-  // Tabellen-Daten vorbereiten
+  // Tabellen-Daten vorbereiten (mit Auftraggeber-spezifischen Preisen)
   const tableData = touren.map((tour, index) => {
     const wartezeitCode = wartezeitToCode(tour.wartezeit)
-    const betrag = calculateCustomerTotal(tour.gefahrene_km, tour.wartezeit)
+    const betrag = calculateCustomerTotal(tour.gefahrene_km, tour.wartezeit, tour.auftraggeber)
 
     return [
       tour.tour_nr,
@@ -58,9 +59,9 @@ export function exportTourenPDF(
     ]
   })
 
-  // Gesamtsumme berechnen
+  // Gesamtsumme berechnen (mit Auftraggeber-spezifischen Preisen)
   const gesamt = touren.reduce((sum, tour) => {
-    return sum + calculateCustomerTotal(tour.gefahrene_km, tour.wartezeit)
+    return sum + calculateCustomerTotal(tour.gefahrene_km, tour.wartezeit, tour.auftraggeber)
   }, 0)
 
   // Tabelle erstellen (mit automatischem Seitenumbruch)
