@@ -293,7 +293,7 @@ export default function ArbeitsnachweiPage() {
                       Diese Tour ist ein Rückläufer
                     </Label>
                     <p className="text-sm text-gray-500">
-                      Markieren Sie diese Option, wenn es sich um eine Rückläufer-Tour handelt (wird mit 0€ berechnet)
+                      Markieren Sie diese Option, wenn es sich um eine Rückläufer-Tour handelt
                     </p>
                   </div>
                 </div>
