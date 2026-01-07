@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { TransNextLogo } from "@/components/ui/logo"
+import { TransNextLogo, TransNextIcon } from "@/components/ui/logo"
 import { ArrowLeft, Upload, CheckCircle } from "lucide-react"
 import { getCurrentUser, getUserProfile, createArbeitsnachweis } from "@/lib/api"
 import { uploadBeleg } from "@/lib/storage"
@@ -123,32 +123,35 @@ export default function ArbeitsnachweiPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Header */}
+      {/* Header - Mobile Optimized */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <TransNextLogo width={150} height={45} showText={true} />
-              <div className="h-8 w-px bg-gray-300" />
-              <h1 className="text-xl font-semibold text-primary-blue">Fahrerportal</h1>
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="sm:hidden">
+              <TransNextIcon size={32} />
             </div>
+            <div className="hidden sm:block">
+              <TransNextLogo width={130} height={40} showText={true} />
+            </div>
+            <div className="h-6 sm:h-8 w-px bg-gray-300" />
+            <h1 className="text-base sm:text-xl font-semibold text-primary-blue">Fahrerportal</h1>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-3xl">
         <Link href="/fahrerportal/dashboard">
-          <Button variant="ghost" className="mb-6 text-primary-blue hover:bg-blue-50">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Zurück zum Dashboard
+          <Button variant="ghost" className="mb-4 sm:mb-6 text-primary-blue hover:bg-blue-50 px-2 sm:px-4">
+            <ArrowLeft className="mr-1 sm:mr-2 h-4 w-4" />
+            <span className="text-sm sm:text-base">Zurück</span>
           </Button>
         </Link>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl text-primary-blue">Arbeitsnachweis hochladen</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-xl sm:text-2xl text-primary-blue">Arbeitsnachweis hochladen</CardTitle>
+            <CardDescription className="text-sm">
               Erfassen Sie hier Ihre abgeschlossene Tour
             </CardDescription>
           </CardHeader>
@@ -164,8 +167,8 @@ export default function ArbeitsnachweiPage() {
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="tourNr">Tour-Nr. *</Label>
                     <Input
@@ -224,9 +227,9 @@ export default function ArbeitsnachweiPage() {
 
                 {/* Auftraggeber Auswahl */}
                 <div className="space-y-3">
-                  <Label className="text-base font-medium">Auftraggeber *</Label>
-                  <p className="text-sm text-gray-500">Bitte wählen Sie den Auftraggeber dieser Tour</p>
-                  <div className="flex gap-6">
+                  <Label className="text-sm sm:text-base font-medium">Auftraggeber *</Label>
+                  <p className="text-xs sm:text-sm text-gray-500">Bitte wählen Sie den Auftraggeber</p>
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
                     <div
                       className={`flex-1 p-4 border-2 rounded-lg cursor-pointer transition-all ${
                         formData.auftraggeber === 'onlogist'
@@ -318,20 +321,20 @@ export default function ArbeitsnachweiPage() {
                   </div>
                 )}
 
-                <div className="flex gap-4 pt-4">
-                  <Button
-                    type="submit"
-                    className="flex-1 bg-primary-blue hover:bg-blue-700"
-                    disabled={isLoading}
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    {isLoading ? "Wird hochgeladen..." : "Arbeitsnachweis hochladen"}
-                  </Button>
-                  <Link href="/fahrerportal/dashboard" className="flex-1">
+                <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 pt-4">
+                  <Link href="/fahrerportal/dashboard" className="sm:flex-1">
                     <Button type="button" variant="outline" className="w-full" disabled={isLoading}>
                       Abbrechen
                     </Button>
                   </Link>
+                  <Button
+                    type="submit"
+                    className="sm:flex-1 bg-primary-blue hover:bg-blue-700"
+                    disabled={isLoading}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {isLoading ? "Wird hochgeladen..." : "Hochladen"}
+                  </Button>
                 </div>
               </form>
             )}

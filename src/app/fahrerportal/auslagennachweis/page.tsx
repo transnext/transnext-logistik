@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TransNextLogo } from "@/components/ui/logo"
+import { TransNextLogo, TransNextIcon } from "@/components/ui/logo"
 import { ArrowLeft, Upload, CheckCircle } from "lucide-react"
 import { getCurrentUser, getUserProfile, createAuslagennachweis } from "@/lib/api"
 import { uploadBeleg } from "@/lib/storage"
@@ -120,49 +120,52 @@ export default function AuslagennachweisPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Header */}
+      {/* Header - Mobile Optimized */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <TransNextLogo width={150} height={45} showText={true} />
-              <div className="h-8 w-px bg-gray-300" />
-              <h1 className="text-xl font-semibold text-primary-blue">Fahrerportal</h1>
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="sm:hidden">
+              <TransNextIcon size={32} />
             </div>
+            <div className="hidden sm:block">
+              <TransNextLogo width={130} height={40} showText={true} />
+            </div>
+            <div className="h-6 sm:h-8 w-px bg-gray-300" />
+            <h1 className="text-base sm:text-xl font-semibold text-primary-blue">Fahrerportal</h1>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-3xl">
         <Link href="/fahrerportal/dashboard">
-          <Button variant="ghost" className="mb-6 text-primary-blue hover:bg-blue-50">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Zurück zum Dashboard
+          <Button variant="ghost" className="mb-4 sm:mb-6 text-primary-blue hover:bg-blue-50 px-2 sm:px-4">
+            <ArrowLeft className="mr-1 sm:mr-2 h-4 w-4" />
+            <span className="text-sm sm:text-base">Zurück</span>
           </Button>
         </Link>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl text-primary-blue">Auslagennachweis hochladen</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-xl sm:text-2xl text-primary-blue">Auslagennachweis hochladen</CardTitle>
+            <CardDescription className="text-sm">
               Erfassen Sie hier Ihre angefallenen Auslagen
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
             {saved ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <CheckCircle className="h-16 w-16 text-green-600 mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-center">
+                <CheckCircle className="h-12 w-12 sm:h-16 sm:w-16 text-green-600 mb-4" />
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
                   Erfolgreich gespeichert!
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-sm sm:text-base text-gray-600">
                   Ihr Auslagennachweis wurde erfolgreich hochgeladen.
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="tourNr">Tour-Nr. *</Label>
                     <Input
@@ -277,20 +280,20 @@ export default function AuslagennachweisPage() {
                   </div>
                 )}
 
-                <div className="flex gap-4 pt-4">
-                  <Button
-                    type="submit"
-                    disabled={isLoading}
-                    className="flex-1 bg-primary-blue hover:bg-blue-700"
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    {isLoading ? "Wird hochgeladen..." : "Auslagennachweis hochladen"}
-                  </Button>
-                  <Link href="/fahrerportal/dashboard" className="flex-1">
+                <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 pt-4">
+                  <Link href="/fahrerportal/dashboard" className="sm:flex-1">
                     <Button type="button" variant="outline" className="w-full" disabled={isLoading}>
                       Abbrechen
                     </Button>
                   </Link>
+                  <Button
+                    type="submit"
+                    disabled={isLoading}
+                    className="sm:flex-1 bg-primary-blue hover:bg-blue-700"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {isLoading ? "Wird hochgeladen..." : "Hochladen"}
+                  </Button>
                 </div>
               </form>
             )}

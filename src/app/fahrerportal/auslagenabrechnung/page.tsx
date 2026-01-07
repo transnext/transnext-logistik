@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { TransNextLogo } from "@/components/ui/logo"
+import { TransNextLogo, TransNextIcon } from "@/components/ui/logo"
 import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle, CreditCard } from "lucide-react"
 import { getCurrentUser, getUserProfile, getAuslagennachweiseByUser } from "@/lib/api"
 
@@ -162,7 +162,7 @@ export default function AuslagenabrechnungPage() {
 
   const getStatusBadge = (status?: string) => {
     const currentStatus = status || "pending"
-    
+
     // Für Fahrer: "billed" und "paid" beide als "Überwiesen" anzeigen
     if (currentStatus === "paid" || currentStatus === "billed") {
       return (
@@ -172,7 +172,7 @@ export default function AuslagenabrechnungPage() {
         </Badge>
       )
     }
-    
+
     if (currentStatus === "approved") {
       return (
         <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center gap-1 w-fit">
@@ -181,7 +181,7 @@ export default function AuslagenabrechnungPage() {
         </Badge>
       )
     }
-    
+
     if (currentStatus === "rejected") {
       return (
         <Badge className="bg-red-100 text-red-800 border-red-200 flex items-center gap-1 w-fit">
@@ -190,7 +190,7 @@ export default function AuslagenabrechnungPage() {
         </Badge>
       )
     }
-    
+
     return (
       <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 flex items-center gap-1 w-fit">
         <Clock className="h-3 w-3" />
@@ -213,25 +213,28 @@ export default function AuslagenabrechnungPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Header */}
+      {/* Header - Mobile Optimized */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <TransNextLogo width={150} height={45} showText={true} />
-              <div className="h-8 w-px bg-gray-300" />
-              <h1 className="text-xl font-semibold text-primary-blue">Fahrerportal</h1>
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="sm:hidden">
+              <TransNextIcon size={32} />
             </div>
+            <div className="hidden sm:block">
+              <TransNextLogo width={130} height={40} showText={true} />
+            </div>
+            <div className="h-6 sm:h-8 w-px bg-gray-300" />
+            <h1 className="text-base sm:text-xl font-semibold text-primary-blue">Fahrerportal</h1>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-6xl">
         <Link href="/fahrerportal/dashboard">
-          <Button variant="ghost" className="mb-6 text-primary-blue hover:bg-blue-50">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Zurück zum Dashboard
+          <Button variant="ghost" className="mb-4 sm:mb-6 text-primary-blue hover:bg-blue-50 px-2 sm:px-4">
+            <ArrowLeft className="mr-1 sm:mr-2 h-4 w-4" />
+            <span className="text-sm sm:text-base">Zurück</span>
           </Button>
         </Link>
 
