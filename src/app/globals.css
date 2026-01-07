@@ -74,31 +74,24 @@
   .text-primary-blue {
     color: #015aa4;
   }
-
   .text-secondary-blue {
     color: #58b1ff;
   }
-
   .bg-primary-blue {
     background-color: #015aa4;
   }
-
   .bg-secondary-blue {
     background-color: #58b1ff;
   }
-
   .border-primary-blue {
     border-color: #015aa4;
   }
-
   .hover-primary-darken:hover {
     background-color: #014a87;
   }
-
   .container-wide {
     @apply container mx-auto px-4 sm:px-6 lg:px-8;
   }
-
   .text-balance {
     text-wrap: balance;
   }
@@ -111,13 +104,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .hero-title {
-  @apply text-4xl md:text-5xl lg:text-6xl font-bold text-balance;
+  @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-balance leading-tight;
 }
 
 .section-title {
-  @apply text-2xl md:text-3xl lg:text-4xl font-bold text-balance;
+  @apply text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-balance;
 }
 
 .section-subtitle {
-  @apply text-lg md:text-xl text-muted-foreground text-balance;
+  @apply text-base sm:text-lg md:text-xl text-muted-foreground text-balance;
 }
