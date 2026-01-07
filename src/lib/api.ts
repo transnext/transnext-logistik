@@ -46,6 +46,8 @@ export async function createArbeitsnachweis(data: {
   gefahrene_km: number
   wartezeit: '30-60' | '60-90' | '90-120' | 'keine'
   beleg_url?: string
+  auftraggeber: 'onlogist' | 'smartandcare'
+  ist_ruecklaufer?: boolean
 }) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Nicht angemeldet')
