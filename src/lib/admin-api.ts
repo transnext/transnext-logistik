@@ -163,7 +163,7 @@ export async function getAllFahrerAdmin() {
 // =====================================================
 
 export async function getAdminStatistics() {
-  // Lade Touren MIT Profil-Informationen (zeitmodell)
+  // Lade Touren MIT Profil-Informationen (zeitmodell) und Auftraggeber
   const [arbeitsnachweiseData, auslagennachweiseData, fahrerData] = await Promise.all([
     supabase.from('arbeitsnachweise').select(`
       status,
@@ -171,6 +171,7 @@ export async function getAdminStatistics() {
       wartezeit,
       datum,
       user_id,
+      auftraggeber,
       profiles!arbeitsnachweise_user_id_fkey (
         zeitmodell,
         festes_gehalt
@@ -215,9 +216,9 @@ export async function getAdminStatistics() {
     return sum + calculateTourVerdienst(t.gefahrene_km || 0, t.wartezeit, fahrerName)
   }, 0)
 
-  // Monatsumsatz (alle Touren des Monats mit Kunden-Preisen)
-  const monatsumsatz = currentMonthTouren.reduce((sum, t) => {
-    return sum + calculateCustomerTotal(t.gefahrene_km || 0, t.wartezeit)
+  // Monatsumsatz (alle Touren des Monats mit Kunden-Preisen) - berücksichtigt Auftraggeber
+  const monatsumsatz = currentMonthTouren.reduce((sum, t: any) => {
+    return sum + calculateCustomerTotal(t.gefahrene_km || 0, t.wartezeit, t.auftraggeber)
   }, 0)
 
   return {
