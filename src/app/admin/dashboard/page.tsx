@@ -223,7 +223,7 @@ export default function AdminDashboardPage() {
     // Monatsumsatz (Kundenpreise)
     const monatsumsatz = monthTouren.reduce((sum, t) => {
       const km = parseFloat(t.gefahreneKm) || 0
-      return sum + calculateCustomerTotal(km, t.wartezeit)
+      return sum + calculateCustomerTotal(km, t.wartezeit, t.auftraggeber as 'onlogist' | 'smartandcare' | undefined)
     }, 0)
 
     return {
