@@ -31,7 +31,8 @@ import {
   deleteAuslage,
   billMultipleAuslagen,
   markTourAsRuecklaufer,
-  getMonatsueberschuss
+  getMonatsueberschuss,
+  updateTour
 } from "@/lib/admin-api"
 import { exportTourenPDF, exportAuslagenPDF, exportAuslagenWithBelege } from "@/lib/pdf-export"
 import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout } from "@/lib/salary-calculator"
@@ -72,6 +73,7 @@ interface Tour {
   erstelltAm: string
   belegUrl?: string
   istRuecklaufer?: boolean
+  auftraggeber?: string
   zeitmodell?: string
   festes_gehalt?: number
 }
@@ -150,6 +152,18 @@ export default function AdminDashboardPage() {
   const [fahrerTouren, setFahrerTouren] = useState<Tour[]>([])
   const [fahrerAuslagen, setFahrerAuslagen] = useState<Auslage[]>([])
   const [fahrerVormonatUeberschuss, setFahrerVormonatUeberschuss] = useState(0)
+  // Tour-Bearbeitung
+  const [showEditTour, setShowEditTour] = useState(false)
+  const [editingTour, setEditingTour] = useState<{
+    id: number
+    tour_nr: string
+    datum: string
+    gefahrene_km: string
+    wartezeit: string
+    auftraggeber: string
+    ist_ruecklaufer: boolean
+    status: string
+  } | null>(null)
 
   // Monat-Filter
   const now = new Date()
@@ -296,6 +310,7 @@ export default function AdminDashboardPage() {
         erstelltAm: t.created_at,
         belegUrl: t.beleg_url,
         istRuecklaufer: t.ist_ruecklaufer,
+        auftraggeber: t.auftraggeber,
         zeitmodell: t.zeitmodell,
         festes_gehalt: t.festes_gehalt
       })))
@@ -587,6 +602,41 @@ export default function AdminDashboardPage() {
     } catch (error) {
       console.error("Fehler beim Rückläufer-Update:", error)
       alert("Fehler beim Aktualisieren des Rückläufer-Status: " + (error as Error).message)
+    }
+  }
+
+  const handleEditTour = (tour: Tour) => {
+    setEditingTour({
+      id: tour.id,
+      tour_nr: tour.tourNr,
+      datum: tour.datum,
+      gefahrene_km: tour.gefahreneKm,
+      wartezeit: tour.wartezeit,
+      auftraggeber: tour.auftraggeber || '',
+      ist_ruecklaufer: tour.istRuecklaufer || false,
+      status: tour.status
+    })
+    setShowEditTour(true)
+  }
+
+  const handleUpdateTour = async () => {
+    if (!editingTour) return
+    try {
+      await updateTour(editingTour.id, {
+        tour_nr: editingTour.tour_nr,
+        datum: editingTour.datum,
+        gefahrene_km: parseFloat(editingTour.gefahrene_km),
+        wartezeit: editingTour.wartezeit,
+        auftraggeber: editingTour.auftraggeber,
+        ist_ruecklaufer: editingTour.ist_ruecklaufer
+      })
+      setShowEditTour(false)
+      setEditingTour(null)
+      await loadAllData()
+      alert("Tour erfolgreich aktualisiert!")
+    } catch (error) {
+      console.error("Fehler beim Aktualisieren der Tour:", error)
+      alert("Fehler beim Aktualisieren der Tour: " + (error as Error).message)
     }
   }
 
@@ -1209,6 +1259,15 @@ export default function AdminDashboardPage() {
                                 title={tour.istRuecklaufer ? "Als normale Tour markieren" : "Als Rückläufer markieren"}
                               >
                                 <RefreshCw className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditTour(tour)}
+                                className="text-blue-700 border-blue-300 hover:bg-blue-50"
+                                title="Bearbeiten"
+                              >
+                                <Edit className="h-3 w-3" />
                               </Button>
                               <Button
                                 size="sm"
@@ -2296,6 +2355,101 @@ export default function AdminDashboardPage() {
           </>
         )}
       </main>
+
+      {/* Tour Bearbeiten Dialog */}
+      {showEditTour && editingTour && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg mx-4">
+            <CardHeader>
+              <CardTitle>Tour bearbeiten</CardTitle>
+              <CardDescription>Tour {editingTour.tour_nr} vom {new Date(editingTour.datum).toLocaleDateString('de-DE')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-tour-nr">Tour-Nr.</Label>
+                  <Input
+                    id="edit-tour-nr"
+                    value={editingTour.tour_nr}
+                    onChange={(e) => setEditingTour({...editingTour, tour_nr: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-datum">Datum</Label>
+                  <Input
+                    id="edit-datum"
+                    type="date"
+                    value={editingTour.datum}
+                    onChange={(e) => setEditingTour({...editingTour, datum: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-km">Gefahrene km</Label>
+                  <Input
+                    id="edit-km"
+                    type="number"
+                    value={editingTour.gefahrene_km}
+                    onChange={(e) => setEditingTour({...editingTour, gefahrene_km: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-wartezeit">Wartezeit</Label>
+                  <Select
+                    value={editingTour.wartezeit}
+                    onValueChange={(value) => setEditingTour({...editingTour, wartezeit: value})}
+                  >
+                    <SelectTrigger id="edit-wartezeit">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="keine">Keine</SelectItem>
+                      <SelectItem value="bis30">Bis 30 Min</SelectItem>
+                      <SelectItem value="30bis60">30-60 Min</SelectItem>
+                      <SelectItem value="ueber60">Über 60 Min</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-auftraggeber">Auftraggeber</Label>
+                <Select
+                  value={editingTour.auftraggeber}
+                  onValueChange={(value) => setEditingTour({...editingTour, auftraggeber: value})}
+                >
+                  <SelectTrigger id="edit-auftraggeber">
+                    <SelectValue placeholder="Auftraggeber wählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="KSP">KSP</SelectItem>
+                    <SelectItem value="SIXT">SIXT</SelectItem>
+                    <SelectItem value="Andere">Andere</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="edit-ruecklaufer"
+                  checked={editingTour.ist_ruecklaufer}
+                  onChange={(e) => setEditingTour({...editingTour, ist_ruecklaufer: e.target.checked})}
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="edit-ruecklaufer">Rückläufer / Retoure</Label>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => { setShowEditTour(false); setEditingTour(null); }}>
+                  Abbrechen
+                </Button>
+                <Button onClick={handleUpdateTour}>
+                  Speichern
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Beleg Dialog */}
       {selectedBeleg && (
