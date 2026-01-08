@@ -357,6 +357,53 @@ export async function billMultipleTours(tourIds: number[]) {
   return { success: true, count: tourIds.length, data }
 }
 
+/**
+ * Aktualisiert eine Tour (Arbeitsnachweis)
+ */
+export async function updateTour(tourId: number, data: {
+  tour_nr?: string
+  datum?: string
+  gefahrene_km?: number
+  wartezeit?: '30-60' | '60-90' | '90-120' | 'keine'
+  auftraggeber?: 'onlogist' | 'smartandcare'
+  ist_ruecklaufer?: boolean
+  status?: 'pending' | 'approved' | 'rejected' | 'billed'
+}) {
+  const { data: result, error } = await supabase
+    .from('arbeitsnachweise')
+    .update(data)
+    .eq('id', tourId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return { success: true, data: result }
+}
+
+/**
+ * Aktualisiert eine Auslage
+ */
+export async function updateAuslage(auslagenId: number, data: {
+  tour_nr?: string
+  kennzeichen?: string
+  datum?: string
+  startort?: string
+  zielort?: string
+  belegart?: 'tankbeleg' | 'waschbeleg' | 'bahnticket' | 'bc50' | 'taxi' | 'uber'
+  kosten?: number
+  status?: 'pending' | 'approved' | 'rejected' | 'paid' | 'billed'
+}) {
+  const { data: result, error } = await supabase
+    .from('auslagennachweise')
+    .update(data)
+    .eq('id', auslagenId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return { success: true, data: result }
+}
+
 // AUSLAGEN MANAGEMENT
 export async function deleteAuslage(auslagenId: number) {
   const { error } = await supabase
