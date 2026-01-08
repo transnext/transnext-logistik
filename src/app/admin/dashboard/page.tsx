@@ -242,7 +242,7 @@ export default function AdminDashboardPage() {
       paidAuslagen: monthAuslagen.filter(e => e.status === 'paid').length,
       rejectedAuslagen: monthAuslagen.filter(e => e.status === 'rejected').length,
       openAuslagenAmount: monthAuslagen
-        .filter(e => e.status !== 'paid')
+        .filter(e => e.status === 'approved')
         .reduce((sum, e) => sum + (parseFloat(e.kosten) || 0), 0),
       paidAuslagenAmount: monthAuslagen
         .filter(e => e.status === 'paid')
@@ -928,7 +928,7 @@ export default function AdminDashboardPage() {
   const tourenPending = touren.filter(t => t.status === "pending").length
   const auslagenPending = auslagen.filter(a => a.status === "pending").length
   const offeneAuslagen = auslagen
-    .filter(a => a.status !== "paid")
+    .filter(a => a.status === "approved")
     .reduce((sum, a) => sum + parseFloat(a.kosten || "0"), 0)
 
   const fuehrerscheinklassen = ['B', 'BE', 'C', 'CE', 'C1', 'C1E', 'D', 'DE', 'D1', 'D1E', 'AM', 'A1', 'A2', 'A', 'L', 'T']
