@@ -2422,9 +2422,8 @@ export default function AdminDashboardPage() {
                     <SelectValue placeholder="Auftraggeber wählen" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="KSP">KSP</SelectItem>
-                    <SelectItem value="SIXT">SIXT</SelectItem>
-                    <SelectItem value="Andere">Andere</SelectItem>
+                    <SelectItem value="smartandcare">Smart and Care</SelectItem>
+                    <SelectItem value="onlogist">Onlogist</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
