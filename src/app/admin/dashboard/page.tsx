@@ -32,7 +32,8 @@ import {
   billMultipleAuslagen,
   markTourAsRuecklaufer,
   getMonatsueberschuss,
-  updateTour
+  updateTour,
+  updateAuslage
 } from "@/lib/admin-api"
 import { exportTourenPDF, exportAuslagenPDF, exportAuslagenWithBelege } from "@/lib/pdf-export"
 import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout } from "@/lib/salary-calculator"
@@ -148,6 +149,18 @@ export default function AdminDashboardPage() {
   const [selectedAuslagenIds, setSelectedAuslagenIds] = useState<number[]>([])
   const [showBelegDialog, setShowBelegDialog] = useState(false)
   const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string; typ: "arbeitsnachweis" | "auslagennachweis"; belegUrl?: string } | null>(null)
+  // Auslagen-Bearbeitung
+  const [showEditAuslage, setShowEditAuslage] = useState(false)
+  const [editingAuslage, setEditingAuslage] = useState<{
+    id: number
+    tour_nr: string
+    kennzeichen: string
+    datum: string
+    startort: string
+    zielort: string
+    belegart: string
+    kosten: string
+  } | null>(null)
   const [selectedFahrerId, setSelectedFahrerId] = useState<number | null>(null)
   const [fahrerTouren, setFahrerTouren] = useState<Tour[]>([])
   const [fahrerAuslagen, setFahrerAuslagen] = useState<Auslage[]>([])
@@ -637,6 +650,42 @@ export default function AdminDashboardPage() {
     } catch (error) {
       console.error("Fehler beim Aktualisieren der Tour:", error)
       alert("Fehler beim Aktualisieren der Tour: " + (error as Error).message)
+    }
+  }
+
+  const handleEditAuslage = (auslage: Auslage) => {
+    setEditingAuslage({
+      id: auslage.id,
+      tour_nr: auslage.tourNr,
+      kennzeichen: auslage.kennzeichen,
+      datum: auslage.datum,
+      startort: auslage.startort,
+      zielort: auslage.zielort,
+      belegart: auslage.belegart,
+      kosten: auslage.kosten
+    })
+    setShowEditAuslage(true)
+  }
+
+  const handleUpdateAuslage = async () => {
+    if (!editingAuslage) return
+    try {
+      await updateAuslage(editingAuslage.id, {
+        tour_nr: editingAuslage.tour_nr,
+        kennzeichen: editingAuslage.kennzeichen,
+        datum: editingAuslage.datum,
+        startort: editingAuslage.startort,
+        zielort: editingAuslage.zielort,
+        belegart: editingAuslage.belegart,
+        kosten: parseFloat(editingAuslage.kosten)
+      })
+      setShowEditAuslage(false)
+      setEditingAuslage(null)
+      await loadAllData()
+      alert("Auslage erfolgreich aktualisiert!")
+    } catch (error) {
+      console.error("Fehler beim Aktualisieren der Auslage:", error)
+      alert("Fehler beim Aktualisieren der Auslage: " + (error as Error).message)
     }
   }
 
@@ -1254,15 +1303,6 @@ export default function AdminDashboardPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => toggleRuecklaufer(tour.id, tour.istRuecklaufer || false)}
-                                className={tour.istRuecklaufer ? "text-orange-700 bg-orange-100 border-orange-300" : "text-gray-700 border-gray-300 hover:bg-gray-50"}
-                                title={tour.istRuecklaufer ? "Als normale Tour markieren" : "Als Rückläufer markieren"}
-                              >
-                                <RefreshCw className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
                                 onClick={() => handleEditTour(tour)}
                                 className="text-blue-700 border-blue-300 hover:bg-blue-50"
                                 title="Bearbeiten"
@@ -1429,6 +1469,15 @@ export default function AdminDashboardPage() {
                                 title="Ablehnen"
                               >
                                 <XCircle className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditAuslage(auslage)}
+                                className="text-blue-700 border-blue-300 hover:bg-blue-50"
+                                title="Bearbeiten"
+                              >
+                                <Edit className="h-3 w-3" />
                               </Button>
                               <Button
                                 size="sm"
@@ -2449,6 +2498,103 @@ export default function AdminDashboardPage() {
           </Card>
         </div>
       )}
+      {/* Auslage Bearbeiten Dialog */}
+      {showEditAuslage && editingAuslage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg mx-4">
+            <CardHeader>
+              <CardTitle>Auslage bearbeiten</CardTitle>
+              <CardDescription>Tour {editingAuslage.tour_nr} vom {new Date(editingAuslage.datum).toLocaleDateString('de-DE')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-auslage-tour-nr">Tour-Nr.</Label>
+                  <Input
+                    id="edit-auslage-tour-nr"
+                    value={editingAuslage.tour_nr}
+                    onChange={(e) => setEditingAuslage({...editingAuslage, tour_nr: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-auslage-kennzeichen">Kennzeichen</Label>
+                  <Input
+                    id="edit-auslage-kennzeichen"
+                    value={editingAuslage.kennzeichen}
+                    onChange={(e) => setEditingAuslage({...editingAuslage, kennzeichen: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-auslage-datum">Datum</Label>
+                  <Input
+                    id="edit-auslage-datum"
+                    type="date"
+                    value={editingAuslage.datum}
+                    onChange={(e) => setEditingAuslage({...editingAuslage, datum: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-auslage-kosten">Kosten (EUR)</Label>
+                  <Input
+                    id="edit-auslage-kosten"
+                    type="number"
+                    step="0.01"
+                    value={editingAuslage.kosten}
+                    onChange={(e) => setEditingAuslage({...editingAuslage, kosten: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-auslage-startort">Startort</Label>
+                  <Input
+                    id="edit-auslage-startort"
+                    value={editingAuslage.startort}
+                    onChange={(e) => setEditingAuslage({...editingAuslage, startort: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-auslage-zielort">Zielort</Label>
+                  <Input
+                    id="edit-auslage-zielort"
+                    value={editingAuslage.zielort}
+                    onChange={(e) => setEditingAuslage({...editingAuslage, zielort: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-auslage-belegart">Belegart</Label>
+                <Select
+                  value={editingAuslage.belegart}
+                  onValueChange={(value) => setEditingAuslage({...editingAuslage, belegart: value})}
+                >
+                  <SelectTrigger id="edit-auslage-belegart">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Tanken">Tanken</SelectItem>
+                    <SelectItem value="Waschen">Waschen</SelectItem>
+                    <SelectItem value="Parken">Parken</SelectItem>
+                    <SelectItem value="Maut">Maut</SelectItem>
+                    <SelectItem value="Sonstiges">Sonstiges</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => { setShowEditAuslage(false); setEditingAuslage(null); }}>
+                  Abbrechen
+                </Button>
+                <Button onClick={handleUpdateAuslage}>
+                  Speichern
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
 
       {/* Beleg Dialog */}
       {selectedBeleg && (
