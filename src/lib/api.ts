@@ -117,15 +117,27 @@ export async function createAuslagennachweis(data: {
   belegart: 'tankbeleg' | 'waschbeleg' | 'bahnticket' | 'bc50' | 'taxi' | 'uber'
   kosten: number
   beleg_url?: string
+  ist_tankkarte?: boolean
 }) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Nicht angemeldet')
+
+  // Wenn Tankkarte genutzt wurde, Status auf 'tankcard' setzen (keine Erstattung)
+  const status = data.ist_tankkarte ? 'tankcard' : 'pending'
 
   const { data: result, error } = await supabase
     .from('auslagennachweise')
     .insert([{
       user_id: user.id,
-      ...data,
+      tour_nr: data.tour_nr,
+      kennzeichen: data.kennzeichen,
+      datum: data.datum,
+      startort: data.startort,
+      zielort: data.zielort,
+      belegart: data.belegart,
+      kosten: data.kosten,
+      beleg_url: data.beleg_url,
+      status: status,
     }])
     .select()
     .single()
