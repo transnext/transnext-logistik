@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TransNextLogo, TransNextIcon } from "@/components/ui/logo"
-import { ArrowLeft, Upload, CheckCircle } from "lucide-react"
+import { ArrowLeft, Upload, CheckCircle, CreditCard } from "lucide-react"
 import { getCurrentUser, getUserProfile, createAuslagennachweis } from "@/lib/api"
 import { uploadBeleg } from "@/lib/storage"
 
@@ -27,7 +27,8 @@ export default function AuslagennachweisPage() {
     zielort: "",
     belegart: "tankbeleg" as "tankbeleg" | "waschbeleg" | "bahnticket" | "bc50" | "taxi" | "uber",
     kosten: "",
-    beleg: null as File | null
+    beleg: null as File | null,
+    istTankkarte: false
   })
 
   useEffect(() => {
@@ -87,7 +88,8 @@ export default function AuslagennachweisPage() {
         zielort: formData.zielort,
         belegart: formData.belegart,
         kosten: parseFloat(formData.kosten),
-        beleg_url: belegUrl
+        beleg_url: belegUrl,
+        ist_tankkarte: formData.istTankkarte
       })
 
       setSaved(true)
@@ -101,7 +103,8 @@ export default function AuslagennachweisPage() {
           zielort: "",
           belegart: "tankbeleg",
           kosten: "",
-          beleg: null
+          beleg: null,
+          istTankkarte: false
         })
         setIsLoading(false)
       }, 2000)
@@ -259,6 +262,27 @@ export default function AuslagennachweisPage() {
                     required
                   />
                 </div>
+
+                {/* Tankkarten-Nutzung Button */}
+                {formData.belegart === "tankbeleg" && (
+                  <div className="space-y-2">
+                    <Label>Tankkarten-Nutzung</Label>
+                    <Button
+                      type="button"
+                      variant={formData.istTankkarte ? "default" : "outline"}
+                      className={`w-full justify-start ${formData.istTankkarte ? "bg-amber-600 hover:bg-amber-700 text-white" : "border-amber-400 text-amber-700 hover:bg-amber-50"}`}
+                      onClick={() => setFormData({ ...formData, istTankkarte: !formData.istTankkarte })}
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      {formData.istTankkarte ? "Tankkarte genutzt (keine Erstattung)" : "Firmen-Tankkarte genutzt?"}
+                    </Button>
+                    {formData.istTankkarte && (
+                      <p className="text-xs text-amber-700 mt-1">
+                        Bei Nutzung der Firmen-Tankkarte erfolgt keine Erstattung. Der Beleg dient nur zur Dokumentation.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="beleg">Beleg hochladen *</Label>
