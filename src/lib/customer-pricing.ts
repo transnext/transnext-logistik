@@ -134,9 +134,16 @@ export function wartezeitToCode(wartezeit?: string): number {
 /**
  * Berechnet den Gesamtpreis für Kunden (KM + Wartezeit)
  * Optional: auftraggeber für auftraggeberspezifische Tabellen
+ * WICHTIG: Bei Onlogist wird KEINE Wartezeit berechnet (immer 0€)
  */
 export function calculateCustomerTotal(km: number, wartezeit?: string, auftraggeber?: Auftraggeber): number {
   const kmPrice = calculateCustomerPrice(km, auftraggeber)
+
+  // Bei Onlogist wird keine Wartezeit berechnet
+  if (auftraggeber === 'onlogist') {
+    return kmPrice
+  }
+
   const wartezeitCode = wartezeitToCode(wartezeit)
   const waitingPrice = calculateCustomerWaitingTime(wartezeitCode)
 
