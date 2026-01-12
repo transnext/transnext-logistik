@@ -73,6 +73,28 @@ export const PHILLIP_SANDER_KM_RANGES: KmRange[] = [
 // Fahrernamen die die spezielle Tabelle nutzen
 const SPECIAL_RATE_DRIVERS = ["Phillip Sander", "phillip sander"]
 
+// Fahrer ohne Lohnberechnung (Touren werden nicht vergütet)
+const NO_SALARY_DRIVERS = [
+  "Nicholas Mandzel",
+  "nicholas mandzel",
+  "Mandzel Nicholas",
+  "Burak Aydin",
+  "burak aydin",
+  "Aydin Burak"
+]
+
+/**
+ * Prüft ob ein Fahrer keine Lohnberechnung hat
+ */
+export function hasNoSalary(fahrerName?: string): boolean {
+  if (!fahrerName) return false
+  const normalizedName = fahrerName.toLowerCase().trim()
+  return NO_SALARY_DRIVERS.some(name =>
+    normalizedName === name.toLowerCase().trim() ||
+    normalizedName.split(' ').sort().join(' ') === name.toLowerCase().split(' ').sort().join(' ')
+  )
+}
+
 /**
  * Prüft ob ein Fahrer die spezielle KM-Tabelle nutzt
  */
@@ -135,8 +157,14 @@ export function calculateWartezeitBonus(wartezeit?: string): number {
 /**
  * Berechnet den Gesamtverdienst für eine Tour
  * Optional: fahrerName für fahrerspezifische Tabellen
+ * Fahrer ohne Lohnberechnung (Nicholas Mandzel, Burak Aydin) erhalten 0€
  */
 export function calculateTourVerdienst(km: number, wartezeit?: string, fahrerName?: string): number {
+  // Fahrer ohne Lohnberechnung
+  if (hasNoSalary(fahrerName)) {
+    return 0
+  }
+
   const baseVerguetung = calculateVerguetung(km, fahrerName)
   const wartezeitBonus = calculateWartezeitBonus(wartezeit)
   return baseVerguetung + wartezeitBonus

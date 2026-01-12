@@ -35,7 +35,7 @@ import {
   updateTour
 } from "@/lib/admin-api"
 import { exportTourenPDF, exportAuslagenPDF, exportAuslagenWithBelege } from "@/lib/pdf-export"
-import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout } from "@/lib/salary-calculator"
+import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout, hasNoSalary } from "@/lib/salary-calculator"
 import { calculateCustomerTotal } from "@/lib/customer-pricing"
 
 /**
@@ -208,10 +208,10 @@ export default function AdminDashboardPage() {
     const monthTouren = allTouren.filter(t => t.datum.startsWith(selectedMonth))
     const monthAuslagen = allAuslagen.filter(a => a.datum.startsWith(selectedMonth))
 
-    // Genehmigte + Abgerechnete Touren (ohne Geschäftsführer)
+    // Genehmigte + Abgerechnete Touren (ohne Fahrer ohne Lohnberechnung)
     const approvedAndBilledTouren = monthTouren.filter(t =>
       (t.status === 'approved' || t.status === 'billed') &&
-      t.zeitmodell !== 'geschaeftsfuehrer'
+      hasNoSalary(t.fahrer) === false
     )
 
     // Berechne Gesamtlohn
@@ -401,7 +401,7 @@ export default function AdminDashboardPage() {
         fuehrerscheinklassen: newFahrer.fuehrerscheinklassen || [],
         ausweisnummer: newFahrer.ausweisnummer || "",
         ausweis_ablauf: newFahrer.ausweisAblauf || "",
-        zeitmodell: (newFahrer.zeitmodell || 'minijob') as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer',
+        zeitmodell: (newFahrer.zeitmodell || 'minijob') as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit',
       })
 
       alert(`Fahrer ${newFahrer.vorname} ${newFahrer.nachname} erfolgreich angelegt!`)
@@ -1638,7 +1638,7 @@ export default function AdminDashboardPage() {
                           <Label htmlFor="edit-zeitmodell">Zeitmodell *</Label>
                           <Select
                             value={editingFahrer.zeitmodell || 'minijob'}
-                            onValueChange={(value) => setEditingFahrer({...editingFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer' | 'geschaeftsfuehrer'})}
+                            onValueChange={(value) => setEditingFahrer({...editingFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'})}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Zeitmodell wählen" />
@@ -1648,7 +1648,6 @@ export default function AdminDashboardPage() {
                               <SelectItem value="werkstudent">Werkstudent</SelectItem>
                               <SelectItem value="teilzeit">Teilzeit</SelectItem>
                               <SelectItem value="vollzeit">Vollzeit</SelectItem>
-                              <SelectItem value="geschaeftsfuehrer">Geschäftsführer</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1658,7 +1657,6 @@ export default function AdminDashboardPage() {
                             {editingFahrer.zeitmodell === 'werkstudent' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
                             {editingFahrer.zeitmodell === 'teilzeit' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
                             {editingFahrer.zeitmodell === 'vollzeit' && 'Gehalt nach Vereinbarung'}
-                            {editingFahrer.zeitmodell === 'geschaeftsfuehrer' && 'Festes monatliches Gehalt (Touren zählen nicht zum Lohn)'}
                           </p>
                         </div>
                       </div>
@@ -1882,7 +1880,7 @@ export default function AdminDashboardPage() {
                           <Label htmlFor="zeitmodell">Zeitmodell *</Label>
                           <Select
                             value={newFahrer.zeitmodell || 'minijob'}
-                            onValueChange={(value) => setNewFahrer({...newFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer'})}
+                            onValueChange={(value) => setNewFahrer({...newFahrer, zeitmodell: value as 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'})}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Zeitmodell wählen" />
@@ -1892,7 +1890,6 @@ export default function AdminDashboardPage() {
                               <SelectItem value="werkstudent">Werkstudent</SelectItem>
                               <SelectItem value="teilzeit">Teilzeit</SelectItem>
                               <SelectItem value="vollzeit">Vollzeit</SelectItem>
-                              <SelectItem value="geschaeftsfuehrer">Geschäftsführer</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1902,13 +1899,12 @@ export default function AdminDashboardPage() {
                             {newFahrer.zeitmodell === 'werkstudent' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
                             {newFahrer.zeitmodell === 'teilzeit' && 'Stundenlohn: 12,82€ + Zeiterfassung'}
                             {newFahrer.zeitmodell === 'vollzeit' && 'Gehalt nach Vereinbarung'}
-                            {newFahrer.zeitmodell === 'geschaeftsfuehrer' && 'Festes monatliches Gehalt'}
                           </p>
                         </div>
                       </div>
                     </div>
-                      {/* Festes Gehalt (nur für Geschäftsführer/Vollzeit) */}
-                      {(newFahrer.zeitmodell === 'geschaeftsfuehrer' || newFahrer.zeitmodell === 'vollzeit') && (
+                      {/* Festes Gehalt (nur für Vollzeit) */}
+                      {(newFahrer.zeitmodell === 'vollzeit') && (
                         <div className="mt-4">
                           <Label htmlFor="festesGehalt">Festes monatliches Gehalt (€) *</Label>
                           <Input
@@ -2008,14 +2004,12 @@ export default function AdminDashboardPage() {
                                 f.zeitmodell === 'minijob' ? 'bg-blue-100 text-blue-800' :
                                 f.zeitmodell === 'werkstudent' ? 'bg-purple-100 text-purple-800' :
                                 f.zeitmodell === 'teilzeit' ? 'bg-orange-100 text-orange-800' :
-                                f.zeitmodell === 'geschaeftsfuehrer' ? 'bg-green-100 text-green-800' :
                                 'bg-gray-100 text-gray-800'
                               }`}>
                                 {f.zeitmodell === 'minijob' && 'Minijob'}
                                 {f.zeitmodell === 'werkstudent' && 'Werkstudent'}
                                 {f.zeitmodell === 'teilzeit' && 'Teilzeit'}
                                 {f.zeitmodell === 'vollzeit' && 'Vollzeit'}
-                                {f.zeitmodell === 'geschaeftsfuehrer' && 'Geschäftsführer'}
                                 {!f.zeitmodell && 'Minijob'}
                               </Badge>
                             </TableCell>
@@ -2091,10 +2085,10 @@ export default function AdminDashboardPage() {
                       const fahrerTourenCount = touren.filter(t => namesMatch(t.fahrer, fahrerName)).length
                       const fahrerAuslagenCount = auslagen.filter(a => namesMatch(a.fahrer, fahrerName)).length
 
-                      // WICHTIG: Unterscheide zwischen Geschäftsführer (festes Gehalt) und anderen (Touren-Lohn)
-                      const isGeschaeftsfuehrer = f.zeitmodell === 'geschaeftsfuehrer'
-                      const fahrerGesamtverdienst = isGeschaeftsfuehrer
-                        ? (f.festes_gehalt || 0)
+                      // Fahrer ohne Lohnberechnung (z.B. Nicholas Mandzel, Burak Aydin) erhalten 0€
+                      const isNoSalary = hasNoSalary(fahrerName)
+                      const fahrerGesamtverdienst = isNoSalary
+                        ? 0
                         : touren
                             .filter(t => namesMatch(t.fahrer, fahrerName) && (t.status === 'approved' || t.status === 'billed'))
                             .reduce((sum, t) => {
@@ -2121,9 +2115,9 @@ export default function AdminDashboardPage() {
                                   {f.vorname} {f.nachname}
                                 </h3>
                                 <p className="text-sm text-gray-500">{f.plz} {f.ort}</p>
-                                {isGeschaeftsfuehrer && (
-                                  <Badge className="bg-purple-100 text-purple-800 border-purple-200 mt-1">
-                                    Geschäftsführer
+                                {isNoSalary && (
+                                  <Badge className="bg-gray-100 text-gray-800 border-gray-200 mt-1">
+                                    Keine Abrechnung
                                   </Badge>
                                 )}
                                 <span className="font-semibold text-green-700">
@@ -2172,13 +2166,12 @@ export default function AdminDashboardPage() {
                   if (!selectedFahrerData) return null
 
                   const fahrerName = `${selectedFahrerData.vorname} ${selectedFahrerData.nachname}`
-                  const isGeschaeftsfuehrer = selectedFahrerData.zeitmodell === 'geschaeftsfuehrer'
+                  const isNoSalary = hasNoSalary(fahrerName)
 
-                  // Berechne Gesamtverdienst
-                  // Bei Geschäftsführern: Festes Gehalt
+                  // Berechne Gesamtverdienst (Fahrer ohne Lohnberechnung = 0€)
                   // Bei anderen: Touren-Lohn
-                  const gesamtverdienst = isGeschaeftsfuehrer
-                    ? (selectedFahrerData.festes_gehalt || 0)
+                  const gesamtverdienst = isNoSalary
+                    ? 0
                     : fahrerTouren
                         .filter(t => t.status === 'approved' || t.status === 'billed')
                         .reduce((sum, t) => {
@@ -2194,8 +2187,8 @@ export default function AdminDashboardPage() {
                   console.log('Gesamtverdienst:', gesamtverdienst)
                   console.log('Vormonat-Überschuss:', fahrerVormonatUeberschuss)
 
-                  // Für Geschäftsführer: Keine Minijob-Logik
-                  const { ausgeZahlt, ueberschuss } = isGeschaeftsfuehrer
+                  // Fahrer ohne Lohnberechnung: Keine Minijob-Logik nötig
+                  const { ausgeZahlt, ueberschuss } = isNoSalary
                     ? { ausgeZahlt: gesamtverdienst, ueberschuss: 0 }
                     : calculateMonthlyPayout(gesamtverdienst, fahrerVormonatUeberschuss)
 

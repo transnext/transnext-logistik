@@ -11,7 +11,7 @@ export interface Profile {
   id: string
   role: 'fahrer' | 'admin' | 'disponent'
   full_name: string
-  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer'
+  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'
   festes_gehalt?: number
   created_at: string
   updated_at: string
