@@ -38,16 +38,16 @@ serve(async (req) => {
       )
     }
 
-    // Prüfe ob User Admin ist
+    // Prüfe ob User Admin oder Disponent ist
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'disponent')) {
       return new Response(
-        JSON.stringify({ error: 'Keine Admin-Berechtigung' }),
+        JSON.stringify({ error: 'Keine Berechtigung' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

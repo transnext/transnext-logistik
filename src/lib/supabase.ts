@@ -9,7 +9,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 // TypeScript types for database schema
 export interface Profile {
   id: string
-  role: 'fahrer' | 'admin'
+  role: 'fahrer' | 'admin' | 'disponent'
   full_name: string
   zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit' | 'geschaeftsfuehrer'
   festes_gehalt?: number

@@ -31,11 +31,11 @@ export default function AdminLoginPage() {
         throw new Error("Anmeldung fehlgeschlagen")
       }
 
-      // Prüfe ob Benutzer Admin ist
+      // Prüfe ob Benutzer Admin oder Disponent ist
       const profile = await getUserProfile(user.id)
 
-      if (profile.role !== 'admin') {
-        setError("Sie haben keine Admin-Berechtigung")
+      if (profile.role !== 'admin' && profile.role !== 'disponent') {
+        setError("Sie haben keine Berechtigung für das Admin-Portal")
         setIsLoading(false)
         return
       }
@@ -44,7 +44,7 @@ export default function AdminLoginPage() {
       router.push("/admin/dashboard")
     } catch (err) {
       console.error("Login Fehler:", err)
-      setError("Ungültige Zugangsdaten oder keine Admin-Berechtigung")
+      setError("Ungültige Zugangsdaten oder keine Berechtigung")
       setIsLoading(false)
     }
   }

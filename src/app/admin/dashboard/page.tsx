@@ -32,8 +32,7 @@ import {
   billMultipleAuslagen,
   markTourAsRuecklaufer,
   getMonatsueberschuss,
-  updateTour,
-  updateAuslage
+  updateTour
 } from "@/lib/admin-api"
 import { exportTourenPDF, exportAuslagenPDF, exportAuslagenWithBelege } from "@/lib/pdf-export"
 import { calculateTourVerdienst, MONTHLY_LIMIT, calculateMonthlyPayout } from "@/lib/salary-calculator"
@@ -135,6 +134,7 @@ function generateMonthOptions(): { value: string; label: string }[] {
 export default function AdminDashboardPage() {
   const router = useRouter()
   const [adminName, setAdminName] = useState("")
+  const [userRole, setUserRole] = useState<'admin' | 'disponent'>('admin')
   const [activeTab, setActiveTab] = useState<"touren" | "auslagen" | "fahrer" | "abrechnung">("touren")
   const [allTouren, setAllTouren] = useState<Tour[]>([]) // Alle Touren (ungefiltert)
   const [allAuslagen, setAllAuslagen] = useState<Auslage[]>([]) // Alle Auslagen (ungefiltert)
@@ -149,18 +149,6 @@ export default function AdminDashboardPage() {
   const [selectedAuslagenIds, setSelectedAuslagenIds] = useState<number[]>([])
   const [showBelegDialog, setShowBelegDialog] = useState(false)
   const [selectedBeleg, setSelectedBeleg] = useState<{ tourNr: string; datum: string; typ: "arbeitsnachweis" | "auslagennachweis"; belegUrl?: string } | null>(null)
-  // Auslagen-Bearbeitung
-  const [showEditAuslage, setShowEditAuslage] = useState(false)
-  const [editingAuslage, setEditingAuslage] = useState<{
-    id: number
-    tour_nr: string
-    kennzeichen: string
-    datum: string
-    startort: string
-    zielort: string
-    belegart: string
-    kosten: string
-  } | null>(null)
   const [selectedFahrerId, setSelectedFahrerId] = useState<number | null>(null)
   const [fahrerTouren, setFahrerTouren] = useState<Tour[]>([])
   const [fahrerAuslagen, setFahrerAuslagen] = useState<Auslage[]>([])
@@ -236,7 +224,7 @@ export default function AdminDashboardPage() {
     // Monatsumsatz (Kundenpreise)
     const monatsumsatz = monthTouren.reduce((sum, t) => {
       const km = parseFloat(t.gefahreneKm) || 0
-      return sum + calculateCustomerTotal(km, t.wartezeit, t.auftraggeber as 'onlogist' | 'smartandcare' | undefined)
+      return sum + calculateCustomerTotal(km, t.wartezeit)
     }, 0)
 
     return {
@@ -254,8 +242,9 @@ export default function AdminDashboardPage() {
       approvedAuslagen: monthAuslagen.filter(e => e.status === 'approved').length,
       paidAuslagen: monthAuslagen.filter(e => e.status === 'paid').length,
       rejectedAuslagen: monthAuslagen.filter(e => e.status === 'rejected').length,
+      tankcardAuslagen: monthAuslagen.filter(e => e.status === 'tankcard').length,
       openAuslagenAmount: monthAuslagen
-        .filter(e => e.status === 'approved')
+        .filter(e => e.status === 'approved') // Nur genehmigte Auslagen zählen als offen (nicht pending, rejected, paid, tankcard)
         .reduce((sum, e) => sum + (parseFloat(e.kosten) || 0), 0),
       paidAuslagenAmount: monthAuslagen
         .filter(e => e.status === 'paid')
@@ -288,11 +277,13 @@ export default function AdminDashboardPage() {
 
       const profile = await getUserProfile(user.id)
 
-      if (profile.role !== 'admin') {
+      // Erlaube sowohl Admin als auch Disponent
+      if (profile.role !== 'admin' && profile.role !== 'disponent') {
         router.push("/admin")
         return
       }
 
+      setUserRole(profile.role as 'admin' | 'disponent')
       setAdminName(profile.full_name)
 
       // Lade alle Daten
@@ -639,8 +630,8 @@ export default function AdminDashboardPage() {
         tour_nr: editingTour.tour_nr,
         datum: editingTour.datum,
         gefahrene_km: parseFloat(editingTour.gefahrene_km),
-        wartezeit: editingTour.wartezeit,
-        auftraggeber: editingTour.auftraggeber,
+        wartezeit: editingTour.wartezeit as '30-60' | '60-90' | '90-120' | 'keine',
+        auftraggeber: editingTour.auftraggeber as 'onlogist' | 'smartandcare' | undefined,
         ist_ruecklaufer: editingTour.ist_ruecklaufer
       })
       setShowEditTour(false)
@@ -650,42 +641,6 @@ export default function AdminDashboardPage() {
     } catch (error) {
       console.error("Fehler beim Aktualisieren der Tour:", error)
       alert("Fehler beim Aktualisieren der Tour: " + (error as Error).message)
-    }
-  }
-
-  const handleEditAuslage = (auslage: Auslage) => {
-    setEditingAuslage({
-      id: auslage.id,
-      tour_nr: auslage.tourNr,
-      kennzeichen: auslage.kennzeichen,
-      datum: auslage.datum,
-      startort: auslage.startort,
-      zielort: auslage.zielort,
-      belegart: auslage.belegart,
-      kosten: auslage.kosten
-    })
-    setShowEditAuslage(true)
-  }
-
-  const handleUpdateAuslage = async () => {
-    if (!editingAuslage) return
-    try {
-      await updateAuslage(editingAuslage.id, {
-        tour_nr: editingAuslage.tour_nr,
-        kennzeichen: editingAuslage.kennzeichen,
-        datum: editingAuslage.datum,
-        startort: editingAuslage.startort,
-        zielort: editingAuslage.zielort,
-        belegart: editingAuslage.belegart,
-        kosten: parseFloat(editingAuslage.kosten)
-      })
-      setShowEditAuslage(false)
-      setEditingAuslage(null)
-      await loadAllData()
-      alert("Auslage erfolgreich aktualisiert!")
-    } catch (error) {
-      console.error("Fehler beim Aktualisieren der Auslage:", error)
-      alert("Fehler beim Aktualisieren der Auslage: " + (error as Error).message)
     }
   }
 
@@ -901,6 +856,15 @@ export default function AdminDashboardPage() {
       )
     }
 
+    if (status === "tankcard") {
+      return (
+        <Badge className="bg-amber-100 text-amber-800 border-amber-200 flex items-center gap-1 w-fit">
+          <CreditCard className="h-3 w-3" />
+          Tankkarte
+        </Badge>
+      )
+    }
+
     return (
       <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 flex items-center gap-1 w-fit">
         <Clock className="h-3 w-3" />
@@ -977,7 +941,7 @@ export default function AdminDashboardPage() {
   const tourenPending = touren.filter(t => t.status === "pending").length
   const auslagenPending = auslagen.filter(a => a.status === "pending").length
   const offeneAuslagen = auslagen
-    .filter(a => a.status === "approved")
+    .filter(a => a.status !== "paid")
     .reduce((sum, a) => sum + parseFloat(a.kosten || "0"), 0)
 
   const fuehrerscheinklassen = ['B', 'BE', 'C', 'CE', 'C1', 'C1E', 'D', 'DE', 'D1', 'D1E', 'AM', 'A1', 'A2', 'A', 'L', 'T']
@@ -1067,8 +1031,8 @@ export default function AdminDashboardPage() {
           </Card>
         </div>
 
-        {/* Statistiken - Zeile 2 (NEU) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        {/* Statistiken - Zeile 2 */}
+        <div className={`grid grid-cols-1 ${userRole === 'admin' ? 'md:grid-cols-2' : ''} gap-4 mb-8`}>
           <Card className="border-2 border-green-200 bg-green-50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -1082,18 +1046,21 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-purple-200 bg-purple-50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Monatsumsatz</p>
-                  <p className="text-2xl font-bold text-purple-700">{formatCurrency(stats?.monatsumsatz || 0)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Kundenpreise im gewählten Monat</p>
+          {/* Monatsumsatz nur für Admins sichtbar - nicht für Disponenten */}
+          {userRole === 'admin' && (
+            <Card className="border-2 border-purple-200 bg-purple-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Monatsumsatz</p>
+                    <p className="text-2xl font-bold text-purple-700">{formatCurrency(stats?.monatsumsatz || 0)}</p>
+                    <p className="text-xs text-gray-500 mt-1">Kundenpreise im gewählten Monat</p>
+                  </div>
+                  <TrendingUp className="h-10 w-10 text-purple-600" />
                 </div>
-                <TrendingUp className="h-10 w-10 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Tabs */}
@@ -1303,6 +1270,15 @@ export default function AdminDashboardPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                onClick={() => toggleRuecklaufer(tour.id, tour.istRuecklaufer || false)}
+                                className={tour.istRuecklaufer ? "text-orange-700 bg-orange-100 border-orange-300" : "text-gray-700 border-gray-300 hover:bg-gray-50"}
+                                title={tour.istRuecklaufer ? "Als normale Tour markieren" : "Als Rückläufer markieren"}
+                              >
+                                <RefreshCw className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 onClick={() => handleEditTour(tour)}
                                 className="text-blue-700 border-blue-300 hover:bg-blue-50"
                                 title="Bearbeiten"
@@ -1469,15 +1445,6 @@ export default function AdminDashboardPage() {
                                 title="Ablehnen"
                               >
                                 <XCircle className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEditAuslage(auslage)}
-                                className="text-blue-700 border-blue-300 hover:bg-blue-50"
-                                title="Bearbeiten"
-                              >
-                                <Edit className="h-3 w-3" />
                               </Button>
                               <Button
                                 size="sm"
@@ -2461,21 +2428,24 @@ export default function AdminDashboardPage() {
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-auftraggeber">Auftraggeber</Label>
-                <Select
-                  value={editingTour.auftraggeber}
-                  onValueChange={(value) => setEditingTour({...editingTour, auftraggeber: value})}
-                >
-                  <SelectTrigger id="edit-auftraggeber">
-                    <SelectValue placeholder="Auftraggeber wählen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="smartandcare">Smart and Care</SelectItem>
-                    <SelectItem value="onlogist">Onlogist</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Auftraggeber nur für Admins sichtbar - nicht für Disponenten */}
+              {userRole === 'admin' && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-auftraggeber">Auftraggeber</Label>
+                  <Select
+                    value={editingTour.auftraggeber}
+                    onValueChange={(value) => setEditingTour({...editingTour, auftraggeber: value})}
+                  >
+                    <SelectTrigger id="edit-auftraggeber">
+                      <SelectValue placeholder="Auftraggeber wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="smartandcare">Smart and Care</SelectItem>
+                      <SelectItem value="onlogist">Onlogist</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -2498,103 +2468,6 @@ export default function AdminDashboardPage() {
           </Card>
         </div>
       )}
-      {/* Auslage Bearbeiten Dialog */}
-      {showEditAuslage && editingAuslage && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-lg mx-4">
-            <CardHeader>
-              <CardTitle>Auslage bearbeiten</CardTitle>
-              <CardDescription>Tour {editingAuslage.tour_nr} vom {new Date(editingAuslage.datum).toLocaleDateString('de-DE')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-auslage-tour-nr">Tour-Nr.</Label>
-                  <Input
-                    id="edit-auslage-tour-nr"
-                    value={editingAuslage.tour_nr}
-                    onChange={(e) => setEditingAuslage({...editingAuslage, tour_nr: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-auslage-kennzeichen">Kennzeichen</Label>
-                  <Input
-                    id="edit-auslage-kennzeichen"
-                    value={editingAuslage.kennzeichen}
-                    onChange={(e) => setEditingAuslage({...editingAuslage, kennzeichen: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-auslage-datum">Datum</Label>
-                  <Input
-                    id="edit-auslage-datum"
-                    type="date"
-                    value={editingAuslage.datum}
-                    onChange={(e) => setEditingAuslage({...editingAuslage, datum: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-auslage-kosten">Kosten (EUR)</Label>
-                  <Input
-                    id="edit-auslage-kosten"
-                    type="number"
-                    step="0.01"
-                    value={editingAuslage.kosten}
-                    onChange={(e) => setEditingAuslage({...editingAuslage, kosten: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-auslage-startort">Startort</Label>
-                  <Input
-                    id="edit-auslage-startort"
-                    value={editingAuslage.startort}
-                    onChange={(e) => setEditingAuslage({...editingAuslage, startort: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-auslage-zielort">Zielort</Label>
-                  <Input
-                    id="edit-auslage-zielort"
-                    value={editingAuslage.zielort}
-                    onChange={(e) => setEditingAuslage({...editingAuslage, zielort: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-auslage-belegart">Belegart</Label>
-                <Select
-                  value={editingAuslage.belegart}
-                  onValueChange={(value) => setEditingAuslage({...editingAuslage, belegart: value})}
-                >
-                  <SelectTrigger id="edit-auslage-belegart">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Tanken">Tanken</SelectItem>
-                    <SelectItem value="Waschen">Waschen</SelectItem>
-                    <SelectItem value="Parken">Parken</SelectItem>
-                    <SelectItem value="Maut">Maut</SelectItem>
-                    <SelectItem value="Sonstiges">Sonstiges</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => { setShowEditAuslage(false); setEditingAuslage(null); }}>
-                  Abbrechen
-                </Button>
-                <Button onClick={handleUpdateAuslage}>
-                  Speichern
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
 
       {/* Beleg Dialog */}
       {selectedBeleg && (
