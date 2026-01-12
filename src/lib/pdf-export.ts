@@ -50,11 +50,14 @@ export function exportTourenPDF(
     const wartezeitCode = wartezeitToCode(tour.wartezeit)
     const betrag = calculateCustomerTotal(tour.gefahrene_km, tour.wartezeit, tour.auftraggeber)
 
+    // Bei Onlogist wird Wartezeit NICHT berechnet - zeige 0 an
+    const wartezeitAnzeige = tour.auftraggeber === 'onlogist' ? '0' : wartezeitCode.toString()
+
     return [
       tour.tour_nr,
       new Date(tour.datum).toLocaleDateString('de-DE'),
       tour.gefahrene_km.toString(),
-      wartezeitCode.toString(),
+      wartezeitAnzeige,
       `${betrag.toFixed(2)} €`
     ]
   })
