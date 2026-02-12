@@ -1,0 +1,586 @@
+// =====================================================
+// TOUR TYPES - Vollständiges Touren-System
+// =====================================================
+
+// =====================================================
+// ENUMS
+// =====================================================
+
+export type TourStatus = 'neu' | 'uebernahme_offen' | 'abgabe_offen' | 'abgeschlossen'
+export type VehicleType = 'pkw' | 'e-auto' | 'transporter'
+export type ProtocolPhase = 'pickup' | 'dropoff'
+export type FuelLevel = 'quarter' | 'half' | 'three_quarter' | 'full'
+export type CableStatus = 'present' | 'not_present' | 'not_applicable'
+export type RimType = 'steel' | 'aluminum' | 'not_applicable'
+export type HandoverType = 'recipient_present' | 'recipient_absent' | 'recipient_refused'
+export type SignatureRole = 'driver' | 'recipient'
+export type AuditAction = 'create' | 'update' | 'delete' | 'status_change' | 'protocol_complete' | 'pdf_generated'
+
+export type DamageType =
+  | 'scratch' | 'dent' | 'crack' | 'tear' | 'stain'
+  | 'missing_part' | 'malfunction' | 'wear' | 'corrosion' | 'other'
+
+export type DamageComponent =
+  // Außen Front
+  | 'front_bumper' | 'hood' | 'grille' | 'windshield'
+  | 'headlight_left' | 'headlight_right'
+  // Außen Links
+  | 'front_left_fender' | 'front_left_door' | 'rear_left_door' | 'rear_left_fender'
+  | 'left_mirror' | 'front_left_window' | 'rear_left_window'
+  | 'front_left_wheel' | 'rear_left_wheel' | 'front_left_rim' | 'rear_left_rim'
+  // Außen Rechts
+  | 'front_right_fender' | 'front_right_door' | 'rear_right_door' | 'rear_right_fender'
+  | 'right_mirror' | 'front_right_window' | 'rear_right_window'
+  | 'front_right_wheel' | 'rear_right_wheel' | 'front_right_rim' | 'rear_right_rim'
+  // Außen Heck
+  | 'rear_bumper' | 'trunk' | 'rear_window'
+  | 'taillight_left' | 'taillight_right'
+  // Außen Sonstiges
+  | 'roof' | 'antenna' | 'license_plate'
+  // Innenraum
+  | 'dashboard' | 'steering_wheel' | 'gear_shift' | 'center_console'
+  | 'driver_seat' | 'passenger_seat' | 'rear_seats'
+  | 'door_panel_left' | 'door_panel_right' | 'headliner'
+  | 'floor_mat' | 'carpet' | 'trunk_interior'
+  | 'engine' | 'other'
+
+export type PhotoCategory =
+  | 'tacho' | 'accessories' | 'engine_bay'
+  | 'bumper_front_left' | 'left_side_front' | 'wheel_front_left' | 'mirror_left'
+  | 'door_front_left' | 'door_rear_left' | 'interior_rear' | 'wheel_rear_left'
+  | 'left_side_rear' | 'bumper_rear_left' | 'trunk_edge' | 'trunk_cover'
+  | 'emergency_kit' | 'spare_wheel'
+  | 'bumper_rear_right' | 'right_side_rear' | 'wheel_rear_right'
+  | 'door_rear_right' | 'door_front_right' | 'wheel_front_right' | 'mirror_right'
+  | 'right_side_front' | 'bumper_front_right'
+  | 'damage' | 'other'
+
+
+// =====================================================
+// LOCATION DATA (JSONB Structure)
+// =====================================================
+
+export interface LocationData {
+  name: string
+  street: string
+  zip: string
+  city: string
+  contact_name: string
+  contact_phone: string
+}
+
+
+// =====================================================
+// ACCESSORIES (JSONB Structure)
+// =====================================================
+
+export interface Accessories {
+  key_count: number
+  registration_original: boolean
+  service_booklet: boolean
+  sd_card_navigation: boolean
+  floor_mats: boolean
+  license_plates_present: boolean
+  radio_with_code: boolean
+  hubcaps_present: boolean | null
+  rim_type: RimType
+  antenna_present: boolean
+  safety_kit: boolean
+}
+
+export const DEFAULT_ACCESSORIES: Accessories = {
+  key_count: 1,
+  registration_original: false,
+  service_booklet: false,
+  sd_card_navigation: false,
+  floor_mats: false,
+  license_plates_present: false,
+  radio_with_code: false,
+  hubcaps_present: null,
+  rim_type: 'not_applicable',
+  antenna_present: false,
+  safety_kit: false,
+}
+
+
+// =====================================================
+// DATABASE INTERFACES
+// =====================================================
+
+export interface Tour {
+  id: string
+  tour_no: number
+  vehicle_type: VehicleType
+  license_plate: string
+  fin: string
+  pickup_data: LocationData
+  dropoff_data: LocationData
+  pickup_from?: string
+  dropoff_until?: string
+  distance_km?: number
+  notes?: string
+  assigned_driver_id?: string
+  status: TourStatus
+  created_at: string
+  updated_at: string
+  created_by?: string
+
+  // Joined data (optional)
+  driver?: {
+    vorname: string
+    nachname: string
+  }
+}
+
+export interface TourProtocol {
+  id: string
+  tour_id: string
+  phase: ProtocolPhase
+  started_at: string
+  completed_at?: string
+  km: number
+  fuel_level: FuelLevel
+  cable_status: CableStatus
+  accessories: Accessories
+  has_interior_damage: boolean
+  has_exterior_damage: boolean
+  handover_type?: HandoverType
+  handover_note?: string
+  recipient_name?: string
+  confirmed: boolean
+  confirmed_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TourPhoto {
+  id: string
+  tour_id: string
+  phase: ProtocolPhase
+  category: PhotoCategory
+  file_url: string
+  file_path?: string
+  uploaded_at: string
+  created_at: string
+}
+
+export interface TourDamage {
+  id: string
+  tour_id: string
+  phase: ProtocolPhase
+  is_interior: boolean
+  damage_type: DamageType
+  component: DamageComponent
+  description: string
+  pre_existing_damage_id?: string
+  is_pre_existing: boolean
+  created_at: string
+  updated_at: string
+
+  // Relations
+  photos?: TourDamagePhoto[]
+}
+
+export interface TourDamagePhoto {
+  id: string
+  damage_id: string
+  file_url: string
+  file_path?: string
+  uploaded_at: string
+  created_at: string
+}
+
+export interface TourSignature {
+  id: string
+  tour_id: string
+  phase: ProtocolPhase
+  role: SignatureRole
+  name?: string
+  file_url: string
+  file_path?: string
+  signed_at: string
+  created_at: string
+}
+
+export interface PdfExport {
+  id: string
+  tour_id: string
+  version: number
+  file_url: string
+  file_path: string
+  file_size_bytes?: number
+  created_at: string
+  created_by?: string
+  change_reason?: string
+}
+
+export interface AuditLog {
+  id: string
+  entity: string
+  entity_id: string
+  action: AuditAction
+  before_json?: Record<string, unknown>
+  after_json?: Record<string, unknown>
+  changed_fields?: string[]
+  actor_id?: string
+  actor_role?: string
+  context?: Record<string, unknown>
+  ip_address?: string
+  created_at: string
+}
+
+
+// =====================================================
+// COMPLETE TOUR DATA (from get_tour_complete function)
+// =====================================================
+
+export interface TourComplete {
+  tour: Tour
+  protocols: TourProtocol[]
+  photos: TourPhoto[]
+  damages: TourDamage[]
+  signatures: TourSignature[]
+  pdf_exports: PdfExport[]
+}
+
+
+// =====================================================
+// LABELS & TRANSLATIONS
+// =====================================================
+
+export const TOUR_STATUS_LABELS: Record<TourStatus, string> = {
+  neu: 'Neu',
+  uebernahme_offen: 'Übernahme offen',
+  abgabe_offen: 'Abgabe offen',
+  abgeschlossen: 'Abgeschlossen',
+}
+
+export const TOUR_STATUS_COLORS: Record<TourStatus, { bg: string; text: string; border: string }> = {
+  neu: { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-200' },
+  uebernahme_offen: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-200' },
+  abgabe_offen: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
+  abgeschlossen: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200' },
+}
+
+export const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
+  pkw: 'PKW',
+  'e-auto': 'E-Auto',
+  transporter: 'Transporter',
+}
+
+export const FUEL_LEVEL_LABELS: Record<FuelLevel, string> = {
+  quarter: '1/4',
+  half: '1/2',
+  three_quarter: '3/4',
+  full: 'Voll',
+}
+
+export const HANDOVER_TYPE_LABELS: Record<HandoverType, string> = {
+  recipient_present: 'Empfänger vor Ort',
+  recipient_absent: 'Empfänger nicht vor Ort',
+  recipient_refused: 'Empfänger verweigert Unterschrift',
+}
+
+export const DAMAGE_TYPE_LABELS: Record<DamageType, string> = {
+  scratch: 'Kratzer',
+  dent: 'Delle',
+  crack: 'Riss',
+  tear: 'Riss (Stoff)',
+  stain: 'Fleck',
+  missing_part: 'Fehlendes Teil',
+  malfunction: 'Defekt',
+  wear: 'Abnutzung',
+  corrosion: 'Korrosion',
+  other: 'Sonstiges',
+}
+
+export const DAMAGE_COMPONENT_LABELS: Record<DamageComponent, string> = {
+  front_bumper: 'Stoßstange vorne',
+  hood: 'Motorhaube',
+  grille: 'Kühlergrill',
+  windshield: 'Windschutzscheibe',
+  headlight_left: 'Scheinwerfer links',
+  headlight_right: 'Scheinwerfer rechts',
+  front_left_fender: 'Kotflügel vorne links',
+  front_left_door: 'Tür vorne links',
+  rear_left_door: 'Tür hinten links',
+  rear_left_fender: 'Kotflügel hinten links',
+  left_mirror: 'Spiegel links',
+  front_left_window: 'Fenster vorne links',
+  rear_left_window: 'Fenster hinten links',
+  front_left_wheel: 'Rad vorne links',
+  rear_left_wheel: 'Rad hinten links',
+  front_left_rim: 'Felge vorne links',
+  rear_left_rim: 'Felge hinten links',
+  front_right_fender: 'Kotflügel vorne rechts',
+  front_right_door: 'Tür vorne rechts',
+  rear_right_door: 'Tür hinten rechts',
+  rear_right_fender: 'Kotflügel hinten rechts',
+  right_mirror: 'Spiegel rechts',
+  front_right_window: 'Fenster vorne rechts',
+  rear_right_window: 'Fenster hinten rechts',
+  front_right_wheel: 'Rad vorne rechts',
+  rear_right_wheel: 'Rad hinten rechts',
+  front_right_rim: 'Felge vorne rechts',
+  rear_right_rim: 'Felge hinten rechts',
+  rear_bumper: 'Stoßstange hinten',
+  trunk: 'Kofferraum',
+  rear_window: 'Heckscheibe',
+  taillight_left: 'Rücklicht links',
+  taillight_right: 'Rücklicht rechts',
+  roof: 'Dach',
+  antenna: 'Antenne',
+  license_plate: 'Kennzeichen',
+  dashboard: 'Armaturenbrett',
+  steering_wheel: 'Lenkrad',
+  gear_shift: 'Schaltknauf',
+  center_console: 'Mittelkonsole',
+  driver_seat: 'Fahrersitz',
+  passenger_seat: 'Beifahrersitz',
+  rear_seats: 'Rücksitze',
+  door_panel_left: 'Türverkleidung links',
+  door_panel_right: 'Türverkleidung rechts',
+  headliner: 'Dachhimmel',
+  floor_mat: 'Fußmatte',
+  carpet: 'Teppich',
+  trunk_interior: 'Kofferraum-Innenraum',
+  engine: 'Motor',
+  other: 'Sonstiges',
+}
+
+
+// =====================================================
+// PHOTO CATEGORIES CONFIG
+// =====================================================
+
+export interface PhotoCategoryConfig {
+  id: PhotoCategory
+  label: string
+  required: boolean
+  order: number
+}
+
+export const PHOTO_CATEGORIES: PhotoCategoryConfig[] = [
+  { id: 'tacho', label: 'Tacho', required: true, order: 1 },
+  { id: 'accessories', label: 'Zubehör', required: true, order: 2 },
+  { id: 'engine_bay', label: 'Motorraum inkl. Motorhaube', required: true, order: 3 },
+  { id: 'bumper_front_left', label: 'Stoßstange vorne links', required: true, order: 4 },
+  { id: 'left_side_front', label: 'Linke Seite vorne (Kennzeichen)', required: true, order: 5 },
+  { id: 'wheel_front_left', label: 'Rad vorne links', required: true, order: 6 },
+  { id: 'mirror_left', label: 'Spiegel links', required: true, order: 7 },
+  { id: 'door_front_left', label: 'Tür vorne links', required: true, order: 8 },
+  { id: 'door_rear_left', label: 'Tür hinten links', required: true, order: 9 },
+  { id: 'interior_rear', label: 'Innenraum hinten', required: true, order: 10 },
+  { id: 'wheel_rear_left', label: 'Rad hinten links', required: true, order: 11 },
+  { id: 'left_side_rear', label: 'Linke Seite hinten (Kennzeichen)', required: true, order: 12 },
+  { id: 'bumper_rear_left', label: 'Stoßstange hinten links', required: true, order: 13 },
+  { id: 'trunk_edge', label: 'Ladekante Kofferraum', required: true, order: 14 },
+  { id: 'trunk_cover', label: 'Kofferraumabdeckung', required: true, order: 15 },
+  { id: 'emergency_kit', label: 'Notfall-Kit', required: true, order: 16 },
+  { id: 'spare_wheel', label: 'Reserverad/Reparaturset', required: true, order: 17 },
+  { id: 'bumper_rear_right', label: 'Stoßstange hinten rechts', required: true, order: 18 },
+  { id: 'right_side_rear', label: 'Rechte Seite hinten (Kennzeichen)', required: true, order: 19 },
+  { id: 'wheel_rear_right', label: 'Rad hinten rechts', required: true, order: 20 },
+  { id: 'door_rear_right', label: 'Tür hinten rechts', required: true, order: 21 },
+  { id: 'door_front_right', label: 'Tür vorne rechts', required: true, order: 22 },
+  { id: 'wheel_front_right', label: 'Rad vorne rechts', required: true, order: 23 },
+  { id: 'mirror_right', label: 'Spiegel rechts', required: true, order: 24 },
+  { id: 'right_side_front', label: 'Rechte Seite vorne (Kennzeichen)', required: true, order: 25 },
+  { id: 'bumper_front_right', label: 'Stoßstange vorne rechts', required: true, order: 26 },
+]
+
+export const REQUIRED_PHOTO_COUNT = PHOTO_CATEGORIES.filter(c => c.required).length
+
+
+// =====================================================
+// FORM DATA TYPES
+// =====================================================
+
+export interface CreateTourData {
+  vehicle_type: VehicleType
+  license_plate: string
+  fin: string
+  pickup_data: LocationData
+  dropoff_data: LocationData
+  pickup_from?: string
+  dropoff_until?: string
+  notes?: string
+  distance_km?: number
+  assigned_driver_id?: string
+}
+
+export interface ProtocolFormData {
+  km: string
+  fuel_level: FuelLevel | ''
+  cable_status: CableStatus
+  accessories: Accessories
+  photos: Record<PhotoCategory, string> // category -> dataUrl
+  has_interior_damage: boolean | null
+  has_exterior_damage: boolean | null
+  damages: DamageFormData[]
+  driver_signature: string
+  handover_type: HandoverType | ''
+  recipient_name: string
+  recipient_signature: string
+  handover_note: string
+  confirmed: boolean
+}
+
+export interface DamageFormData {
+  id: string // temp ID for UI
+  is_interior: boolean
+  damage_type: DamageType | ''
+  component: DamageComponent | ''
+  description: string
+  photos: string[] // dataUrls
+}
+
+export const INITIAL_PROTOCOL_FORM_DATA: ProtocolFormData = {
+  km: '',
+  fuel_level: '',
+  cable_status: 'not_applicable',
+  accessories: { ...DEFAULT_ACCESSORIES },
+  photos: {} as Record<PhotoCategory, string>,
+  has_interior_damage: null,
+  has_exterior_damage: null,
+  damages: [],
+  driver_signature: '',
+  handover_type: '',
+  recipient_name: '',
+  recipient_signature: '',
+  handover_note: '',
+  confirmed: false,
+}
+
+
+// =====================================================
+// VALIDATION
+// =====================================================
+
+export type WizardStep =
+  | 'auftragsdaten'
+  | 'daten'
+  | 'fotos'
+  | 'vorschaeden'
+  | 'schaeden'
+  | 'unterschriften'
+  | 'bestaetigung'
+
+export const WIZARD_STEPS: WizardStep[] = [
+  'auftragsdaten',
+  'daten',
+  'fotos',
+  'vorschaeden',
+  'schaeden',
+  'unterschriften',
+  'bestaetigung',
+]
+
+export const WIZARD_STEP_LABELS: Record<WizardStep, string> = {
+  auftragsdaten: 'Auftragsdaten',
+  daten: 'Daten',
+  fotos: 'Fotos',
+  vorschaeden: 'Vorschäden',
+  schaeden: 'Schäden',
+  unterschriften: 'Unterschriften',
+  bestaetigung: 'Bestätigung',
+}
+
+export interface ValidationResult {
+  isValid: boolean
+  errors: string[]
+}
+
+export function validateProtocolStep(
+  step: WizardStep,
+  formData: ProtocolFormData,
+  isEAuto: boolean,
+  phase: ProtocolPhase
+): ValidationResult {
+  const errors: string[] = []
+
+  switch (step) {
+    case 'auftragsdaten':
+      // Read-only, immer valid
+      break
+
+    case 'daten':
+      if (!formData.km || Number.parseInt(formData.km) < 0) {
+        errors.push('KM-Stand ist Pflicht')
+      }
+      if (!formData.fuel_level) {
+        errors.push('Tank/Ladezustand ist Pflicht')
+      }
+      if (isEAuto && formData.cable_status === 'not_applicable') {
+        errors.push('Ladekabel-Status ist bei E-Autos Pflicht')
+      }
+      break
+
+    case 'fotos':
+      const requiredCategories = PHOTO_CATEGORIES.filter(c => c.required)
+      for (const cat of requiredCategories) {
+        if (!formData.photos[cat.id]) {
+          errors.push(`Foto "${cat.label}" fehlt`)
+        }
+      }
+      break
+
+    case 'vorschaeden':
+      // Read-only bei Abgabe, keine Validierung nötig
+      break
+
+    case 'schaeden':
+      if (formData.has_interior_damage === null) {
+        errors.push('Bitte beantworten Sie die Frage zu Innenschäden')
+      }
+      if (formData.has_exterior_damage === null) {
+        errors.push('Bitte beantworten Sie die Frage zu Außenschäden')
+      }
+
+      if (formData.has_interior_damage || formData.has_exterior_damage) {
+        if (formData.damages.length === 0) {
+          errors.push('Mindestens ein Schaden muss erfasst werden')
+        }
+        for (const damage of formData.damages) {
+          if (!damage.damage_type) errors.push('Schadensart ist Pflicht')
+          if (!damage.component) errors.push('Bauteil ist Pflicht')
+          if (!damage.description.trim()) errors.push('Beschreibung ist Pflicht')
+          if (damage.photos.length === 0) errors.push('Mindestens 1 Foto pro Schaden')
+        }
+      }
+      break
+
+    case 'unterschriften':
+      if (!formData.driver_signature) {
+        errors.push('Fahrer-Unterschrift ist Pflicht')
+      }
+      if (!formData.handover_type) {
+        errors.push('Übergabe-Typ ist Pflicht')
+      }
+      if (formData.handover_type === 'recipient_present') {
+        if (!formData.recipient_name.trim()) {
+          errors.push('Empfängername ist Pflicht')
+        }
+        if (!formData.recipient_signature) {
+          errors.push('Empfänger-Unterschrift ist Pflicht')
+        }
+      }
+      if (formData.handover_type === 'recipient_absent' || formData.handover_type === 'recipient_refused') {
+        if (!formData.handover_note.trim()) {
+          errors.push('Notiz ist Pflicht')
+        }
+      }
+      break
+
+    case 'bestaetigung':
+      if (!formData.confirmed) {
+        errors.push('Bestätigung ist Pflicht')
+      }
+      break
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  }
+}
