@@ -427,7 +427,7 @@ async function addProtocolSection(
   doc.setFont('helvetica', 'bold')
   doc.text('KM-Stand:', PDF_CONFIG.margin + 5, y + 5)
   doc.setFont('helvetica', 'normal')
-  doc.text(`${protocol.km.toLocaleString('de-DE')} km`, PDF_CONFIG.margin + 35, y + 5)
+  doc.text(`${protocol.km_stand.toLocaleString('de-DE')} km`, PDF_CONFIG.margin + 35, y + 5)
 
   doc.setFont('helvetica', 'bold')
   doc.text(isEAuto ? 'Ladezustand:' : 'Tankstand:', PDF_CONFIG.margin + 80, y + 5)
