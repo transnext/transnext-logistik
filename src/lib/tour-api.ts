@@ -287,6 +287,8 @@ export async function updateProtocol(
 // PHOTOS
 // =====================================================
 
+import { validateAndNormalizeImage } from './image-utils'
+
 /**
  * Lädt ein Foto hoch
  */
@@ -296,8 +298,11 @@ export async function uploadPhoto(
   category: PhotoCategory,
   dataUrl: string
 ): Promise<TourPhoto> {
+  // Validate and normalize the image
+  const normalizedDataUrl = await validateAndNormalizeImage(dataUrl)
+  
   // DataURL zu Blob konvertieren
-  const response = await fetch(dataUrl)
+  const response = await fetch(normalizedDataUrl)
   const blob = await response.blob()
 
   const timestamp = Date.now()
@@ -423,7 +428,10 @@ export async function uploadDamagePhoto(
   tourId: string,
   dataUrl: string
 ): Promise<TourDamagePhoto> {
-  const response = await fetch(dataUrl)
+  // Validate and normalize the image
+  const normalizedDataUrl = await validateAndNormalizeImage(dataUrl)
+  
+  const response = await fetch(normalizedDataUrl)
   const blob = await response.blob()
 
   const timestamp = Date.now()
