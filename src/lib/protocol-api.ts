@@ -433,7 +433,17 @@ export async function completeProtocol(
     protocol = result1.data
   }
 
-  if (protocolError) throw protocolError
+  if (protocolError) {
+    // DEBUG: RLS-Diagnose bei Fehler
+    console.error('[Protocol] Fehler beim Speichern:', protocolError)
+    try {
+      const debugResult = await supabase.rpc('debug_can_write_protocol', { _tour_id: tourId })
+      console.error('[Protocol] RLS Debug Info:', JSON.stringify(debugResult.data, null, 2))
+    } catch (debugErr) {
+      console.error('[Protocol] Debug RPC failed:', debugErr)
+    }
+    throw protocolError
+  }
 
   // 2. Fotos hochladen
   for (const [category, dataUrl] of Object.entries(formData.photos)) {
