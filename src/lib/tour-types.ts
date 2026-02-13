@@ -151,7 +151,7 @@ export interface TourProtocol {
   phase: ProtocolPhase
   started_at: string
   completed_at?: string
-  km: number
+  km_stand: number
   fuel_level: FuelLevel
   cable_status: CableStatus
   accessories: Accessories
