@@ -93,7 +93,7 @@ export async function getPickupProtocolData(tourId: string): Promise<{
 } | null> {
   const { data, error } = await supabase
     .from('tour_protocols')
-    .select('km, started_at, completed_at')
+    .select('km_stand, started_at, completed_at')
     .eq('tour_id', tourId)
     .eq('phase', 'pickup')
     .single()
@@ -102,7 +102,7 @@ export async function getPickupProtocolData(tourId: string): Promise<{
   if (!data) return null
 
   return {
-    km_stand: data.km,
+    km_stand: data.km_stand,
     started_at: data.completed_at || data.started_at
   }
 }
@@ -375,7 +375,7 @@ export async function completeProtocol(
   const basePayload: Record<string, unknown> = {
     tour_id: tourId,
     phase,
-    km: kmValue,
+    km_stand: kmValue,
     fuel_level: formData.fuel_level || 'quarter',
     cable_status: formData.cable_status,
     has_interior_damage: formData.has_interior_damage ?? false,
