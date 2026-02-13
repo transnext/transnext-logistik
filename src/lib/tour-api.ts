@@ -252,7 +252,7 @@ export async function getOrCreateProtocol(tourId: string, phase: ProtocolPhase):
     .insert({
       tour_id: tourId,
       phase,
-      km: 0,
+      km_stand: 0,
       fuel_level: 'quarter',
     })
     .select()
@@ -556,7 +556,7 @@ export async function completeProtocol(
     .upsert({
       tour_id: tourId,
       phase,
-      km: Number.parseInt(formData.km) || 0,
+      km_stand: Number.parseInt(formData.km) || 0,
       fuel_level: formData.fuel_level || 'quarter',
       cable_status: formData.cable_status,
       accessories: formData.accessories,
