@@ -1,10 +1,14 @@
 # Foto-Kategorie Fixierung - Dokumentation
+
 ## Zusammenfassung
+
 Diese Änderung behebt das Problem mit Enum-Fehlern (22P02) beim Foto-Upload durch:
 1. **Single Source of Truth** für alle Foto-Kategorien
 2. **Legacy-Mapping** für alte Kategorienamen
 3. **DB-Migration** für konsistente Daten
+
 ## Kanonische Kategorien (20 Stück)
+
 | ID | Label | Legacy-IDs |
 |----|-------|------------|
 | `tacho` | Tacho | kilometerstand, speedometer |
@@ -27,13 +31,18 @@ Diese Änderung behebt das Problem mit Enum-Fehlern (22P02) beim Foto-Upload dur
 | `wheel_fr` | Rad vorne rechts | wheel_front_right, rad_vorne_rechts |
 | `mirror_right` | Spiegel rechts | spiegel_rechts |
 | `right_front` | Rechte Seite vorne | right_side_front, rechtsfront |
+
 Plus Spezial-Kategorien: `damage`, `other`
+
 ## DB-Migration ausführen
+
 ```sql
 -- In Supabase SQL Editor ausführen:
 -- Datei: supabase/migrations/20260213_photo_category_v2.sql
 ```
+
 ## Test
+
 Upload mit `category="front_exterior"`:
 1. `validateAndNormalize("front_exterior")` -> `"front"`
 2. Dateiname: `tour_xxx_pickup_front_12345.jpg`

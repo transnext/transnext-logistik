@@ -16,6 +16,7 @@ import type {
   LocationData,
   TourStatus,
 } from './tour-types'
+import { validateAndNormalize, isSpecialCategory, type AllPhotoCategories } from './photo-categories'
 
 // =====================================================
 // TOURS CRUD (Admin)
@@ -252,7 +253,7 @@ export async function getOrCreateProtocol(tourId: string, phase: ProtocolPhase):
     .insert({
       tour_id: tourId,
       phase,
-      km_stand: 0,
+      km: 0,
       fuel_level: 'quarter',
     })
     .select()
@@ -287,26 +288,24 @@ export async function updateProtocol(
 // PHOTOS
 // =====================================================
 
-import { validateAndNormalizeImage } from './image-utils'
-
 /**
  * Lädt ein Foto hoch
  */
 export async function uploadPhoto(
   tourId: string,
   phase: ProtocolPhase,
-  category: PhotoCategory,
+  category: AllPhotoCategories,
   dataUrl: string
 ): Promise<TourPhoto> {
-  // Validate and normalize the image
-  const normalizedDataUrl = await validateAndNormalizeImage(dataUrl)
-  
+  // WICHTIG: Kategorie normalisieren (Single Source of Truth)
+  const normalizedCategory = validateAndNormalize(category, `Upload Tour ${tourId}`)
+
   // DataURL zu Blob konvertieren
-  const response = await fetch(normalizedDataUrl)
+  const response = await fetch(dataUrl)
   const blob = await response.blob()
 
   const timestamp = Date.now()
-  const fileName = `tour_${tourId}_${phase}_${category}_${timestamp}.jpg`
+  const fileName = `tour_${tourId}_${phase}_${normalizedCategory}_${timestamp}.jpg`
   const filePath = `tours/${tourId}/${phase}/photos/${fileName}`
 
   // Upload zu Storage
@@ -325,13 +324,13 @@ export async function uploadPhoto(
     .getPublicUrl(filePath)
 
   // Altes Foto für diese Kategorie löschen (außer damage/other)
-  if (category !== 'damage' && category !== 'other') {
+  if (!isSpecialCategory(normalizedCategory)) {
     await supabase
       .from('tour_photos')
       .delete()
       .eq('tour_id', tourId)
       .eq('phase', phase)
-      .eq('category', category)
+      .eq('category', normalizedCategory)
   }
 
   // In DB speichern
@@ -340,7 +339,7 @@ export async function uploadPhoto(
     .insert({
       tour_id: tourId,
       phase,
-      category,
+      category: normalizedCategory,
       file_url: urlData.publicUrl,
       file_path: filePath,
     })
@@ -428,10 +427,7 @@ export async function uploadDamagePhoto(
   tourId: string,
   dataUrl: string
 ): Promise<TourDamagePhoto> {
-  // Validate and normalize the image
-  const normalizedDataUrl = await validateAndNormalizeImage(dataUrl)
-  
-  const response = await fetch(normalizedDataUrl)
+  const response = await fetch(dataUrl)
   const blob = await response.blob()
 
   const timestamp = Date.now()
@@ -556,7 +552,7 @@ export async function completeProtocol(
     .upsert({
       tour_id: tourId,
       phase,
-      km_stand: Number.parseInt(formData.km) || 0,
+      km: Number.parseInt(formData.km) || 0,
       fuel_level: formData.fuel_level || 'quarter',
       cable_status: formData.cable_status,
       accessories: formData.accessories,
@@ -577,7 +573,7 @@ export async function completeProtocol(
   // 2. Fotos hochladen
   for (const [category, dataUrl] of Object.entries(formData.photos)) {
     if (dataUrl && dataUrl.startsWith('data:')) {
-      await uploadPhoto(tourId, phase, category as PhotoCategory, dataUrl)
+      await uploadPhoto(tourId, phase, category as AllPhotoCategories, dataUrl)
     }
   }
 

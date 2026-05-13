@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { validateAndNormalize, isSpecialCategory } from './photo-categories'
+import { validateAndNormalize, isSpecialCategory, type AllPhotoCategories } from './photo-categories'
 import type {
   TourProtocol,
   ProtocolPhoto,
@@ -93,7 +93,7 @@ export async function getPickupProtocolData(tourId: string): Promise<{
 } | null> {
   const { data, error } = await supabase
     .from('tour_protocols')
-    .select('km_stand, started_at, completed_at')
+    .select('km, started_at, completed_at')
     .eq('tour_id', tourId)
     .eq('phase', 'pickup')
     .single()
@@ -102,7 +102,7 @@ export async function getPickupProtocolData(tourId: string): Promise<{
   if (!data) return null
 
   return {
-    km_stand: data.km_stand,
+    km_stand: data.km,
     started_at: data.completed_at || data.started_at
   }
 }
@@ -118,7 +118,7 @@ export async function getPickupProtocolData(tourId: string): Promise<{
 export async function uploadProtocolPhoto(
   tourId: string,
   phase: ProtocolPhase,
-  category: PhotoCategory,
+  category: AllPhotoCategories,
   dataUrl: string
 ): Promise<ProtocolPhoto> {
   // WICHTIG: Kategorie normalisieren (Single Source of Truth)
@@ -375,7 +375,7 @@ export async function completeProtocol(
   const basePayload: Record<string, unknown> = {
     tour_id: tourId,
     phase,
-    km_stand: kmValue,
+    km: kmValue,
     fuel_level: formData.fuel_level || 'quarter',
     cable_status: formData.cable_status,
     has_interior_damage: formData.has_interior_damage ?? false,
@@ -433,7 +433,7 @@ export async function completeProtocol(
   // 2. Fotos hochladen
   for (const [category, dataUrl] of Object.entries(formData.photos)) {
     if (dataUrl && dataUrl.startsWith('data:')) {
-      await uploadProtocolPhoto(tourId, phase, category as PhotoCategory, dataUrl)
+      await uploadProtocolPhoto(tourId, phase, category as AllPhotoCategories, dataUrl)
     }
   }
 

@@ -65,11 +65,15 @@ export async function createArbeitsnachweis(data: {
   return result as Arbeitsnachweis
 }
 
+/**
+ * Lädt Arbeitsnachweise für einen Fahrer über die sichere Fahrer-View.
+ * Die View filtert automatisch auf eigene Daten und versteckt Finanzfelder.
+ */
 export async function getArbeitsnachweiseByUser(userId: string) {
+  // Fahrer nutzt View arbeitsnachweise_fahrer (versteckt Finanzfelder, filtert auf eigene Daten)
   const { data, error } = await supabase
-    .from('arbeitsnachweise')
+    .from('arbeitsnachweise_fahrer')
     .select('*')
-    .eq('user_id', userId)
     .order('datum', { ascending: false })
 
   if (error) throw error
@@ -146,11 +150,15 @@ export async function createAuslagennachweis(data: {
   return result as Auslagennachweis
 }
 
+/**
+ * Lädt Auslagennachweise für einen Fahrer über die sichere Fahrer-View.
+ * Die View filtert automatisch auf eigene Daten und versteckt Kundenabrechnungsfelder.
+ */
 export async function getAuslagennachweiseByUser(userId: string) {
+  // Fahrer nutzt View auslagennachweise_fahrer (versteckt Kundenabrechnungsfelder, filtert auf eigene Daten)
   const { data, error } = await supabase
-    .from('auslagennachweise')
+    .from('auslagennachweise_fahrer')
     .select('*')
-    .eq('user_id', userId)
     .order('datum', { ascending: false })
 
   if (error) throw error
@@ -283,4 +291,147 @@ export function formatStatus(status: string): string {
     'paid': 'Überwiesen',
   }
   return mapping[status] || status
+}
+
+// =====================================================
+// FAHRERPORTAL ACCESS CHECK
+// =====================================================
+
+/**
+ * Lädt Fahrer-Datensatz für einen User (ohne Fehler zu werfen wenn nicht vorhanden)
+ */
+export async function getFahrerByUserIdSafe(userId: string): Promise<Fahrer | null> {
+  const { data, error } = await supabase
+    .from('fahrer')
+    .select('*')
+    .eq('user_id', userId)
+    .single()
+
+  if (error) {
+    // PGRST116 = not found - das ist kein echter Fehler
+    if (error.code === 'PGRST116') return null
+    console.error('Fehler beim Laden des Fahrer-Datensatzes:', error)
+    return null
+  }
+  return data as Fahrer
+}
+
+/**
+ * Prüft, ob ein User Zugriff auf das Fahrerportal hat.
+ *
+ * Erlaubt wenn:
+ * - role === 'fahrer' UND Fahrer ist aktiv UND nicht archiviert
+ * - ODER role === 'admin' oder 'gf' UND es existiert ein verknüpfter aktiver, nicht archivierter fahrer-Datensatz
+ *
+ * Nicht erlaubt:
+ * - Deaktivierter Fahrer (status = 'inaktiv')
+ * - Archivierter Fahrer (archived_at != null)
+ * - Disponent ohne Fahrer-Datensatz
+ * - Admin/GF ohne Fahrer-Datensatz
+ * - HR/andere Rollen
+ */
+export async function canAccessFahrerportal(userId: string): Promise<{
+  canAccess: boolean
+  reason: string
+  fahrer: Fahrer | null
+  profile: Profile | null
+  role: string
+}> {
+  // Profile laden
+  const profile = await getUserProfile(userId)
+  if (!profile) {
+    return { canAccess: false, reason: 'Kein Profil gefunden', fahrer: null, profile: null, role: '' }
+  }
+
+  const role = profile.role as string
+
+  // Fahrer-Rolle: Prüfe ob Fahrer aktiv und nicht archiviert
+  if (role === 'fahrer') {
+    const fahrer = await getFahrerByUserIdSafe(userId)
+
+    // Prüfe Fahrer-Status
+    if (fahrer) {
+      // Archivierter Fahrer
+      if (fahrer.archived_at) {
+        return {
+          canAccess: false,
+          reason: 'Ihr Fahrerzugang wurde archiviert. Bitte wenden Sie sich an die Disposition.',
+          fahrer,
+          profile,
+          role
+        }
+      }
+
+      // Deaktivierter Fahrer
+      if (fahrer.status !== 'aktiv') {
+        return {
+          canAccess: false,
+          reason: 'Ihr Fahrerzugang ist aktuell deaktiviert. Bitte wenden Sie sich an die Disposition.',
+          fahrer,
+          profile,
+          role
+        }
+      }
+    }
+
+    return {
+      canAccess: true,
+      reason: 'Fahrer-Rolle',
+      fahrer,
+      profile,
+      role
+    }
+  }
+
+  // Admin/GF mit Fahrer-Datensatz
+  if (role === 'admin' || role === 'gf') {
+    const fahrer = await getFahrerByUserIdSafe(userId)
+    if (fahrer) {
+      // Auch Admin/GF mit archiviertem/deaktiviertem Fahrerprofil hat keinen Fahrerportal-Zugang
+      if (fahrer.archived_at) {
+        return {
+          canAccess: false,
+          reason: 'Ihr Fahrerprofil ist archiviert - kein Fahrerportal-Zugang',
+          fahrer,
+          profile,
+          role
+        }
+      }
+
+      if (fahrer.status !== 'aktiv') {
+        return {
+          canAccess: false,
+          reason: 'Ihr Fahrerprofil ist deaktiviert - kein Fahrerportal-Zugang',
+          fahrer,
+          profile,
+          role
+        }
+      }
+
+      return {
+        canAccess: true,
+        reason: 'Admin/GF mit Fahrer-Datensatz',
+        profile,
+        fahrer,
+        role
+      }
+    }
+    return {
+      canAccess: false,
+      reason: 'Admin/GF ohne Fahrer-Datensatz - kein Fahrerportal-Zugang',
+      fahrer: null,
+      profile,
+      role
+    }
+  }
+
+  // Alle anderen Rollen (disponent, hr, etc.) haben keinen Zugang
+  return {
+    canAccess: false,
+    reason: `Rolle '${role}' hat keinen Fahrerportal-Zugang`,
+    profile,
+
+    fahrer: null,
+    role
+  }
 }

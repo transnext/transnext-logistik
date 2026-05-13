@@ -8,17 +8,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TransNextLogo, TransNextIcon } from "@/components/ui/logo"
-import { ArrowLeft, Upload, CheckCircle, CreditCard } from "lucide-react"
-import { getCurrentUser, getUserProfile, createAuslagennachweis } from "@/lib/api"
+import { FahrerportalLayout } from "@/components/fahrerportal/FahrerportalLayout"
+import { ArrowLeft, Upload, CheckCircle, CreditCard, AlertCircle, FileText, Receipt } from "lucide-react"
+import { getCurrentUser, canAccessFahrerportal, createAuslagennachweis } from "@/lib/api"
 import { uploadBeleg } from "@/lib/storage"
+import { processFileForUpload, isHeicFile } from "@/lib/heic-converter"
 
 export default function AuslagennachweisPage() {
   const router = useRouter()
   const [fahrerName, setFahrerName] = useState("")
+  const [fahrerRecord, setFahrerRecord] = useState<any>(null)
   const [saved, setSaved] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
   const [error, setError] = useState("")
+  const [fileConversionMessage, setFileConversionMessage] = useState("")
+  const [isConverting, setIsConverting] = useState(false)
   const [formData, setFormData] = useState({
     tourNr: "",
     kennzeichen: "",
@@ -44,13 +49,21 @@ export default function AuslagennachweisPage() {
         return
       }
 
-      const profile = await getUserProfile(user.id)
-      if (profile.role !== 'fahrer') {
+      // Nutze die neue Zugriffsprüfung (erlaubt Admin/GF mit Fahrer-Datensatz)
+      const accessResult = await canAccessFahrerportal(user.id)
+
+      if (!accessResult.canAccess) {
+        console.log("Fahrerportal-Zugang verweigert:", accessResult.reason)
         router.push("/fahrerportal")
         return
       }
 
-      setFahrerName(profile.full_name)
+      setFahrerRecord(accessResult.fahrer)
+      const name = accessResult.fahrer
+        ? `${accessResult.fahrer.vorname} ${accessResult.fahrer.nachname}`
+        : 'Fahrer'
+      setFahrerName(name)
+      setIsAuthLoading(false)
     } catch (error) {
       console.error("Auth Fehler:", error)
       router.push("/fahrerportal")
@@ -115,62 +128,88 @@ export default function AuslagennachweisPage() {
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData({ ...formData, beleg: e.target.files[0] })
+      const originalFile = e.target.files[0]
+      setFileConversionMessage("")
+      setError("")
+
+      // Prüfe ob HEIC-Datei
+      if (isHeicFile(originalFile)) {
+        setIsConverting(true)
+        setFileConversionMessage("iPhone-Foto wird konvertiert...")
+
+        try {
+          const result = await processFileForUpload(originalFile)
+          setFormData({ ...formData, beleg: result.file })
+          setFileConversionMessage(result.message)
+        } catch (conversionError) {
+          console.error("HEIC-Konvertierung fehlgeschlagen:", conversionError)
+          setError(conversionError instanceof Error ? conversionError.message : "HEIC-Konvertierung fehlgeschlagen")
+          setFormData({ ...formData, beleg: null })
+          // Reset file input
+          e.target.value = ""
+        } finally {
+          setIsConverting(false)
+        }
+      } else {
+        // Andere Dateitypen direkt übernehmen
+        setFormData({ ...formData, beleg: originalFile })
+      }
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Header - Mobile Optimized */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
-          <div className="flex items-center gap-2 sm:gap-4">
-            <div className="sm:hidden">
-              <TransNextIcon size={32} />
-            </div>
-            <div className="hidden sm:block">
-              <TransNextLogo width={130} height={40} showText={true} />
-            </div>
-            <div className="h-6 sm:h-8 w-px bg-gray-300" />
-            <h1 className="text-base sm:text-xl font-semibold text-primary-blue">Fahrerportal</h1>
-          </div>
+  if (isAuthLoading) {
+    return (
+      <FahrerportalLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-blue" />
         </div>
-      </header>
+      </FahrerportalLayout>
+    )
+  }
 
-      {/* Main Content */}
-      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-3xl">
+  return (
+    <FahrerportalLayout title="Auslagennachweis">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-2xl">
         <Link href="/fahrerportal/dashboard">
-          <Button variant="ghost" className="mb-4 sm:mb-6 text-primary-blue hover:bg-blue-50 px-2 sm:px-4">
-            <ArrowLeft className="mr-1 sm:mr-2 h-4 w-4" />
-            <span className="text-sm sm:text-base">Zurück</span>
+          <Button variant="ghost" className="mb-4 text-primary-blue hover:bg-blue-50 -ml-2 px-2">
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            <span className="text-sm">Zurück</span>
           </Button>
         </Link>
 
-        <Card>
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-xl sm:text-2xl text-primary-blue">Auslagennachweis hochladen</CardTitle>
-            <CardDescription className="text-sm">
+        <Card className="border-gray-100 shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl text-primary-blue flex items-center gap-2">
+              <Receipt className="h-5 w-5" />
+              Auslagennachweis hochladen
+            </CardTitle>
+            <CardDescription>
               Erfassen Sie hier Ihre angefallenen Auslagen
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+          <CardContent>
             {saved ? (
-              <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-center">
-                <CheckCircle className="h-12 w-12 sm:h-16 sm:w-16 text-green-600 mb-4" />
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+                  <CheckCircle className="h-8 w-8 text-emerald-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   Erfolgreich gespeichert!
                 </h3>
-                <p className="text-sm sm:text-base text-gray-600">
+                <p className="text-gray-600">
                   Ihr Auslagennachweis wurde erfolgreich hochgeladen.
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Tour-Nr. und Kennzeichen */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="tourNr">Tour-Nr. *</Label>
+                    <Label htmlFor="tourNr" className="text-sm font-medium">
+                      Tour-Nr. <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="tourNr"
                       type="text"
@@ -178,11 +217,14 @@ export default function AuslagennachweisPage() {
                       value={formData.tourNr}
                       onChange={(e) => setFormData({ ...formData, tourNr: e.target.value })}
                       required
+                      className="h-11"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="kennzeichen">Kennzeichen *</Label>
+                    <Label htmlFor="kennzeichen" className="text-sm font-medium">
+                      Kennzeichen <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="kennzeichen"
                       type="text"
@@ -190,28 +232,37 @@ export default function AuslagennachweisPage() {
                       value={formData.kennzeichen}
                       onChange={(e) => setFormData({ ...formData, kennzeichen: e.target.value })}
                       required
+                      className="h-11"
                     />
                   </div>
+                </div>
 
+                {/* Datum und Belegart */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="datum">Datum der Tour *</Label>
+                    <Label htmlFor="datum" className="text-sm font-medium">
+                      Datum <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="datum"
                       type="date"
                       value={formData.datum}
                       onChange={(e) => setFormData({ ...formData, datum: e.target.value })}
                       required
+                      className="h-11"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="belegart">Belegart *</Label>
+                    <Label htmlFor="belegart" className="text-sm font-medium">
+                      Belegart <span className="text-red-500">*</span>
+                    </Label>
                     <Select
                       value={formData.belegart}
                       onValueChange={(value) => setFormData({ ...formData, belegart: value as "tankbeleg" | "waschbeleg" | "bahnticket" | "bc50" | "taxi" | "uber" })}
                       required
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="h-11">
                         <SelectValue placeholder="Bitte wählen" />
                       </SelectTrigger>
                       <SelectContent>
@@ -224,9 +275,14 @@ export default function AuslagennachweisPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
 
+                {/* Start/Zielort */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="startort">Startort *</Label>
+                    <Label htmlFor="startort" className="text-sm font-medium">
+                      Startort <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="startort"
                       type="text"
@@ -234,11 +290,14 @@ export default function AuslagennachweisPage() {
                       value={formData.startort}
                       onChange={(e) => setFormData({ ...formData, startort: e.target.value })}
                       required
+                      className="h-11"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="zielort">Zielort *</Label>
+                    <Label htmlFor="zielort" className="text-sm font-medium">
+                      Zielort <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="zielort"
                       type="text"
@@ -246,84 +305,127 @@ export default function AuslagennachweisPage() {
                       value={formData.zielort}
                       onChange={(e) => setFormData({ ...formData, zielort: e.target.value })}
                       required
+                      className="h-11"
                     />
                   </div>
                 </div>
 
+                {/* Kosten */}
                 <div className="space-y-2">
-                  <Label htmlFor="kosten">Kosten (in €) *</Label>
+                  <Label htmlFor="kosten" className="text-sm font-medium">
+                    Kosten (€) <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="kosten"
                     type="number"
                     step="0.01"
+                    min="0"
                     placeholder="z.B. 45.50"
                     value={formData.kosten}
                     onChange={(e) => setFormData({ ...formData, kosten: e.target.value })}
                     required
+                    className="h-11"
                   />
                 </div>
 
-                {/* Tankkarten-Nutzung Button */}
+                {/* Tankkarten-Nutzung */}
                 {formData.belegart === "tankbeleg" && (
                   <div className="space-y-2">
-                    <Label>Tankkarten-Nutzung</Label>
                     <Button
                       type="button"
                       variant={formData.istTankkarte ? "default" : "outline"}
-                      className={`w-full justify-start ${formData.istTankkarte ? "bg-amber-600 hover:bg-amber-700 text-white" : "border-amber-400 text-amber-700 hover:bg-amber-50"}`}
+                      className={`w-full h-12 justify-start ${
+                        formData.istTankkarte
+                          ? "bg-amber-500 hover:bg-amber-600 text-white"
+                          : "border-amber-300 text-amber-700 hover:bg-amber-50"
+                      }`}
                       onClick={() => setFormData({ ...formData, istTankkarte: !formData.istTankkarte })}
                     >
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      {formData.istTankkarte ? "Tankkarte genutzt (keine Erstattung)" : "Firmen-Tankkarte genutzt?"}
+                      <CreditCard className="mr-3 h-5 w-5" />
+                      {formData.istTankkarte ? "Firmen-Tankkarte genutzt" : "Firmen-Tankkarte genutzt?"}
                     </Button>
                     {formData.istTankkarte && (
-                      <p className="text-xs text-amber-700 mt-1">
-                        Bei Nutzung der Firmen-Tankkarte erfolgt keine Erstattung. Der Beleg dient nur zur Dokumentation.
+                      <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded-lg">
+                        Bei Nutzung der Firmen-Tankkarte erfolgt keine Erstattung.
                       </p>
                     )}
                   </div>
                 )}
 
+                {/* Beleg-Upload */}
                 <div className="space-y-2">
-                  <Label htmlFor="beleg">Beleg hochladen *</Label>
-                  <div className="flex items-center gap-4">
-                    <Input
-                      id="beleg"
-                      type="file"
-                      accept="application/pdf,image/jpeg,image/jpg,image/png,image/heic,image/heif"
-                      onChange={handleFileChange}
-                      required
-                      className="cursor-pointer"
-                    />
-                  </div>
+                  <Label htmlFor="beleg" className="text-sm font-medium">
+                    Beleg hochladen <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="beleg"
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/jpg,image/png,image/heic,image/heif"
+                    onChange={handleFileChange}
+                    required
+                    className="h-12 cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-blue file:text-white hover:file:bg-blue-700"
+                  />
+                  {isConverting && (
+                    <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 p-2 rounded-lg">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700" />
+                      <span>iPhone-Foto wird konvertiert...</span>
+                    </div>
+                  )}
+                  {formData.beleg && !isConverting && (
+                    <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 p-2 rounded-lg">
+                      <FileText className="h-4 w-4" />
+                      <span className="truncate">{formData.beleg.name}</span>
+                    </div>
+                  )}
+                  {fileConversionMessage && !isConverting && (
+                    <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 p-2 rounded-lg">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>{fileConversionMessage}</span>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Erlaubt: PDF, JPG, PNG. iPhone-HEIC wird automatisch konvertiert.
+                  </p>
                 </div>
 
+                {/* Fehleranzeige */}
                 {error && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-800 text-sm">{error}</p>
+                  <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl">
+                    <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm">{error}</p>
                   </div>
                 )}
 
-                <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 pt-4">
+                {/* Buttons */}
+                <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
                   <Link href="/fahrerportal/dashboard" className="sm:flex-1">
-                    <Button type="button" variant="outline" className="w-full" disabled={isLoading}>
+                    <Button type="button" variant="outline" className="w-full h-11" disabled={isLoading}>
                       Abbrechen
                     </Button>
                   </Link>
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="sm:flex-1 bg-primary-blue hover:bg-blue-700"
+                    className="sm:flex-1 h-11 bg-emerald-600 hover:bg-emerald-700"
                   >
-                    <Upload className="mr-2 h-4 w-4" />
-                    {isLoading ? "Wird hochgeladen..." : "Hochladen"}
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                        Wird hochgeladen...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Hochladen
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+      </div>
+    </FahrerportalLayout>
   )
 }

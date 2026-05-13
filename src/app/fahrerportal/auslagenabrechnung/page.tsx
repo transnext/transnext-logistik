@@ -9,9 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { TransNextLogo, TransNextIcon } from "@/components/ui/logo"
+import { FahrerportalLayout } from "@/components/fahrerportal/FahrerportalLayout"
 import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle, CreditCard } from "lucide-react"
-import { getCurrentUser, getUserProfile, getAuslagennachweiseByUser } from "@/lib/api"
+import { getCurrentUser, canAccessFahrerportal, getUserProfile, getAuslagennachweiseByUser } from "@/lib/api"
 
 interface Auslage {
   id: number
@@ -212,35 +212,18 @@ export default function AuslagenabrechnungPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Header - Mobile Optimized */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
-          <div className="flex items-center gap-2 sm:gap-4">
-            <div className="sm:hidden">
-              <TransNextIcon size={32} />
-            </div>
-            <div className="hidden sm:block">
-              <TransNextLogo width={130} height={40} showText={true} />
-            </div>
-            <div className="h-6 sm:h-8 w-px bg-gray-300" />
-            <h1 className="text-base sm:text-xl font-semibold text-primary-blue">Fahrerportal</h1>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-6xl">
+    <FahrerportalLayout title="Auslagenübersicht">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-4xl">
         <Link href="/fahrerportal/dashboard">
-          <Button variant="ghost" className="mb-4 sm:mb-6 text-primary-blue hover:bg-blue-50 px-2 sm:px-4">
-            <ArrowLeft className="mr-1 sm:mr-2 h-4 w-4" />
-            <span className="text-sm sm:text-base">Zurück</span>
+          <Button variant="ghost" className="mb-4 text-primary-blue hover:bg-blue-50 -ml-2 px-2">
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            <span className="text-sm">Zurück</span>
           </Button>
         </Link>
 
         {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600">Lade Daten...</p>
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-blue" />
           </div>
         ) : (
           <Card>
@@ -364,7 +347,7 @@ export default function AuslagenabrechnungPage() {
             </CardContent>
           </Card>
         )}
-      </main>
+      </div>
 
       {/* Beleg Dialog */}
       {selectedBeleg && (
@@ -377,6 +360,6 @@ export default function AuslagenabrechnungPage() {
           belegUrl={selectedBeleg.belegUrl}
         />
       )}
-    </div>
+    </FahrerportalLayout>
   )
 }

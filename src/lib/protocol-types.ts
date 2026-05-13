@@ -1,7 +1,8 @@
+// Re-export Photo-Kategorien aus Single Source of Truth
+export { type PhotoCategory, type AllPhotoCategories, type PhotoCategoryConfig, PHOTO_CATEGORIES, REQUIRED_PHOTO_COUNT, normalizePhotoCategory } from './photo-categories'
 // =====================================================
 // PROTOKOLL-TYPEN - Vollständige Übernahme/Abgabe-Logik
 // =====================================================
-
 // Enums
 export type FuelLevel = 'quarter' | 'half' | 'three_quarter' | 'full'
 export type CableStatus = 'present' | 'not_present' | 'not_applicable'
@@ -9,11 +10,9 @@ export type RimType = 'steel' | 'aluminum' | 'not_applicable'
 export type ProtocolPhase = 'pickup' | 'dropoff'
 export type HandoverType = 'recipient_present' | 'recipient_absent' | 'recipient_refused'
 export type SignatureRole = 'driver' | 'recipient'
-
 export type DamageType =
   | 'scratch' | 'dent' | 'crack' | 'tear' | 'stain'
   | 'missing_part' | 'malfunction' | 'wear' | 'corrosion' | 'other'
-
 export type DamageComponent =
   // Außen
   | 'front_bumper' | 'rear_bumper' | 'hood' | 'trunk' | 'roof'
@@ -33,70 +32,18 @@ export type DamageComponent =
   // Sonstiges
   | 'engine' | 'other'
 
-export type PhotoCategory =
-  | 'tacho' | 'accessories' | 'front_exterior' | 'windshield'
-  | 'left_side_front' | 'wheel_front_left' | 'mirror_left'
-  | 'interior_front' | 'interior_rear' | 'wheel_rear_left'
-  | 'left_side_rear' | 'trunk_interior' | 'rear_exterior'
-  | 'emergency_kit' | 'spare_wheel'
-  | 'right_side_rear' | 'wheel_rear_right'
-  | 'wheel_front_right' | 'mirror_right' | 'right_side_front'
-  | 'damage' | 'other'
-
 // Art der Bereifung
 export type TireType = 'winter' | 'summer' | 'allseason'
-
 export const TIRE_TYPE_LABELS: Record<TireType, string> = {
   winter: 'Winterreifen',
   summer: 'Sommerreifen',
   allseason: 'M+S',
 }
-
 // Schlüsselanzahl Optionen
 export const KEY_COUNT_OPTIONS = [1, 2, 3, 4, '4+'] as const
-
-
-// =====================================================
-// FOTO-KATEGORIEN MIT LABELS
-// =====================================================
-
-export interface PhotoCategoryConfig {
-  id: PhotoCategory
-  label: string
-  required: boolean
-  order: number
-}
-
-export const PHOTO_CATEGORIES: PhotoCategoryConfig[] = [
-  { id: 'tacho', label: 'Tacho', required: true, order: 1 },
-  { id: 'accessories', label: 'Zubehör', required: true, order: 2 },
-  { id: 'front_exterior', label: 'Vorderseite', required: true, order: 3 },
-  { id: 'windshield', label: 'Windschutzscheibe', required: true, order: 4 },
-  { id: 'left_side_front', label: 'Linke Seite vorne (Kennzeichen sichtbar)', required: true, order: 5 },
-  { id: 'wheel_front_left', label: 'Rad vorne links', required: true, order: 6 },
-  { id: 'mirror_left', label: 'Spiegel links', required: true, order: 7 },
-  { id: 'interior_front', label: 'Innenraum vorne', required: true, order: 8 },
-  { id: 'interior_rear', label: 'Innenraum hinten', required: true, order: 9 },
-  { id: 'wheel_rear_left', label: 'Rad hinten links', required: true, order: 10 },
-  { id: 'left_side_rear', label: 'Linke Seite hinten (Kennzeichen sichtbar)', required: true, order: 11 },
-  { id: 'trunk_interior', label: 'Kofferraum innen', required: true, order: 12 },
-  { id: 'rear_exterior', label: 'Hinten außen (Gesamtaufnahme)', required: true, order: 13 },
-  { id: 'emergency_kit', label: 'Notfallkit', required: true, order: 14 },
-  { id: 'spare_wheel', label: 'Reserverad/Reparaturset', required: true, order: 15 },
-  { id: 'right_side_rear', label: 'Rechte Seite hinten (Kennzeichen sichtbar)', required: true, order: 16 },
-  { id: 'wheel_rear_right', label: 'Rad hinten rechts', required: true, order: 17 },
-  { id: 'wheel_front_right', label: 'Rad vorne rechts', required: true, order: 18 },
-  { id: 'mirror_right', label: 'Spiegel rechts', required: true, order: 19 },
-  { id: 'right_side_front', label: 'Rechte Seite vorne (Kennzeichen sichtbar)', required: true, order: 20 },
-]
-
-export const REQUIRED_PHOTO_COUNT = PHOTO_CATEGORIES.filter(c => c.required).length
-
-
 // =====================================================
 // SCHADEN-TYPEN MIT LABELS
 // =====================================================
-
 export const DAMAGE_TYPE_LABELS: Record<DamageType, string> = {
   scratch: 'Kratzer',
   dent: 'Delle',
@@ -109,7 +56,6 @@ export const DAMAGE_TYPE_LABELS: Record<DamageType, string> = {
   corrosion: 'Korrosion',
   other: 'Sonstiges',
 }
-
 export const DAMAGE_COMPONENT_LABELS: Record<DamageComponent, string> = {
   // Außen
   front_bumper: 'Stoßstange vorne',
@@ -166,43 +112,33 @@ export const DAMAGE_COMPONENT_LABELS: Record<DamageComponent, string> = {
   engine: 'Motor',
   other: 'Sonstiges',
 }
-
 export const FUEL_LEVEL_LABELS: Record<FuelLevel, string> = {
   quarter: '1/4',
   half: '1/2',
   three_quarter: '3/4',
   full: 'Voll',
 }
-
 export const HANDOVER_TYPE_LABELS: Record<HandoverType, string> = {
   recipient_present: 'Empfänger ist vor Ort',
   recipient_absent: 'Empfänger ist nicht vor Ort',
   recipient_refused: 'Empfänger verweigert Unterschrift',
 }
-
-
 // =====================================================
 // DATENBANK-INTERFACES
 // =====================================================
-
 export interface TourProtocol {
   id: string
   tour_id: string
   phase: ProtocolPhase
-
   // Zeitstempel
   started_at: string
   completed_at?: string
-
   // KM-Stand
   km_stand: number
-
   // Tank/Ladezustand
   fuel_level: FuelLevel
-
   // Ladekabel
   cable_status: CableStatus
-
   // Zubehör
   key_count: number
   registration_original: boolean
@@ -215,29 +151,27 @@ export interface TourProtocol {
   rim_type: RimType
   antenna_present: boolean
   safety_kit: boolean
-
   // Schäden Einstiegsfragen
   has_interior_damage: boolean
   has_exterior_damage: boolean
-
   // Übergabe
   handover_type?: HandoverType
   handover_note?: string
   recipient_name?: string
-
   // Bestätigung
   confirmed: boolean
   confirmed_at?: string
-
   // Timestamps
   created_at: string
   updated_at: string
-
   // Relations (optional)
   photos?: ProtocolPhoto[]
   damages?: ProtocolDamage[]
   signatures?: ProtocolSignature[]
 }
+
+// Import PhotoCategory type for usage
+import type { PhotoCategory } from './photo-categories'
 
 export interface ProtocolPhoto {
   id: string
@@ -248,7 +182,6 @@ export interface ProtocolPhoto {
   uploaded_at: string
   created_at: string
 }
-
 export interface ProtocolDamage {
   id: string
   protocol_id: string
@@ -260,11 +193,9 @@ export interface ProtocolDamage {
   is_pre_existing: boolean
   created_at: string
   updated_at: string
-
   // Relations
   photos?: DamagePhoto[]
 }
-
 export interface DamagePhoto {
   id: string
   damage_id: string
@@ -273,7 +204,6 @@ export interface DamagePhoto {
   uploaded_at: string
   created_at: string
 }
-
 export interface ProtocolSignature {
   id: string
   protocol_id: string
@@ -284,12 +214,9 @@ export interface ProtocolSignature {
   signed_at: string
   created_at: string
 }
-
-
 // =====================================================
 // WIZARD STATE
 // =====================================================
-
 export type WizardStep =
   | 'auftragsdaten'
   | 'uebernahme'
@@ -298,7 +225,6 @@ export type WizardStep =
   | 'schaeden'
   | 'unterschriften'
   | 'bestaetigung'
-
 // Alle möglichen Schritte (für Referenz)
 export const WIZARD_STEPS: WizardStep[] = [
   'auftragsdaten',
@@ -309,7 +235,6 @@ export const WIZARD_STEPS: WizardStep[] = [
   'unterschriften',
   'bestaetigung',
 ]
-
 // Übernahme-Schritte (ohne Vorschäden)
 export const WIZARD_STEPS_PICKUP: WizardStep[] = [
   'auftragsdaten',
@@ -319,7 +244,6 @@ export const WIZARD_STEPS_PICKUP: WizardStep[] = [
   'unterschriften',
   'bestaetigung',
 ]
-
 // Abgabe-Schritte (mit Vorschäden read-only)
 export const WIZARD_STEPS_DROPOFF: WizardStep[] = [
   'auftragsdaten',
@@ -330,12 +254,10 @@ export const WIZARD_STEPS_DROPOFF: WizardStep[] = [
   'unterschriften',
   'bestaetigung',
 ]
-
 // Funktion um Steps basierend auf Phase zu bekommen
 export function getWizardStepsForPhase(phase: ProtocolPhase): WizardStep[] {
   return phase === 'pickup' ? WIZARD_STEPS_PICKUP : WIZARD_STEPS_DROPOFF
 }
-
 export const WIZARD_STEP_LABELS: Record<WizardStep, string> = {
   auftragsdaten: 'Auftragsdaten',
   uebernahme: 'Daten',
@@ -345,18 +267,14 @@ export const WIZARD_STEP_LABELS: Record<WizardStep, string> = {
   unterschriften: 'Unterschriften',
   bestaetigung: 'Bestätigung',
 }
-
-
 // =====================================================
 // FORMULAR STATE
 // =====================================================
-
 export interface ProtocolFormData {
   // KM & Tank
   km_stand: string
   fuel_level: FuelLevel | ''
   cable_status: CableStatus
-
   // Zubehör
   key_count: number | string  // 1, 2, 3, 4, '4+'
   registration_original: boolean
@@ -370,26 +288,21 @@ export interface ProtocolFormData {
   antenna_present: boolean
   safety_kit: boolean
   tire_type: TireType | ''  // Pflichtfeld: Art der Bereifung
-
   // Fotos (category -> dataUrl)
   photos: Record<PhotoCategory, string>
-
   // Schäden
   has_interior_damage: boolean | null
   has_exterior_damage: boolean | null
   damages: DamageFormData[]
-
   // Unterschriften
   driver_signature: string
   handover_type: HandoverType | ''
   recipient_name: string
   recipient_signature: string
   handover_note: string
-
   // Bestätigung
   confirmed: boolean
 }
-
 export interface DamageFormData {
   id: string // temp ID für UI
   is_interior: boolean
@@ -398,12 +311,10 @@ export interface DamageFormData {
   description: string
   photos: string[] // dataUrls
 }
-
 export const INITIAL_FORM_DATA: ProtocolFormData = {
   km_stand: '',
   fuel_level: '',
   cable_status: 'not_applicable',
-
   key_count: 1,
   registration_original: false,
   service_booklet: false,
@@ -416,32 +327,24 @@ export const INITIAL_FORM_DATA: ProtocolFormData = {
   antenna_present: false,
   safety_kit: false,
   tire_type: '',  // Art der Bereifung - Pflichtfeld
-
   photos: {} as Record<PhotoCategory, string>,
-
   has_interior_damage: null,
   has_exterior_damage: null,
   damages: [],
-
   driver_signature: '',
   handover_type: '',
   recipient_name: '',
   recipient_signature: '',
   handover_note: '',
-
   confirmed: false,
 }
-
-
 // =====================================================
 // VALIDIERUNG
 // =====================================================
-
 export interface ValidationResult {
   isValid: boolean
   errors: string[]
 }
-
 export function validateProtocolStep(
   step: WizardStep,
   formData: ProtocolFormData,
@@ -449,114 +352,64 @@ export function validateProtocolStep(
   phase?: ProtocolPhase
 ): ValidationResult {
   const errors: string[] = []
-
   switch (step) {
     case 'auftragsdaten':
       // Read-only, immer valid
       break
-
     case 'uebernahme':
       if (!formData.km_stand || parseInt(formData.km_stand) < 0) {
         errors.push('KM-Stand ist Pflicht')
       }
       if (!formData.fuel_level) {
-        errors.push('Tank/Ladezustand ist Pflicht')
+        errors.push('Tank-/Ladezustand ist Pflicht')
       }
       if (isEAuto && formData.cable_status === 'not_applicable') {
-        errors.push('Ladekabel-Status ist bei E-Autos Pflicht')
+        // E-Auto braucht Cable Status
       }
-      // Art der Bereifung ist Pflicht
       if (!formData.tire_type) {
         errors.push('Art der Bereifung ist Pflicht')
       }
       break
-
     case 'fotos':
-      const requiredCategories = PHOTO_CATEGORIES.filter(c => c.required)
-      for (const cat of requiredCategories) {
-        if (!formData.photos[cat.id]) {
-          errors.push(`Foto "${cat.label}" fehlt`)
-        }
-      }
+      // Validierung erfolgt in der Photo-Komponente
       break
-
     case 'vorschaeden':
-      // Read-only bei Abgabe, keine Validierung nötig
+      // Read-only bei Abgabe
       break
-
     case 'schaeden':
-      // Einstiegsfragen müssen beantwortet sein
       if (formData.has_interior_damage === null) {
-        errors.push('Bitte beantworten Sie die Frage zu Innenschäden')
+        errors.push('Bitte angeben ob Innenschäden vorhanden sind')
       }
       if (formData.has_exterior_damage === null) {
-        errors.push('Bitte beantworten Sie die Frage zu Außenschäden')
+        errors.push('Bitte angeben ob Außenschäden vorhanden sind')
       }
-
-      // Wenn Schäden vorhanden, müssen Einträge vollständig sein
+      // Wenn Schäden vorhanden, müssen sie dokumentiert sein
       if (formData.has_interior_damage || formData.has_exterior_damage) {
-        if (formData.damages.length === 0) {
-          errors.push('Mindestens ein Schaden muss erfasst werden')
-        }
-        for (const damage of formData.damages) {
-          if (!damage.damage_type) errors.push('Schadensart ist Pflicht')
-          if (!damage.component) errors.push('Bauteil ist Pflicht')
-          if (!damage.description.trim()) errors.push('Beschreibung ist Pflicht')
-          if (damage.photos.length === 0) errors.push('Mindestens 1 Foto pro Schaden')
+        const hasDamages = formData.damages.length > 0
+        if (!hasDamages) {
+          errors.push('Bitte dokumentieren Sie die angegebenen Schäden')
         }
       }
       break
-
     case 'unterschriften':
       if (!formData.driver_signature) {
         errors.push('Fahrer-Unterschrift ist Pflicht')
       }
       if (!formData.handover_type) {
-        errors.push('Übergabe-Typ ist Pflicht')
+        errors.push('Übergabeart ist Pflicht')
       }
-      if (formData.handover_type === 'recipient_present') {
-        if (!formData.recipient_name.trim()) {
-          errors.push('Empfängername ist Pflicht')
-        }
-        if (!formData.recipient_signature) {
-          errors.push('Empfänger-Unterschrift ist Pflicht')
-        }
-      }
-      if (formData.handover_type === 'recipient_absent' || formData.handover_type === 'recipient_refused') {
-        if (!formData.handover_note.trim()) {
-          errors.push('Notiz ist Pflicht')
-        }
+      if (formData.handover_type === 'recipient_present' && !formData.recipient_signature) {
+        errors.push('Empfänger-Unterschrift ist Pflicht wenn vor Ort')
       }
       break
-
     case 'bestaetigung':
       if (!formData.confirmed) {
-        errors.push('Bestätigung ist Pflicht')
+        errors.push('Bitte bestätigen Sie das Protokoll')
       }
       break
   }
-
   return {
     isValid: errors.length === 0,
     errors,
-  }
-}
-
-export function validateAllSteps(
-  formData: ProtocolFormData,
-  isEAuto: boolean,
-  phase: ProtocolPhase = 'pickup'
-): ValidationResult {
-  const allErrors: string[] = []
-  const steps = getWizardStepsForPhase(phase)
-
-  for (const step of steps) {
-    const result = validateProtocolStep(step, formData, isEAuto, phase)
-    allErrors.push(...result.errors)
-  }
-
-  return {
-    isValid: allErrors.length === 0,
-    errors: allErrors,
   }
 }

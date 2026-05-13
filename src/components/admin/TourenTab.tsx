@@ -30,6 +30,7 @@ interface Fahrer {
   vorname: string
   nachname: string
   status: string
+  archived_at?: string | null
 }
 
 interface TourenTabProps {
@@ -76,7 +77,8 @@ export function TourenTab({ fahrer, onRefresh }: TourenTabProps) {
   const [error, setError] = useState("")
   const [formData, setFormData] = useState<CreateTourData>(emptyFormData)
 
-  const aktiveFahrer = fahrer.filter(f => f.status === 'aktiv')
+  // Nur aktive, nicht-archivierte Fahrer für Touren-Zuweisung
+  const aktiveFahrer = fahrer.filter(f => f.status === 'aktiv' && !f.archived_at)
 
   useEffect(() => { loadTouren() }, [])
 
@@ -194,7 +196,7 @@ export function TourenTab({ fahrer, onRefresh }: TourenTabProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-2xl text-primary-blue">Touren-Verwaltung</CardTitle>
+              <CardTitle className="text-2xl text-primary-blue">Tourenverwaltung</CardTitle>
               <CardDescription>Fahrzeugüberführungen verwalten</CardDescription>
             </div>
             <Button onClick={() => { resetForm(); setShowCreateModal(true) }} className="bg-primary-blue hover:bg-blue-700">

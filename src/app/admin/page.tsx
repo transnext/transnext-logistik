@@ -34,7 +34,7 @@ export default function AdminLoginPage() {
       // Prüfe ob Benutzer Admin oder Disponent ist
       const profile = await getUserProfile(user.id)
 
-      if (profile.role !== 'admin' && profile.role !== 'disponent') {
+      if (profile.role !== 'admin' && profile.role !== 'disponent' && profile.role !== 'gf') {
         setError("Sie haben keine Berechtigung für das Admin-Portal")
         setIsLoading(false)
         return
