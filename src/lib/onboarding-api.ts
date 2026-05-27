@@ -57,6 +57,13 @@ export interface OnboardingCandidate {
   desired_employment_type: string | null
   interview_date: string | null
   teams_link: string | null
+  // Phase 2: Termin-Slots
+  termin_slot_1: string | null
+  termin_slot_2: string | null
+  termin_slot_3: string | null
+  termin_bemerkung: string | null
+  termin_gewaehlt: number | null
+  // Timestamps
   created_at: string
   updated_at: string
   archived_at: string | null
@@ -109,6 +116,35 @@ export interface UpdateCandidateParams extends Partial<CreateCandidateParams> {
   interview_date?: string | null
   teams_link?: string | null
   desired_employment_type?: string | null
+  // Phase 2: Termin-Slots
+  termin_slot_1?: string | null
+  termin_slot_2?: string | null
+  termin_slot_3?: string | null
+  termin_bemerkung?: string | null
+  termin_gewaehlt?: number | null
+}
+
+// ============================================================
+// COMMUNICATION TYPES (Phase 2)
+// ============================================================
+
+export type OnboardingCommType =
+  | 'erstkontakt' | 'terminangebot' | 'teams_link' | 'personalfragebogen'
+  | 'infomaterial' | 'fehlende_dokumente' | 'vertrag' | 'absage' | 'willkommen' | 'sonstiges'
+
+export type OnboardingCommStatus = 'prepared' | 'copied' | 'sent_manual' | 'sent_auto'
+
+export interface OnboardingCommunication {
+  id: string
+  candidate_id: string
+  comm_type: OnboardingCommType
+  subject: string | null
+  body: string
+  status: OnboardingCommStatus
+  created_by: string | null
+  created_by_name: string | null
+  created_at: string
+  sent_at: string | null
 }
 
 // ============================================================
@@ -455,4 +491,127 @@ export function getDocumentTypesForCandidateType(type: CandidateType): Onboardin
   if (type === 'minijobber') return MINIJOBBER_DOCUMENT_TYPES
   if (type === 'subcontractor') return SUBCONTRACTOR_DOCUMENT_TYPES
   return ['sonstiges']
+}
+
+// ============================================================
+// COMMUNICATION FUNCTIONS (Phase 2)
+// ============================================================
+
+export const COMM_TYPE_LABELS: Record<OnboardingCommType, string> = {
+  'erstkontakt': 'Erstkontakt',
+  'terminangebot': 'Terminangebot',
+  'teams_link': 'Teams-Link',
+  'personalfragebogen': 'Personalfragebogen',
+  'infomaterial': 'Infomaterial',
+  'fehlende_dokumente': 'Fehlende Dokumente',
+  'vertrag': 'Vertrag',
+  'absage': 'Absage',
+  'willkommen': 'Willkommen',
+  'sonstiges': 'Sonstiges'
+}
+
+export const COMM_STATUS_LABELS: Record<OnboardingCommStatus, string> = {
+  'prepared': 'Vorbereitet',
+  'copied': 'Kopiert',
+  'sent_manual': 'Manuell gesendet',
+  'sent_auto': 'Automatisch gesendet'
+}
+
+/**
+ * Holt alle Kommunikationen für einen Kandidaten
+ */
+export async function getCandidateCommunications(candidateId: string): Promise<OnboardingCommunication[]> {
+  try {
+    const { data, error } = await supabase
+      .from('onboarding_communications')
+      .select('*')
+      .eq('candidate_id', candidateId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('[Onboarding] Error loading communications:', error)
+      return []
+    }
+    return (data || []) as OnboardingCommunication[]
+  } catch (err) {
+    console.error('[Onboarding] Error:', err)
+    return []
+  }
+}
+
+/**
+ * Erstellt einen neuen Kommunikationseintrag
+ */
+export async function createCommunication(
+  candidateId: string,
+  commType: OnboardingCommType,
+  subject: string | null,
+  body: string,
+  status: OnboardingCommStatus = 'prepared'
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Nicht authentifiziert' }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+
+    const { data, error } = await supabase
+      .from('onboarding_communications')
+      .insert({
+        candidate_id: candidateId,
+        comm_type: commType,
+        subject,
+        body,
+        status,
+        created_by: user.id,
+        created_by_name: profile?.full_name || null,
+        sent_at: status === 'sent_manual' || status === 'sent_auto' ? new Date().toISOString() : null
+      })
+      .select('id')
+      .single()
+
+    if (error) return { success: false, error: error.message }
+
+    await logAuditEvent({
+      action: 'onboarding_communication_created',
+      entityType: 'onboarding_communication',
+      entityId: data.id,
+      severity: 'info',
+      afterData: { comm_type: commType, status }
+    })
+
+    return { success: true, id: data.id }
+  } catch (err) {
+    console.error('[Onboarding] Error creating communication:', err)
+    return { success: false, error: 'Unerwarteter Fehler' }
+  }
+}
+
+/**
+ * Aktualisiert den Status einer Kommunikation (z.B. auf "copied" oder "sent_manual")
+ */
+export async function updateCommunicationStatus(
+  commId: string,
+  status: OnboardingCommStatus
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const updateData: Record<string, unknown> = { status }
+    if (status === 'sent_manual' || status === 'sent_auto') {
+      updateData.sent_at = new Date().toISOString()
+    }
+
+    const { error } = await supabase
+      .from('onboarding_communications')
+      .update(updateData)
+      .eq('id', commId)
+
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: 'Unerwarteter Fehler' }
+  }
 }
