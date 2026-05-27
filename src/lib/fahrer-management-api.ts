@@ -163,7 +163,7 @@ async function getCurrentUserRole(): Promise<'admin' | 'gf' | 'disponent' | 'fah
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   return profile?.role as 'admin' | 'gf' | 'disponent' | 'fahrer' | null
 }
@@ -206,7 +206,7 @@ export async function getFahrerUserData(fahrerId: string): Promise<FahrerUserDat
       )
     `)
     .eq('id', fahrerId)
-    .single()
+    .maybeSingle()
 
   if (error || !fahrer) {
     console.error('Fehler beim Laden der Fahrer-Benutzerdaten:', error)
@@ -257,7 +257,7 @@ export async function updateFahrerName(
     .from('fahrer')
     .select('id, vorname, nachname, user_id')
     .eq('id', fahrerId)
-    .single()
+    .maybeSingle()
 
   if (fetchError || !beforeFahrer) {
     return { success: false, error: 'Fahrer nicht gefunden' }
@@ -324,7 +324,7 @@ export async function updateFahrerZeitmodell(
     .from('fahrer')
     .select('id, user_id, vorname, nachname')
     .eq('id', fahrerId)
-    .single()
+    .maybeSingle()
 
   if (fetchError || !fahrer) {
     return { success: false, error: 'Fahrer nicht gefunden' }
@@ -337,7 +337,7 @@ export async function updateFahrerZeitmodell(
       .from('profiles')
       .select('zeitmodell')
       .eq('id', fahrer.user_id)
-      .single()
+      .maybeSingle()
     oldZeitmodell = oldProfile?.zeitmodell || null
   }
 
@@ -387,7 +387,7 @@ export async function requestPasswordReset(
     .from('fahrer')
     .select('id, user_id, vorname, nachname')
     .eq('id', fahrerId)
-    .single()
+    .maybeSingle()
 
   if (fetchError || !fahrer || !fahrer.user_id) {
     return { success: false, error: 'Fahrer nicht gefunden oder kein Benutzerkonto verknüpft' }
@@ -503,7 +503,7 @@ export async function getFahrerDocument(documentId: string): Promise<FahrerDocum
     .from('fahrer_documents')
     .select('*')
     .eq('id', documentId)
-    .single()
+    .maybeSingle()
 
   if (error) {
     console.error('Fehler beim Laden des Dokuments:', error)
@@ -609,11 +609,20 @@ export async function uploadFahrerDocument(
       })
 
     if (uploadError) {
+      // Vollständiges Error-Logging für Diagnose
       console.error('[uploadFahrerDocument] Storage Upload-Fehler:', {
         message: uploadError.message,
         name: (uploadError as any).name,
-        cause: (uploadError as any).cause
+        statusCode: (uploadError as any).statusCode,
+        status: (uploadError as any).status,
+        error: (uploadError as any).error,
+        cause: (uploadError as any).cause,
+        bucket: 'fahrer-dokumente',
+        filePath,
+        fileSize: file.size,
+        fileType: file.type
       })
+      console.error('[uploadFahrerDocument] Error JSON:', JSON.stringify(uploadError, null, 2))
 
       // Detaillierte Fehlermeldung
       let errorMessage = 'Fehler beim Hochladen'
@@ -679,7 +688,7 @@ export async function uploadFahrerDocument(
         comment: comment || null
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (dbError) {
       console.error('[uploadFahrerDocument] DB-Fehler beim Insert:', dbError)
@@ -817,7 +826,7 @@ export async function archiveDocument(
     .from('fahrer_documents')
     .select('*')
     .eq('id', documentId)
-    .single()
+    .maybeSingle()
 
   if (fetchError || !doc) {
     return { success: false, error: 'Dokument nicht gefunden' }
@@ -889,7 +898,7 @@ export async function getDocumentDownloadUrl(
     .from('fahrer_documents')
     .select('file_path')
     .eq('id', documentId)
-    .single()
+    .maybeSingle()
 
   if (fetchError || !doc) {
     return { success: false, error: 'Dokument nicht gefunden' }
@@ -935,7 +944,7 @@ export async function getFahrerFuelCard(fahrerId: string): Promise<FahrerFuelCar
     .eq('fahrer_id', fahrerId)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   if (error && error.code !== 'PGRST116') { // PGRST116 = nicht gefunden
     console.error('Fehler beim Laden der Tankkarte:', error)
@@ -981,7 +990,7 @@ export async function saveFahrerFuelCard(
       })
       .eq('id', existing.id)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       return { success: false, error: error.message }
@@ -1017,7 +1026,7 @@ export async function saveFahrerFuelCard(
         created_by: currentUserId
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       return { success: false, error: error.message }
@@ -1160,7 +1169,7 @@ export async function createFahrerNote(
       created_by: currentUserId
     })
     .select()
-    .single()
+    .maybeSingle()
 
   if (error) {
     console.error('DB-Fehler beim Notiz-Insert:', error)
@@ -1246,7 +1255,7 @@ export async function calculateComplianceStatus(fahrerId: string): Promise<Compl
     .from('fahrer')
     .select('status, archived_at, fuehrerschein_nr, ausweis_ablauf')
     .eq('id', fahrerId)
-    .single()
+    .maybeSingle()
 
   if (fahrer) {
     status.fahrerStatus.aktiv = fahrer.status === 'aktiv'
