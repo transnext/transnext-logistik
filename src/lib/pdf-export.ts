@@ -28,6 +28,11 @@ interface TourForExport {
   wartezeit: string
   fahrer_name: string
   auftraggeber?: Auftraggeber
+  // Nachberechnungs-Felder (optional für Abwärtskompatibilität)
+  billing_type?: 'regulaer' | 'nachberechnung' | 'korrektur'
+  original_billing_period?: string | null
+  is_retroactive?: boolean
+  customer_amount?: number
 }
 
 interface AuslageForExport {
@@ -39,6 +44,10 @@ interface AuslageForExport {
   belegart: string
   kosten: number
   beleg_url?: string
+  // Nachberechnungs-Felder (optional für Abwärtskompatibilität)
+  billing_type?: 'regulaer' | 'nachberechnung' | 'korrektur'
+  original_billing_period?: string | null
+  is_retroactive?: boolean
 }
 
 // =====================================================
@@ -237,104 +246,166 @@ function getUnsupportedMessage(type: DetectedFileType): string {
 }
 
 /**
- * Exportiert Touren-Abrechnung als PDF
- *
- * Redesigned Layout:
- * - Professioneller Header mit TransNext-Blau Akzent
- * - Klare Dokumenthierarchie
- * - Deutsches Währungsformat (1.234,56 €)
- * - Rechtsbündige Beträge mit ausreichend Platz
- * - Summary-Box für Gesamtbetrag
+ * Exportiert Touren-Abrechnung als PDF mit Nachberechnungs-Unterstützung
+ * @param touren - Alle Touren (regulär und Nachberechnung)
+ * @param kw - Kalenderwoche
+ * @param year - Jahr
+ * @param invoiceNumber - Optionale Abrechnungsnummer
  */
 export function exportTourenPDF(
   touren: TourForExport[],
   kw: string,
-  year: number
+  year: number,
+  invoiceNumber?: string
 ): void {
   const doc = new jsPDF()
   let currentPage = 1
 
-  // Gesamtsumme vorab berechnen
-  const gesamt = touren.reduce((sum, tour) => {
-    return sum + calculateCustomerTotal(tour.gefahrene_km, tour.wartezeit, tour.auftraggeber)
-  }, 0)
+  // Trenne reguläre und Nachberechnungs-Touren
+  const regularTours = touren.filter(t => !t.is_retroactive && t.billing_type !== 'nachberechnung')
+  const retroTours = touren.filter(t => t.is_retroactive || t.billing_type === 'nachberechnung')
 
-  // === ERSTE SEITE: Header und Titel ===
+  // Betrag-Berechnung mit Fallback
+  const calcAmount = (t: TourForExport) =>
+    t.customer_amount ?? calculateCustomerTotal(t.gefahrene_km, t.wartezeit, t.auftraggeber)
+
+  const regularSum = regularTours.reduce((sum, t) => sum + calcAmount(t), 0)
+  const retroSum = retroTours.reduce((sum, t) => sum + calcAmount(t), 0)
+  const gesamt = regularSum + retroSum
+
+  // === Header und Titel ===
   let yPos = drawPdfHeader(doc)
-  yPos = drawPdfTitle(doc, 'Tourenabrechnung', `KW ${kw} / ${year}`, yPos)
+  const title = invoiceNumber ? `Tourenabrechnung ${invoiceNumber}` : 'Tourenabrechnung'
+  yPos = drawPdfTitle(doc, title, `KW ${kw} / ${year}`, yPos)
 
-  // Info-Zeile
-  yPos = drawPdfInfoLine(doc, [
-    { label: 'Touren', value: touren.length },
-    { label: 'Summe', value: formatPdfCurrency(gesamt) }
-  ], yPos)
-
+  // Info-Zeilen
+  if (retroTours.length > 0) {
+    yPos = drawPdfInfoLine(doc, [
+      { label: 'Regulär', value: regularTours.length },
+      { label: 'Nachberechnung', value: retroTours.length },
+      { label: 'Gesamt', value: formatPdfCurrency(gesamt) }
+    ], yPos)
+  } else {
+    yPos = drawPdfInfoLine(doc, [
+      { label: 'Touren', value: touren.length },
+      { label: 'Summe', value: formatPdfCurrency(gesamt) }
+    ], yPos)
+  }
   yPos += 4
 
-  // Tabellen-Daten vorbereiten (mit deutschem Währungsformat)
-  const tableData = touren.map((tour) => {
-    const wartezeitCode = wartezeitToCode(tour.wartezeit)
-    const betrag = calculateCustomerTotal(tour.gefahrene_km, tour.wartezeit, tour.auftraggeber)
-    const wartezeitAnzeige = tour.auftraggeber === 'onlogist' ? '0' : wartezeitCode.toString()
-
-    return [
-      tour.tour_nr,
-      formatPdfDate(tour.datum),
-      tour.gefahrene_km.toString(),
-      wartezeitAnzeige,
-      formatPdfCurrency(betrag)
-    ]
-  })
-
-  // Tabelle erstellen mit modernem Design
-  autoTable(doc, {
-    head: [['Tour-Nr.', 'Datum', 'KM', 'Wartezeit', 'Betrag']],
-    body: tableData,
-    startY: yPos,
-    theme: 'striped',
-    headStyles: {
-      fillColor: TRANSNEXT_BLUE_ARRAY,
-      textColor: 255,
-      fontStyle: 'bold',
-      fontSize: 9,
-      cellPadding: 4
-    },
-    bodyStyles: {
-      fontSize: 9,
-      cellPadding: 3,
-      textColor: [40, 40, 40]
-    },
-    alternateRowStyles: {
-      fillColor: [248, 250, 252]
-    },
-    columnStyles: {
-      0: { cellWidth: 35 },
-      1: { cellWidth: 28 },
-      2: { cellWidth: 20, halign: 'right' },
-      3: { cellWidth: 25, halign: 'center' },
-      4: { cellWidth: getAmountColumnWidth(), halign: 'right' }
-    },
-    showHead: 'everyPage',
-    margin: { top: 50, bottom: 30, left: PDF_MARGINS.left, right: PDF_MARGINS.right },
-    didDrawPage: (data) => {
-      currentPage = data.pageNumber
-      // Header auf Folgeseiten
-      if (data.pageNumber > 1) {
-        drawPdfHeader(doc)
-        doc.setFontSize(10)
-        doc.setTextColor(DARK_GRAY.r, DARK_GRAY.g, DARK_GRAY.b)
-        doc.text(`Tourenabrechnung KW ${kw} / ${year} (Fortsetzung)`, PDF_MARGINS.left, 45)
-      }
+  // === REGULÄRE TOUREN ===
+  if (regularTours.length > 0) {
+    if (retroTours.length > 0) {
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(TRANSNEXT_BLUE.r, TRANSNEXT_BLUE.g, TRANSNEXT_BLUE.b)
+      doc.text('Reguläre Abrechnung', PDF_MARGINS.left, yPos)
+      doc.setTextColor(DARK_GRAY.r, DARK_GRAY.g, DARK_GRAY.b)
+      yPos += 5
     }
-  })
 
-  // Gesamtsumme auf der letzten Seite
-  const finalY = (doc as any).lastAutoTable.finalY || yPos
+    const tableData = regularTours.map((tour) => {
+      const wartezeitCode = wartezeitToCode(tour.wartezeit)
+      const wartezeitAnzeige = tour.auftraggeber === 'onlogist' ? '0' : wartezeitCode.toString()
+      return [
+        tour.tour_nr,
+        formatPdfDate(tour.datum),
+        tour.gefahrene_km.toString(),
+        wartezeitAnzeige,
+        formatPdfCurrency(calcAmount(tour))
+      ]
+    })
 
-  // Prüfe ob genug Platz für Summary-Box (mind. 30mm)
+    autoTable(doc, {
+      head: [['Tour-Nr.', 'Datum', 'KM', 'Wartezeit', 'Betrag']],
+      body: tableData,
+      startY: yPos,
+      theme: 'striped',
+      headStyles: { fillColor: TRANSNEXT_BLUE_ARRAY, textColor: 255, fontStyle: 'bold', fontSize: 9, cellPadding: 4 },
+      bodyStyles: { fontSize: 9, cellPadding: 3, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 35 }, 1: { cellWidth: 28 }, 2: { cellWidth: 20, halign: 'right' },
+        3: { cellWidth: 25, halign: 'center' }, 4: { cellWidth: getAmountColumnWidth(), halign: 'right' }
+      },
+      showHead: 'everyPage',
+      margin: { top: 50, bottom: 30, left: PDF_MARGINS.left, right: PDF_MARGINS.right },
+      didDrawPage: (data) => {
+        currentPage = data.pageNumber
+        if (data.pageNumber > 1) {
+          drawPdfHeader(doc)
+          doc.setFontSize(10)
+          doc.setTextColor(DARK_GRAY.r, DARK_GRAY.g, DARK_GRAY.b)
+          doc.text(`Tourenabrechnung KW ${kw} / ${year} (Fortsetzung)`, PDF_MARGINS.left, 45)
+        }
+      }
+    })
+
+    yPos = (doc as any).lastAutoTable.finalY || yPos
+    if (retroTours.length > 0) {
+      yPos += 3
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`Zwischensumme regulär: ${formatPdfCurrency(regularSum)}`, PAGE_WIDTH - PDF_MARGINS.right, yPos, { align: 'right' })
+      yPos += 8
+    }
+  }
+
+  // === NACHBERECHNUNGEN ===
+  if (retroTours.length > 0) {
+    if (yPos > 200) { doc.addPage(); currentPage++; yPos = drawPdfHeader(doc) + 10 }
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(200, 120, 50)
+    doc.text('Nachberechnungen aus früheren Zeiträumen', PDF_MARGINS.left, yPos)
+    doc.setTextColor(DARK_GRAY.r, DARK_GRAY.g, DARK_GRAY.b)
+    yPos += 5
+
+    const retroData = retroTours.map((tour) => {
+      const wartezeitCode = wartezeitToCode(tour.wartezeit)
+      const wartezeitAnzeige = tour.auftraggeber === 'onlogist' ? '0' : wartezeitCode.toString()
+      return [
+        tour.tour_nr,
+        formatPdfDate(tour.datum),
+        tour.original_billing_period || '—',
+        tour.gefahrene_km.toString(),
+        wartezeitAnzeige,
+        formatPdfCurrency(calcAmount(tour))
+      ]
+    })
+
+    autoTable(doc, {
+      head: [['Tour-Nr.', 'Datum', 'Urspr. KW', 'KM', 'Wartezeit', 'Betrag']],
+      body: retroData,
+      startY: yPos,
+      theme: 'striped',
+      headStyles: { fillColor: [200, 120, 50], textColor: 255, fontStyle: 'bold', fontSize: 9, cellPadding: 4 },
+      bodyStyles: { fontSize: 9, cellPadding: 3, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: [255, 248, 240] },
+      columnStyles: {
+        0: { cellWidth: 30 }, 1: { cellWidth: 24 }, 2: { cellWidth: 25 },
+        3: { cellWidth: 18, halign: 'right' }, 4: { cellWidth: 22, halign: 'center' },
+        5: { cellWidth: getAmountColumnWidth(), halign: 'right' }
+      },
+      showHead: 'everyPage',
+      margin: { top: 50, bottom: 30, left: PDF_MARGINS.left, right: PDF_MARGINS.right }
+    })
+
+    yPos = (doc as any).lastAutoTable.finalY || yPos
+    yPos += 3
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(200, 120, 50)
+    doc.text(`Zwischensumme Nachberechnung: ${formatPdfCurrency(retroSum)}`, PAGE_WIDTH - PDF_MARGINS.right, yPos, { align: 'right' })
+    doc.setTextColor(DARK_GRAY.r, DARK_GRAY.g, DARK_GRAY.b)
+  }
+
+  // === GESAMTSUMME ===
+  const finalY = (doc as any).lastAutoTable?.finalY || yPos
+
   if (finalY > 250) {
-    doc.addPage()
-    currentPage++
+    doc.addPage(); currentPage++
     drawPdfHeader(doc)
     drawPdfSummaryBox(doc, 'Gesamtbetrag', gesamt, 50)
     drawPdfFooter(doc, currentPage)
@@ -343,18 +414,13 @@ export function exportTourenPDF(
     drawPdfFooter(doc, currentPage)
   }
 
-  // Footer auf allen vorherigen Seiten (wenn mehrere Seiten)
   if (currentPage > 1) {
-    for (let i = 1; i < currentPage; i++) {
-      doc.setPage(i)
-      drawPdfFooter(doc, i, currentPage)
-    }
-    doc.setPage(currentPage)
-    drawPdfFooter(doc, currentPage, currentPage)
+    for (let i = 1; i < currentPage; i++) { doc.setPage(i); drawPdfFooter(doc, i, currentPage) }
+    doc.setPage(currentPage); drawPdfFooter(doc, currentPage, currentPage)
   }
 
-  // Download
-  doc.save(`Tourenabrechnung_KW${kw}_${year}.pdf`)
+  const filename = invoiceNumber ? `${invoiceNumber}.pdf` : `Tourenabrechnung_KW${kw}_${year}.pdf`
+  doc.save(filename)
 }
 
 /**
