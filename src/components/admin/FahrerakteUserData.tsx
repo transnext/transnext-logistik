@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ import {
   updateFahrerZeitmodell,
   requestPasswordReset
 } from "@/lib/fahrer-management-api"
+import { updateFahrerStatus } from "@/lib/admin-api"
 
 interface FahrerDetails {
   id: number
@@ -62,6 +64,7 @@ export function FahrerakteUserData({
   const [vorname, setVorname] = useState(fahrer.vorname)
   const [nachname, setNachname] = useState(fahrer.nachname)
   const [zeitmodell, setZeitmodell] = useState(fahrer.zeitmodell || 'minijob')
+  const [statusAktiv, setStatusAktiv] = useState(fahrer.status === 'aktiv')
 
   // Passwort-Reset State
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false)
@@ -73,6 +76,7 @@ export function FahrerakteUserData({
     setVorname(fahrer.vorname)
     setNachname(fahrer.nachname)
     setZeitmodell(fahrer.zeitmodell || 'minijob')
+    setStatusAktiv(fahrer.status === 'aktiv')
     setIsEditing(true)
     setError("")
     setSaveSuccess(false)
@@ -111,6 +115,12 @@ export function FahrerakteUserData({
         if (!zeitmodellResult.success) {
           throw new Error(zeitmodellResult.error || 'Fehler beim Aktualisieren des Zeitmodells')
         }
+      }
+
+      // Status aktualisieren wenn geändert
+      const newStatus = statusAktiv ? 'aktiv' : 'inaktiv'
+      if (newStatus !== fahrer.status) {
+        await updateFahrerStatus(fahrer.id.toString(), newStatus)
       }
 
       setSaveSuccess(true)
@@ -258,20 +268,42 @@ export function FahrerakteUserData({
                 </div>
               </div>
 
-              {/* Zeitmodell */}
-              <div className="space-y-2">
-                <Label htmlFor="zeitmodell">Zeitmodell</Label>
-                <Select value={zeitmodell} onValueChange={setZeitmodell}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Zeitmodell wählen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="minijob">Minijob</SelectItem>
-                    <SelectItem value="werkstudent">Werkstudent</SelectItem>
-                    <SelectItem value="teilzeit">Teilzeit</SelectItem>
-                    <SelectItem value="vollzeit">Vollzeit</SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* Zeitmodell und Status */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="zeitmodell">Zeitmodell</Label>
+                  <Select value={zeitmodell} onValueChange={setZeitmodell}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Zeitmodell wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="minijob">Minijob</SelectItem>
+                      <SelectItem value="werkstudent">Werkstudent</SelectItem>
+                      <SelectItem value="teilzeit">Teilzeit</SelectItem>
+                      <SelectItem value="vollzeit">Vollzeit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Status aktiv/inaktiv */}
+                <div className="space-y-2">
+                  <Label>Fahrer-Status</Label>
+                  <div className="flex items-center gap-3 h-10">
+                    <Switch
+                      id="statusAktiv"
+                      checked={statusAktiv}
+                      onCheckedChange={setStatusAktiv}
+                    />
+                    <Label
+                      htmlFor="statusAktiv"
+                      className={`cursor-pointer font-medium ${
+                        statusAktiv ? 'text-emerald-600' : 'text-gray-500'
+                      }`}
+                    >
+                      {statusAktiv ? 'Aktiv' : 'Inaktiv'}
+                    </Label>
+                  </div>
+                </div>
               </div>
 
               {/* Fehleranzeige */}

@@ -37,6 +37,7 @@ export type DocumentStatus =
   | 'geprueft'
   | 'abgelehnt'
   | 'abgelaufen'
+  | 'archiviert'
 
 export interface FahrerDocument {
   id: string
@@ -53,6 +54,9 @@ export interface FahrerDocument {
   reviewed_at?: string | null
   reviewed_by?: string | null
   comment?: string | null
+  archived_at?: string | null
+  archived_by?: string | null
+  archive_reason?: string | null
   created_at: string
   updated_at: string
 }
@@ -441,7 +445,8 @@ const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
   hochgeladen: 'Hochgeladen',
   geprueft: 'Geprüft',
   abgelehnt: 'Abgelehnt',
-  abgelaufen: 'Abgelaufen'
+  abgelaufen: 'Abgelaufen',
+  archiviert: 'Archiviert'
 }
 
 export function getDocumentTypeLabel(type: DocumentType): string {
@@ -454,17 +459,29 @@ export function getDocumentStatusLabel(status: DocumentStatus): string {
 
 /**
  * Lädt alle Dokumente eines Fahrers
+ *
+ * @param fahrerId - ID des Fahrers
+ * @param includeArchived - Optional: Auch archivierte Dokumente laden (default: false)
  */
-export async function getFahrerDocuments(fahrerId: string): Promise<FahrerDocument[]> {
+export async function getFahrerDocuments(
+  fahrerId: string,
+  includeArchived: boolean = false
+): Promise<FahrerDocument[]> {
   if (!(await hasHRAccess())) {
     return []
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('fahrer_documents')
     .select('*')
     .eq('fahrer_id', fahrerId)
-    .order('created_at', { ascending: false })
+
+  // Standardmäßig archivierte Dokumente ausblenden
+  if (!includeArchived) {
+    query = query.or('status.neq.archiviert,status.is.null')
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) {
     console.error('Fehler beim Laden der Dokumente:', error)
@@ -632,16 +649,26 @@ export async function updateDocumentStatus(
 }
 
 /**
- * Löscht ein Dokument (Archivierung statt echtes Löschen empfohlen)
+ * Archiviert ein Dokument (kein hartes Löschen mehr)
+ *
+ * Storage-Dateien werden NICHT gelöscht, um Datenintegrität zu gewährleisten.
+ * Das Dokument erhält den Status 'archiviert' und ein archived_at Timestamp.
+ * Archivierte Dokumente werden in der Standard-Ansicht nicht mehr angezeigt.
  */
-export async function deleteDocument(
-  documentId: string
+export async function archiveDocument(
+  documentId: string,
+  reason?: string
 ): Promise<{ success: boolean; error?: string }> {
   if (!(await hasHRAccess())) {
     return { success: false, error: 'Keine Berechtigung' }
   }
 
-  // Dokument laden für Storage-Pfad
+  const currentUserId = await getCurrentUserId()
+  if (!currentUserId) {
+    return { success: false, error: 'Nicht angemeldet' }
+  }
+
+  // Dokument laden für Audit
   const { data: doc, error: fetchError } = await supabase
     .from('fahrer_documents')
     .select('*')
@@ -652,41 +679,56 @@ export async function deleteDocument(
     return { success: false, error: 'Dokument nicht gefunden' }
   }
 
-  // Aus Storage löschen
-  const { error: storageError } = await supabase.storage
-    .from('fahrer-dokumente')
-    .remove([doc.file_path])
-
-  if (storageError) {
-    console.error('Storage-Löschfehler:', storageError)
-    // Fahren trotzdem fort
-  }
-
-  // Aus DB löschen
-  const { error: dbError } = await supabase
+  // Status auf archiviert setzen (kein hartes Löschen!)
+  const { error: updateError } = await supabase
     .from('fahrer_documents')
-    .delete()
+    .update({
+      status: 'archiviert',
+      archived_at: new Date().toISOString(),
+      archived_by: currentUserId,
+      archive_reason: reason || null,
+      updated_at: new Date().toISOString()
+    })
     .eq('id', documentId)
 
-  if (dbError) {
-    return { success: false, error: dbError.message }
+  if (updateError) {
+    return { success: false, error: updateError.message }
   }
 
   // Audit-Log
   await logAuditEvent({
-    action: 'fahrer_document_deleted',
+    action: 'fahrer_document_archived',
     entityType: 'fahrer_document',
     entityId: documentId,
     entityLabel: doc.file_name,
     severity: 'warning',
     isFinancial: false,
+    beforeData: {
+      status: doc.status
+    },
+    afterData: {
+      status: 'archiviert'
+    },
     metadata: {
       fahrer_id: doc.fahrer_id,
-      document_type: doc.document_type
+      document_type: doc.document_type,
+      archive_reason: reason || null
     }
   })
 
   return { success: true }
+}
+
+/**
+ * @deprecated Verwende archiveDocument statt deleteDocument
+ * Hartes Löschen ist für sensible Fahrerakte-Dokumente nicht empfohlen.
+ * Diese Funktion bleibt nur für Abwärtskompatibilität erhalten.
+ */
+export async function deleteDocument(
+  documentId: string
+): Promise<{ success: boolean; error?: string }> {
+  // Leite auf archiveDocument um statt hartem Löschen
+  return archiveDocument(documentId, 'Über deleteDocument aufgerufen')
 }
 
 /**

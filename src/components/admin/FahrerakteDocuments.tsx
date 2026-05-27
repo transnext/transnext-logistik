@@ -29,6 +29,7 @@ import {
   Upload,
   Download,
   Trash2,
+  Archive,
   MoreHorizontal,
   CheckCircle,
   XCircle,
@@ -44,7 +45,7 @@ import {
   getFahrerDocuments,
   uploadFahrerDocument,
   updateDocumentStatus,
-  deleteDocument,
+  archiveDocument,
   getDocumentDownloadUrl,
   getDocumentTypeLabel,
   getDocumentStatusLabel,
@@ -94,6 +95,11 @@ const STATUS_CONFIG: Record<DocumentStatus, { label: string; className: string; 
     label: 'Abgelaufen',
     className: 'bg-orange-50 text-orange-700 border-orange-200',
     icon: <AlertTriangle className="h-3 w-3" />
+  },
+  archiviert: {
+    label: 'Archiviert',
+    className: 'bg-gray-100 text-gray-500 border-gray-300',
+    icon: <Trash2 className="h-3 w-3" />
   }
 }
 
@@ -122,10 +128,10 @@ export function FahrerakteDocuments({ fahrerId, isAdmin }: FahrerakteDocumentsPr
   const [statusComment, setStatusComment] = useState("")
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
 
-  // Delete Modal State
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [deleteDoc, setDeleteDoc] = useState<FahrerDocument | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
+  // Archive Modal State (kein hartes Löschen mehr)
+  const [showArchiveModal, setShowArchiveModal] = useState(false)
+  const [archiveDoc, setArchiveDoc] = useState<FahrerDocument | null>(null)
+  const [isArchiving, setIsArchiving] = useState(false)
 
   useEffect(() => {
     loadDocuments()
@@ -234,29 +240,29 @@ export function FahrerakteDocuments({ fahrerId, isAdmin }: FahrerakteDocumentsPr
     }
   }
 
-  const handleOpenDeleteModal = (doc: FahrerDocument) => {
-    setDeleteDoc(doc)
-    setShowDeleteModal(true)
+  const handleOpenArchiveModal = (doc: FahrerDocument) => {
+    setArchiveDoc(doc)
+    setShowArchiveModal(true)
   }
 
-  const handleDelete = async () => {
-    if (!deleteDoc) return
+  const handleArchive = async () => {
+    if (!archiveDoc) return
 
-    setIsDeleting(true)
+    setIsArchiving(true)
     try {
-      const result = await deleteDocument(deleteDoc.id)
+      const result = await archiveDocument(archiveDoc.id)
       if (!result.success) {
-        throw new Error(result.error || 'Fehler beim Löschen')
+        throw new Error(result.error || 'Fehler beim Archivieren')
       }
 
-      setShowDeleteModal(false)
-      setDeleteDoc(null)
+      setShowArchiveModal(false)
+      setArchiveDoc(null)
       await loadDocuments()
     } catch (err) {
-      console.error("Lösch-Fehler:", err)
-      alert("Fehler beim Löschen des Dokuments")
+      console.error("Archivierungs-Fehler:", err)
+      alert("Fehler beim Archivieren des Dokuments")
     } finally {
-      setIsDeleting(false)
+      setIsArchiving(false)
     }
   }
 
@@ -454,11 +460,11 @@ export function FahrerakteDocuments({ fahrerId, isAdmin }: FahrerakteDocumentsPr
                                   Status ändern
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={() => handleOpenDeleteModal(doc)}
-                                  className="text-red-600"
+                                  onClick={() => handleOpenArchiveModal(doc)}
+                                  className="text-amber-600"
                                 >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Löschen
+                                  <Archive className="h-4 w-4 mr-2" />
+                                  Archivieren
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -536,10 +542,11 @@ export function FahrerakteDocuments({ fahrerId, isAdmin }: FahrerakteDocumentsPr
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleOpenDeleteModal(doc)}
-                          className="text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={() => handleOpenArchiveModal(doc)}
+                          className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                          title="Archivieren"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Archive className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
@@ -737,24 +744,25 @@ export function FahrerakteDocuments({ fahrerId, isAdmin }: FahrerakteDocumentsPr
         </DialogContent>
       </Dialog>
 
-      {/* Delete Modal */}
-      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+      {/* Archive Modal (kein hartes Löschen) */}
+      <Dialog open={showArchiveModal} onOpenChange={setShowArchiveModal}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <Trash2 className="h-5 w-5" />
-              Dokument löschen
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <Archive className="h-5 w-5" />
+              Dokument archivieren
             </DialogTitle>
             <DialogDescription>
-              Sind Sie sicher, dass Sie dieses Dokument unwiderruflich löschen möchten?
+              Das Dokument wird archiviert und nicht mehr in der Standardansicht angezeigt.
+              Die Datei bleibt erhalten und kann bei Bedarf wiederhergestellt werden.
             </DialogDescription>
           </DialogHeader>
 
-          {deleteDoc && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="font-medium text-sm text-red-700">{deleteDoc.file_name}</p>
-              <p className="text-xs text-red-600">
-                {getDocumentTypeLabel(deleteDoc.document_type)}
+          {archiveDoc && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="font-medium text-sm text-amber-700">{archiveDoc.file_name}</p>
+              <p className="text-xs text-amber-600">
+                {getDocumentTypeLabel(archiveDoc.document_type)}
               </p>
             </div>
           )}
@@ -762,22 +770,22 @@ export function FahrerakteDocuments({ fahrerId, isAdmin }: FahrerakteDocumentsPr
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowDeleteModal(false)}
-              disabled={isDeleting}
+              onClick={() => setShowArchiveModal(false)}
+              disabled={isArchiving}
             >
               Abbrechen
             </Button>
             <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
+              onClick={handleArchive}
+              disabled={isArchiving}
+              className="bg-amber-600 hover:bg-amber-700"
             >
-              {isDeleting ? (
+              {isArchiving ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Löschen
+                  <Archive className="h-4 w-4 mr-2" />
+                  Archivieren
                 </>
               )}
             </Button>
