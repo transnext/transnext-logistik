@@ -265,14 +265,17 @@ export function FahrerFormModal({
               <h3 className="font-semibold text-lg mb-4 text-primary-blue">Zugangsdaten für Fahrerportal</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="benutzername">Benutzername *</Label>
+                  <Label htmlFor="benutzername">Benutzername / E-Mail *</Label>
                   <Input
                     id="benutzername"
                     required
-                    placeholder="z.B. max.mustermann"
+                    placeholder="z.B. max.mustermann oder max@beispiel.de"
                     value={fahrer.benutzername || ''}
                     onChange={(e) => onFahrerChange({ ...fahrer, benutzername: e.target.value })}
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Benutzername (wird zu @transnext.fahrer) oder echte E-Mail-Adresse
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="passwort">Passwort *</Label>
