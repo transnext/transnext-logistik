@@ -205,8 +205,15 @@ export default function FahrerPage() {
 
     setIsSaving(true)
     try {
+      // E-Mail-Logik: Wenn bereits @ enthalten, als echte E-Mail verwenden
+      // Sonst @transnext.fahrer anhängen
+      const benutzername = newFahrer.benutzername?.trim() || ""
+      const email = benutzername.includes('@')
+        ? benutzername  // Echte E-Mail eingegeben
+        : `${benutzername}@transnext.fahrer`  // Nur Benutzername, Domain anhängen
+
       await createFahrer({
-        email: `${newFahrer.benutzername}@transnext.fahrer`,
+        email,
         password: newFahrer.passwort || "",
         vorname: newFahrer.vorname || "",
         nachname: newFahrer.nachname || "",
