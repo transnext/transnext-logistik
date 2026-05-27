@@ -442,11 +442,11 @@
 
 | Dateiname | Zweck | Neue Tabellen | Live |
 |-----------|-------|---------------|------|
-| `20260527_onboarding_system.sql` | HR/Onboarding MVP | `onboarding_candidates`, `onboarding_documents`, `onboarding_notes` | ⏳ Manuell |
-| `20260527_system_announcements.sql` | Hinweise-System | `system_announcements` | ⏳ Manuell |
-| `20260527_billing_nachberechnung.sql` | Nachberechnung | Erweiterung `arbeitsnachweise`, `weekly_invoices` | ⏳ Manuell |
-| `20260527_block4_fahrerakte.sql` | Fahrerakte-Erweiterung | `fahrer_documents`, `fahrer_fuel_cards`, `fahrer_notes` | ⏳ Manuell |
-| `20260527_fix_fahrer_dokumente_storage_policies.sql` | Storage RLS Fix | - | ⏳ Manuell |
+| `20260527_onboarding_system.sql` | HR/Onboarding MVP | `onboarding_candidates`, `onboarding_documents`, `onboarding_notes` | ✅ Angewendet |
+| `20260527_system_announcements.sql` | Hinweise-System | `system_announcements` | ✅ Angewendet |
+| `20260527_billing_nachberechnung.sql` | Nachberechnung | Erweiterung `arbeitsnachweise`, `weekly_invoices` | ✅ Angewendet |
+| `20260527_block4_fahrerakte.sql` | Fahrerakte-Erweiterung | `fahrer_documents`, `fahrer_fuel_cards`, `fahrer_notes` | ✅ Angewendet |
+| `20260527_fix_fahrer_dokumente_storage_policies.sql` | Storage RLS Fix | - | ✅ Angewendet |
 
 ### Frühere Migrationen (Phase 2026-05 + 2026-02)
 
@@ -533,7 +533,7 @@
 | Punkt | Beschreibung | Priorität |
 |-------|--------------|-----------|
 | **Strato/DNS** | Domain transnext.de zeigt nicht auf Netlify | 🔴 Hoch |
-| **Migrationen** | Block 4 + Onboarding Migrationen manuell anwenden | 🔴 Hoch |
+| **Migrationen** | Alle Migrationen erfolgreich angewendet | ✅ Erledigt |
 
 ### Onboarding Phase 2 (geplant)
 
@@ -590,7 +590,7 @@
 ### Kurzfristig (1-2 Tage)
 
 1. **DNS korrigieren** - Domain transnext.de auf Netlify zeigen
-2. **Migrationen anwenden** - Block 4 + Onboarding Migrationen in Supabase
+2. ~~Migrationen anwenden~~ - ✅ Bereits angewendet
 3. **Onboarding testen** - Kandidat anlegen, Status ändern, Dokumente
 4. **Nachberechnung testen** - Abrechnungslauf mit Nachberechnung
 
