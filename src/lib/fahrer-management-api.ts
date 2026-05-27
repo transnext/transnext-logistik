@@ -547,7 +547,9 @@ export async function uploadFahrerDocument(
   const fileExt = file.name.split('.').pop()?.toLowerCase() || 'pdf'
   const sanitizedType = documentType.replace(/[^a-zA-Z0-9]/g, '_')
   const fileName = `${sanitizedType}_${timestamp}.${fileExt}`
-  const filePath = `fahrer-dokumente/${fahrerId}/${documentType}/${fileName}`
+  // WICHTIG: Der Bucket heißt 'fahrer-dokumente', daher NICHT nochmal im Pfad!
+  // Pfad-Struktur: {fahrerId}/{documentType}/{filename}
+  const filePath = `${fahrerId}/${documentType}/${fileName}`
 
   // Upload zu Supabase Storage
   const { error: uploadError } = await supabase.storage
@@ -558,8 +560,19 @@ export async function uploadFahrerDocument(
     })
 
   if (uploadError) {
-    console.error('Upload-Fehler:', uploadError)
-    return { success: false, error: 'Fehler beim Hochladen' }
+    console.error('Storage Upload-Fehler:', uploadError)
+    // Detaillierte Fehlermeldung für bessere Diagnose
+    let errorMessage = 'Fehler beim Hochladen'
+    if (uploadError.message?.includes('Bucket not found')) {
+      errorMessage = 'Storage-Bucket "fahrer-dokumente" existiert nicht. Bitte Administrator kontaktieren.'
+    } else if (uploadError.message?.includes('policy')) {
+      errorMessage = 'Keine Berechtigung für Upload. Storage-Policy prüfen.'
+    } else if (uploadError.message?.includes('size')) {
+      errorMessage = 'Datei zu groß für Upload.'
+    } else if (uploadError.message) {
+      errorMessage = `Storage-Fehler: ${uploadError.message}`
+    }
+    return { success: false, error: errorMessage }
   }
 
   // Datensatz in DB erstellen
@@ -581,10 +594,21 @@ export async function uploadFahrerDocument(
     .single()
 
   if (dbError) {
-    console.error('DB-Fehler:', dbError)
+    console.error('DB-Fehler beim Dokument-Insert:', dbError)
     // Versuche Upload rückgängig zu machen
     await supabase.storage.from('fahrer-dokumente').remove([filePath])
-    return { success: false, error: 'Fehler beim Speichern' }
+    // Detaillierte Fehlermeldung
+    let errorMessage = 'Fehler beim Speichern in der Datenbank'
+    if (dbError.code === '42P01') {
+      errorMessage = 'Tabelle "fahrer_documents" existiert nicht. Migration ausstehend.'
+    } else if (dbError.code === '42501' || dbError.message?.includes('policy')) {
+      errorMessage = 'Keine Berechtigung für DB-Insert. RLS-Policy prüfen.'
+    } else if (dbError.code === '23503') {
+      errorMessage = 'Fahrer-ID ungültig oder Fahrer existiert nicht.'
+    } else if (dbError.message) {
+      errorMessage = `DB-Fehler: ${dbError.message}`
+    }
+    return { success: false, error: errorMessage }
   }
 
   // Audit-Log
@@ -940,27 +964,51 @@ export function getNoteCategoryLabel(category: NoteCategory): string {
  */
 export async function getFahrerNotes(fahrerId: string): Promise<FahrerNote[]> {
   if (!(await hasHRAccess())) {
+    console.log('[getFahrerNotes] Kein HR-Zugriff, leere Liste zurückgegeben')
     return []
   }
 
+  // Erst ohne Join laden, um RLS-Probleme beim profiles-JOIN zu vermeiden
   const { data, error } = await supabase
     .from('fahrer_notes')
-    .select(`
-      *,
-      profiles:created_by (full_name)
-    `)
+    .select('*')
     .eq('fahrer_id', fahrerId)
     .is('archived_at', null)
     .order('created_at', { ascending: false })
 
   if (error) {
     console.error('Fehler beim Laden der Notizen:', error)
+    console.error('Fehlerdetails:', { code: error.code, message: error.message, details: error.details })
     return []
   }
 
-  return (data || []).map(note => ({
+  if (!data || data.length === 0) {
+    console.log('[getFahrerNotes] Keine Notizen gefunden für Fahrer:', fahrerId)
+    return []
+  }
+
+  console.log('[getFahrerNotes] Geladene Notizen:', data.length)
+
+  // Versuche Namen der Ersteller separat nachzuladen
+  const creatorIds = [...new Set(data.map(n => n.created_by).filter(Boolean))]
+  const creatorNames: Record<string, string> = {}
+
+  if (creatorIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', creatorIds)
+
+    if (profiles) {
+      profiles.forEach(p => {
+        creatorNames[p.id] = p.full_name
+      })
+    }
+  }
+
+  return data.map(note => ({
     ...note,
-    created_by_name: note.profiles?.full_name || 'Unbekannt'
+    created_by_name: creatorNames[note.created_by] || 'Unbekannt'
   }))
 }
 
@@ -995,7 +1043,19 @@ export async function createFahrerNote(
     .single()
 
   if (error) {
-    return { success: false, error: error.message }
+    console.error('DB-Fehler beim Notiz-Insert:', error)
+    // Detaillierte Fehlermeldung
+    let errorMessage = 'Fehler beim Speichern der Notiz'
+    if (error.code === '42P01') {
+      errorMessage = 'Tabelle "fahrer_notes" existiert nicht. Migration ausstehend.'
+    } else if (error.code === '42501' || error.message?.includes('policy')) {
+      errorMessage = 'Keine Berechtigung. Nur Admin/GF dürfen Notizen erstellen.'
+    } else if (error.code === '23503') {
+      errorMessage = 'Fahrer-ID ungültig oder Fahrer existiert nicht.'
+    } else if (error.message) {
+      errorMessage = `DB-Fehler: ${error.message}`
+    }
+    return { success: false, error: errorMessage }
   }
 
   // Audit-Log

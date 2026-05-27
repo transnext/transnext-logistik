@@ -44,40 +44,23 @@ CREATE INDEX IF NOT EXISTS idx_fahrer_documents_fahrer_id ON fahrer_documents(fa
 CREATE INDEX IF NOT EXISTS idx_fahrer_documents_status ON fahrer_documents(status);
 
 -- RLS für fahrer_documents (nur Admin/GF)
+-- WICHTIG: Nutze is_admin() SECURITY DEFINER Funktion aus Phase 1 Migration
 ALTER TABLE fahrer_documents ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Admin/GF können alle Dokumente sehen" ON fahrer_documents;
 CREATE POLICY "Admin/GF können alle Dokumente sehen" ON fahrer_documents
     FOR SELECT
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role IN ('admin', 'gf')
-        )
-    );
+    USING (public.is_admin());
 
 DROP POLICY IF EXISTS "Admin/GF können Dokumente erstellen" ON fahrer_documents;
 CREATE POLICY "Admin/GF können Dokumente erstellen" ON fahrer_documents
     FOR INSERT
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role IN ('admin', 'gf')
-        )
-    );
+    WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "Admin/GF können Dokumente aktualisieren" ON fahrer_documents;
 CREATE POLICY "Admin/GF können Dokumente aktualisieren" ON fahrer_documents
     FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role IN ('admin', 'gf')
-        )
-    );
+    USING (public.is_admin());
 
 -- Kein DELETE-Policy: Dokumente werden archiviert, nicht gelöscht
 
@@ -106,51 +89,28 @@ CREATE TABLE IF NOT EXISTS fahrer_fuel_cards (
 CREATE INDEX IF NOT EXISTS idx_fahrer_fuel_cards_fahrer_id ON fahrer_fuel_cards(fahrer_id);
 
 -- RLS für fahrer_fuel_cards (nur Admin/GF)
+-- WICHTIG: Nutze is_admin() SECURITY DEFINER Funktion aus Phase 1 Migration
 ALTER TABLE fahrer_fuel_cards ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Admin/GF können alle Tankkarten sehen" ON fahrer_fuel_cards;
 CREATE POLICY "Admin/GF können alle Tankkarten sehen" ON fahrer_fuel_cards
     FOR SELECT
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role IN ('admin', 'gf')
-        )
-    );
+    USING (public.is_admin());
 
 DROP POLICY IF EXISTS "Admin/GF können Tankkarten erstellen" ON fahrer_fuel_cards;
 CREATE POLICY "Admin/GF können Tankkarten erstellen" ON fahrer_fuel_cards
     FOR INSERT
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role IN ('admin', 'gf')
-        )
-    );
+    WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "Admin/GF können Tankkarten aktualisieren" ON fahrer_fuel_cards;
 CREATE POLICY "Admin/GF können Tankkarten aktualisieren" ON fahrer_fuel_cards
     FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role IN ('admin', 'gf')
-        )
-    );
+    USING (public.is_admin());
 
 DROP POLICY IF EXISTS "Admin/GF können Tankkarten löschen" ON fahrer_fuel_cards;
 CREATE POLICY "Admin/GF können Tankkarten löschen" ON fahrer_fuel_cards
     FOR DELETE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role IN ('admin', 'gf')
-        )
-    );
+    USING (public.is_admin());
 
 -- ============================================================
 -- 3. FAHRER_NOTES - Interne Notizen (HR/Admin)
@@ -174,42 +134,26 @@ CREATE TABLE IF NOT EXISTS fahrer_notes (
 CREATE INDEX IF NOT EXISTS idx_fahrer_notes_fahrer_id ON fahrer_notes(fahrer_id);
 CREATE INDEX IF NOT EXISTS idx_fahrer_notes_archived ON fahrer_notes(archived_at);
 
--- RLS für fahrer_notes (nur Admin/GF - keine Dispo!)
+-- RLS für fahrer_notes (nur Admin/GF - KEINE Dispo!)
+-- WICHTIG: Nutze is_admin() SECURITY DEFINER Funktion aus Phase 1 Migration
+-- is_admin() prüft bereits auf 'admin', 'gf', 'geschaeftsfuehrer'
+-- Dispo hat bewusst keinen Zugriff auf interne HR-Notizen!
 ALTER TABLE fahrer_notes ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Admin/GF können alle Notizen sehen" ON fahrer_notes;
 CREATE POLICY "Admin/GF können alle Notizen sehen" ON fahrer_notes
     FOR SELECT
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role IN ('admin', 'gf')
-            -- WICHTIG: Dispo explizit ausgeschlossen!
-        )
-    );
+    USING (public.is_admin());
 
 DROP POLICY IF EXISTS "Admin/GF können Notizen erstellen" ON fahrer_notes;
 CREATE POLICY "Admin/GF können Notizen erstellen" ON fahrer_notes
     FOR INSERT
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role IN ('admin', 'gf')
-        )
-    );
+    WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "Admin/GF können Notizen aktualisieren" ON fahrer_notes;
 CREATE POLICY "Admin/GF können Notizen aktualisieren" ON fahrer_notes
     FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role IN ('admin', 'gf')
-        )
-    );
+    USING (public.is_admin());
 
 -- Kein DELETE-Policy: Notizen werden archiviert, nicht gelöscht
 
