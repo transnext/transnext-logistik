@@ -515,13 +515,9 @@ export async function getFahrerDocument(documentId: string): Promise<FahrerDocum
 
 /**
  * Lädt ein Dokument hoch.
- *
- * WICHTIG: Nutzt serverseitigen Upload über API Route!
- * Der direkte Browser-Upload auf den fahrer-dokumente Bucket schlug fehl
- * mit net::ERR_FAILED / "Failed to fetch" trotz korrekter RLS-Policies.
- *
- * Die API Route nutzt den Service Role Key serverseitig, umgeht damit
- * potenzielle CORS/RLS-Probleme und bietet robustere Fehlerbehandlung.
+ * 
+ * Direkter Browser-Upload wie bei uploadBeleg() für Touren/Auslagen.
+ * Funktioniert nachdem der Bucket auf public=true gesetzt wurde.
  */
 export async function uploadFahrerDocument(
   fahrerId: string,
@@ -530,16 +526,25 @@ export async function uploadFahrerDocument(
   expiresAt?: string,
   comment?: string
 ): Promise<{ success: boolean; document?: FahrerDocument; error?: string }> {
-  // 1. Client-seitige Validierung für schnelles Feedback
+  // 1. Berechtigungsprüfung
+  if (!(await hasHRAccess())) {
+    return { success: false, error: 'Keine Berechtigung' }
+  }
+
+  const currentUserId = await getCurrentUserId()
+  if (!currentUserId) {
+    return { success: false, error: 'Nicht angemeldet' }
+  }
+
+  // 2. Datei-Validierung
   const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/heif']
   const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')
-
+  
   if (!allowedTypes.includes(file.type) && !isHeic && file.type !== '') {
-    console.log('[uploadFahrerDocument] Ungültiger Dateityp:', file.type, file.name)
     return { success: false, error: `Dateityp "${file.type || 'unbekannt'}" nicht erlaubt. Nur PDF, JPG, PNG oder HEIC.` }
   }
 
-  if (file.size > 50 * 1024 * 1024) { // 50MB
+  if (file.size > 50 * 1024 * 1024) {
     return { success: false, error: 'Datei zu groß (max. 50MB)' }
   }
 
@@ -547,101 +552,86 @@ export async function uploadFahrerDocument(
     return { success: false, error: 'Datei ist leer (0 Bytes)' }
   }
 
-  // 2. Session Token holen für Authorization Header
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-  if (sessionError || !sessionData.session?.access_token) {
-    console.error('[uploadFahrerDocument] Session ungültig:', sessionError)
-    return {
-      success: false,
-      error: 'Sitzung abgelaufen. Bitte Seite neu laden und erneut anmelden.'
-    }
-  }
+  // 3. Dateiname und Pfad generieren
+  const timestamp = Date.now()
+  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+  const sanitizedDocType = documentType.toLowerCase()
+  const fileName = `${sanitizedDocType}_${timestamp}.${fileExt}`
+  const filePath = `${fahrerId}/${sanitizedDocType}/${fileName}`
 
-  const accessToken = sessionData.session.access_token
-
-  // 3. FormData für Upload vorbereiten
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('fahrerId', fahrerId)
-  formData.append('documentType', documentType)
-  if (expiresAt) formData.append('expiresAt', expiresAt)
-  if (comment) formData.append('comment', comment)
-
-  // 4. Logging für Diagnose
-  console.log('[uploadFahrerDocument] Server-Upload-Start:', {
-    endpoint: '/api/admin/fahrer-documents/upload',
-    fahrerId,
-    documentType,
-    fileName: file.name,
+  console.log('[uploadFahrerDocument] Upload-Start:', {
+    bucket: 'fahrer-dokumente',
+    filePath,
     fileSize: file.size,
-    fileType: file.type,
-    timestamp: new Date().toISOString()
+    fileType: file.type
   })
 
-  // 5. Upload über API Route
-  try {
-    const response = await fetch('/api/admin/fahrer-documents/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      },
-      body: formData
+  // 4. Upload zu Supabase Storage (wie bei uploadBeleg)
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from('fahrer-dokumente')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false
     })
 
-    const result = await response.json()
-
-    if (!response.ok || !result.success) {
-      console.error('[uploadFahrerDocument] API-Fehler:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: result.error
-      })
-      return {
-        success: false,
-        error: result.error || `Server-Fehler: ${response.status}`
-      }
+  if (uploadError) {
+    console.error('[uploadFahrerDocument] Storage-Fehler:', uploadError)
+    
+    if (uploadError.message?.includes('row-level security') || uploadError.message?.includes('policy')) {
+      return { success: false, error: 'Keine Berechtigung zum Hochladen. Bitte erneut anmelden.' }
+    } else if (uploadError.message?.includes('duplicate') || uploadError.message?.includes('already exists')) {
+      return { success: false, error: 'Diese Datei existiert bereits.' }
+    } else if (uploadError.message?.includes('too large') || uploadError.message?.includes('size')) {
+      return { success: false, error: 'Datei ist zu groß (max. 50MB).' }
     }
+    return { success: false, error: `Upload fehlgeschlagen: ${uploadError.message || 'Unbekannter Fehler'}` }
+  }
 
-    console.log('[uploadFahrerDocument] Upload erfolgreich:', result.document)
+  console.log('[uploadFahrerDocument] Upload erfolgreich:', uploadData?.path)
 
-    // Document-Objekt aus API-Antwort rekonstruieren
-    const now = new Date().toISOString()
-    const document: FahrerDocument = {
-      id: result.document.id,
+  // 5. Datensatz in DB erstellen
+  const { data: document, error: dbError } = await supabase
+    .from('fahrer_documents')
+    .insert({
       fahrer_id: fahrerId,
-      document_type: result.document.document_type as DocumentType,
-      file_name: result.document.file_name,
-      file_path: result.document.file_path,
+      document_type: documentType,
+      file_name: file.name,
+      file_path: filePath,
       file_size: file.size,
       mime_type: file.type || 'application/octet-stream',
-      uploaded_at: now,
-      uploaded_by: sessionData.session.user.id,
+      uploaded_by: currentUserId,
       status: 'hochgeladen',
-      created_at: now,
-      updated_at: now
-    }
-
-    return { success: true, document }
-
-  } catch (networkError: any) {
-    console.error('[uploadFahrerDocument] Netzwerk-Exception:', {
-      name: networkError?.name,
-      message: networkError?.message,
-      stack: networkError?.stack
+      expires_at: expiresAt || null,
+      comment: comment || null
     })
+    .select()
+    .single()
 
-    if (networkError?.name === 'TypeError' || networkError?.message?.toLowerCase().includes('fetch')) {
-      return {
-        success: false,
-        error: 'Netzwerkverbindung fehlgeschlagen. Bitte Internetverbindung prüfen und erneut versuchen.'
-      }
-    }
-
-    return {
-      success: false,
-      error: `Unerwarteter Fehler: ${networkError?.message || 'Unbekannt'}`
-    }
+  if (dbError) {
+    console.error('[uploadFahrerDocument] DB-Fehler:', dbError)
+    // Rollback: Upload löschen
+    await supabase.storage.from('fahrer-dokumente').remove([filePath])
+    return { success: false, error: `Datenbank-Fehler: ${dbError.message}` }
   }
+
+  // 6. Audit-Log
+  await logAuditEvent({
+    action: 'fahrer_document_uploaded',
+    entityType: 'fahrer_document',
+    entityId: document.id,
+    entityLabel: `${getDocumentTypeLabel(documentType)} - ${file.name}`,
+    severity: 'info',
+    isFinancial: false,
+    metadata: {
+      fahrer_id: fahrerId,
+      document_type: documentType,
+      file_name: file.name,
+      file_size: file.size
+    }
+  })
+
+  console.log('[uploadFahrerDocument] Dokument gespeichert:', document.id)
+  return { success: true, document }
 }
 
 /**
