@@ -58,15 +58,96 @@ export async function createFahrer(data: {
   ausweis_ablauf: string
   zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'
 }) {
+  console.log('[createFahrer] Starte Fahrer-Erstellung für:', data.email)
+
   // Rufe Supabase Edge Function auf (läuft mit SERVICE_ROLE_KEY)
   const { data: result, error } = await supabase.functions.invoke('create-fahrer', {
     body: data
   })
 
-  if (error) throw error
-  if (!result || !result.success) {
-    throw new Error(result?.error || 'Fehler beim Erstellen des Fahrers')
+  // Verbesserte Fehlerbehandlung: Extrahiere echte Fehlermeldung
+  if (error) {
+    console.error('[createFahrer] Edge Function Fehler:', error)
+
+    // Versuche, die echte Fehlermeldung aus dem Fehler zu extrahieren
+    // Bei FunctionsFetchError enthält error.context.body manchmal die Antwort
+    let errorMessage = 'Fehler beim Erstellen des Fahrers'
+    let errorCode = 'UNKNOWN'
+
+    // Prüfe ob error.message JSON enthält
+    try {
+      if (error.message) {
+        // Manchmal ist die Nachricht das JSON-Objekt
+        const parsed = JSON.parse(error.message)
+        if (parsed.error) {
+          errorMessage = parsed.error
+          errorCode = parsed.code || 'UNKNOWN'
+        }
+      }
+    } catch {
+      // error.message ist kein JSON
+    }
+
+    // Prüfe ob error.context vorhanden ist (Supabase FunctionsFetchError)
+    if ((error as any).context) {
+      try {
+        const ctx = (error as any).context
+        if (ctx.body) {
+          const parsed = typeof ctx.body === 'string' ? JSON.parse(ctx.body) : ctx.body
+          if (parsed.error) {
+            errorMessage = parsed.error
+            errorCode = parsed.code || 'UNKNOWN'
+          }
+        }
+      } catch {
+        // context.body ist kein JSON
+      }
+    }
+
+    // Benutzerfreundliche Fehlermeldungen basierend auf Code
+    switch (errorCode) {
+      case 'EMAIL_EXISTS':
+        throw new Error('Diese E-Mail-Adresse ist bereits registriert.')
+      case 'WEAK_PASSWORD':
+        throw new Error('Das Passwort muss mindestens 6 Zeichen lang sein.')
+      case 'FORBIDDEN':
+        throw new Error('Sie haben keine Berechtigung, Fahrer anzulegen.')
+      case 'MISSING_FIELDS':
+        throw new Error(errorMessage)
+      case 'ENV_MISSING':
+        throw new Error('Server-Konfigurationsfehler. Bitte Admin kontaktieren.')
+      default:
+        throw new Error(errorMessage)
+    }
   }
+
+  // Prüfe auf Fehler in der Antwort
+  if (!result) {
+    console.error('[createFahrer] Keine Antwort von Edge Function')
+    throw new Error('Keine Antwort vom Server erhalten')
+  }
+
+  if (!result.success) {
+    console.error('[createFahrer] Edge Function meldet Fehler:', result.error, result.code)
+
+    // Benutzerfreundliche Fehlermeldungen basierend auf Code
+    switch (result.code) {
+      case 'EMAIL_EXISTS':
+        throw new Error('Diese E-Mail-Adresse ist bereits registriert.')
+      case 'WEAK_PASSWORD':
+        throw new Error('Das Passwort muss mindestens 6 Zeichen lang sein.')
+      case 'FORBIDDEN':
+        throw new Error('Sie haben keine Berechtigung, Fahrer anzulegen.')
+      case 'MISSING_FIELDS':
+        throw new Error(result.error || 'Pflichtfelder fehlen.')
+      case 'ENV_MISSING':
+        throw new Error('Server-Konfigurationsfehler. Bitte Admin kontaktieren.')
+      default:
+        throw new Error(result.error || 'Fehler beim Erstellen des Fahrers')
+    }
+  }
+
+  console.log('[createFahrer] Fahrer erfolgreich erstellt:', result.fahrer?.id)
 
   // Audit-Log: Fahrer erstellt
   await logAuditEvent({
