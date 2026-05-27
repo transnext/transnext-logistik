@@ -22,6 +22,12 @@ import { getUpcomingAvailability } from "@/lib/availability-api"
 import { calculateCockpitKennzahlen, filterCockpitForDisponent, type CockpitKennzahlen } from "@/lib/dashboard-calculator"
 import { getDismissedSyntheticIds } from "@/lib/computed-alert-dismissals-api"
 import {
+  getActiveAnnouncements,
+  getAnnouncementPriorityStyle,
+  formatAnnouncementDate,
+  type Announcement
+} from "@/lib/announcements-api"
+import {
   Car,
   FileText,
   Receipt,
@@ -38,7 +44,10 @@ import {
   Settings,
   ClipboardCheck,
   UserCheck,
-  ExternalLink
+  ExternalLink,
+  Plus,
+  Megaphone,
+  Info
 } from "lucide-react"
 
 export default function AdminDashboardPage() {
@@ -47,6 +56,7 @@ export default function AdminDashboardPage() {
   const [userRole, setUserRole] = useState<'admin' | 'disponent' | 'gf'>('admin')
   const [isLoading, setIsLoading] = useState(true)
   const [kennzahlen, setKennzahlen] = useState<CockpitKennzahlen | null>(null)
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
 
   const isAdminOrGF = userRole === 'admin' || userRole === 'gf'
 
@@ -93,21 +103,26 @@ export default function AdminDashboardPage() {
       let korrekturen = undefined
       let verfuegbarkeiten = undefined
       let dismissedSyntheticIds: Set<string> | undefined = undefined
+      let announcementsData: Announcement[] = []
 
       try {
-        const [alertsResult, korrekturenResult, verfuegbarkeitenResult, dismissedIds] = await Promise.all([
+        const [alertsResult, korrekturenResult, verfuegbarkeitenResult, dismissedIds, announcementsResult] = await Promise.all([
           getOpenAlerts(isAdmin).catch(() => undefined),
           getCorrectionRequests(isAdmin).catch(() => undefined),
           getUpcomingAvailability().catch(() => undefined),
-          getDismissedSyntheticIds().catch(() => new Set<string>())
+          getDismissedSyntheticIds().catch(() => new Set<string>()),
+          getActiveAnnouncements().catch(() => [])
         ])
         alerts = alertsResult
         korrekturen = korrekturenResult
         verfuegbarkeiten = verfuegbarkeitenResult
         dismissedSyntheticIds = dismissedIds
+        announcementsData = announcementsResult
       } catch (e) {
         console.warn("Optionale Daten konnten nicht geladen werden:", e)
       }
+
+      setAnnouncements(announcementsData)
 
       // Daten in das Calculator-Format transformieren
       const arbeitsnachweise = tourenData.map((t: any) => ({
@@ -116,7 +131,6 @@ export default function AdminDashboardPage() {
         status: t.status,
         created_at: t.created_at,
         user_id: t.user_id,
-        // KM-Daten für Alert-Berechnung (tour_nicht_berechenbar)
         gefahrene_km: t.gefahrene_km ?? null
       }))
 
@@ -185,6 +199,18 @@ export default function AdminDashboardPage() {
     { label: "Kunden", href: "/admin/kunden", icon: UserCheck },
     { label: "Korrekturen", href: "/admin/korrekturen", icon: ClipboardCheck, count: kennzahlen?.korrekturanfragenOffen },
   ]
+
+  // Priority Icon
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case 'critical':
+        return <AlertCircle className="h-4 w-4" />
+      case 'important':
+        return <AlertTriangle className="h-4 w-4" />
+      default:
+        return <Info className="h-4 w-4" />
+    }
+  }
 
   if (isLoading) {
     return (
@@ -464,41 +490,83 @@ export default function AdminDashboardPage() {
               </CardContent>
             </Card>
 
-            {/* News & Hinweise */}
+            {/* News & Hinweise - jetzt mit echten Daten */}
             <Card className="border-gray-100 shadow-sm">
               <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <Newspaper className="h-5 w-5 text-primary-blue" />
-                  <CardTitle className="text-lg font-semibold text-gray-900">News & Hinweise</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Megaphone className="h-5 w-5 text-primary-blue" />
+                    <CardTitle className="text-lg font-semibold text-gray-900">News & Hinweise</CardTitle>
+                  </div>
+                  {isAdminOrGF && (
+                    <Link href="/admin/hinweise">
+                      <Button variant="ghost" size="sm" className="text-gray-500 hover:text-primary-blue">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Verwalten
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="pb-3 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900">Phase 1 Smart & Care</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Korrekturworkflow und Alerts aktiv</p>
-                  </div>
-                  <div className="pb-3 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900">Preislisten versioniert</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Historische Preise nachvollziehbar</p>
-                  </div>
-                  <div className="pb-3 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900">Einstellungen-Editor</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Systemeinstellungen mit Versionen</p>
-                  </div>
-                  {isAdminOrGF && (
-                    <div>
-                      <Link href="/admin/analytics" className="group">
-                        <div className="flex items-center gap-2 text-sm font-medium text-primary-blue group-hover:text-primary-blue/80">
-                          <TrendingUp className="h-4 w-4" />
-                          Analytics für Marge & Fahrerprofitabilität
-                          <ExternalLink className="h-3 w-3" />
+                {announcements.length > 0 ? (
+                  <div className="space-y-3">
+                    {announcements.slice(0, 5).map((announcement) => {
+                      const style = getAnnouncementPriorityStyle(announcement.priority)
+                      return (
+                        <div
+                          key={announcement.id}
+                          className={`p-3 rounded-lg border ${style.bg} ${style.border}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className={`mt-0.5 ${style.icon}`}>
+                              {getPriorityIcon(announcement.priority)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium ${style.text}`}>
+                                {announcement.title}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">
+                                {announcement.content}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <span className="text-[10px] text-gray-400">
+                                  {formatAnnouncementDate(announcement.created_at)}
+                                </span>
+                                {announcement.created_by_name && (
+                                  <span className="text-[10px] text-gray-400">
+                                    • {announcement.created_by_name}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
+                      )
+                    })}
+                    {announcements.length > 5 && isAdminOrGF && (
+                      <Link href="/admin/hinweise">
+                        <Button variant="ghost" size="sm" className="w-full text-gray-500 hover:text-primary-blue">
+                          Alle {announcements.length} Hinweise anzeigen
+                          <ArrowRight className="h-3 w-3 ml-1" />
+                        </Button>
                       </Link>
-                      <p className="text-xs text-gray-400 mt-0.5">Umsatz, Ertrag und Margenanalyse</p>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <Newspaper className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Keine aktuellen Hinweise vorhanden</p>
+                    {isAdminOrGF && (
+                      <Link href="/admin/hinweise">
+                        <Button variant="outline" size="sm" className="mt-2">
+                          <Plus className="h-3 w-3 mr-1" />
+                          Hinweis erstellen
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
