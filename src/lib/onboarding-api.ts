@@ -63,6 +63,10 @@ export interface OnboardingCandidate {
   termin_slot_3: string | null
   termin_bemerkung: string | null
   termin_gewaehlt: number | null
+  // Phase 3a: Bewerber-Feedback
+  applicant_comment: string | null
+  appointment_selected_at: string | null
+  applicant_data_updated_at: string | null
   // Timestamps
   created_at: string
   updated_at: string
@@ -613,5 +617,296 @@ export async function updateCommunicationStatus(
     return { success: true }
   } catch (err) {
     return { success: false, error: 'Unerwarteter Fehler' }
+  }
+}
+
+// ============================================================
+// PUBLIC LINKS TYPES (Phase 3a)
+// ============================================================
+
+export type OnboardingLinkStatus = 'active' | 'used' | 'expired' | 'revoked'
+export type OnboardingLinkPurpose = 'appointment_selection' | 'document_upload' | 'data_confirmation'
+
+export interface OnboardingPublicLink {
+  id: string
+  candidate_id: string
+  token: string
+  purpose: OnboardingLinkPurpose
+  status: OnboardingLinkStatus
+  expires_at: string
+  created_by: string | null
+  created_by_name: string | null
+  created_at: string
+  used_at: string | null
+}
+
+export const LINK_STATUS_LABELS: Record<OnboardingLinkStatus, string> = {
+  'active': 'Aktiv',
+  'used': 'Verwendet',
+  'expired': 'Abgelaufen',
+  'revoked': 'Deaktiviert'
+}
+
+// ============================================================
+// PUBLIC LINK FUNCTIONS (Phase 3a)
+// ============================================================
+
+/**
+ * Generiert einen kryptisch starken Token (64 Hex-Zeichen = 256 bit)
+ */
+function generateSecureToken(): string {
+  const array = new Uint8Array(32)
+  if (typeof window !== 'undefined' && window.crypto) {
+    window.crypto.getRandomValues(array)
+  } else {
+    // Fallback für Server-Side
+    for (let i = 0; i < array.length; i++) {
+      array[i] = Math.floor(Math.random() * 256)
+    }
+  }
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * Holt alle Public Links für einen Kandidaten
+ */
+export async function getCandidatePublicLinks(candidateId: string): Promise<OnboardingPublicLink[]> {
+  try {
+    const { data, error } = await supabase
+      .from('onboarding_public_links')
+      .select('*')
+      .eq('candidate_id', candidateId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('[Onboarding] Error loading public links:', error)
+      return []
+    }
+    return (data || []) as OnboardingPublicLink[]
+  } catch (err) {
+    console.error('[Onboarding] Error:', err)
+    return []
+  }
+}
+
+/**
+ * Erstellt einen neuen Bewerberlink
+ */
+export async function createPublicLink(
+  candidateId: string,
+  purpose: OnboardingLinkPurpose = 'appointment_selection',
+  expiresInDays: number = 7
+): Promise<{ success: boolean; link?: OnboardingPublicLink; url?: string; error?: string }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Nicht authentifiziert' }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+
+    const token = generateSecureToken()
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + expiresInDays)
+
+    const { data, error } = await supabase
+      .from('onboarding_public_links')
+      .insert({
+        candidate_id: candidateId,
+        token,
+        purpose,
+        status: 'active',
+        expires_at: expiresAt.toISOString(),
+        created_by: user.id,
+        created_by_name: profile?.full_name || null
+      })
+      .select('*')
+      .single()
+
+    if (error) return { success: false, error: error.message }
+
+    // URL generieren
+    const baseUrl = typeof window !== 'undefined'
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_BASE_URL || 'https://transnext.netlify.app'
+    const url = `${baseUrl}/onboarding/${token}`
+
+    await logAuditEvent({
+      action: 'onboarding_public_link_created',
+      entityType: 'onboarding_public_link',
+      entityId: data.id,
+      severity: 'info',
+      afterData: { purpose, expires_at: expiresAt.toISOString() }
+    })
+
+    return { success: true, link: data as OnboardingPublicLink, url }
+  } catch (err) {
+    console.error('[Onboarding] Error creating public link:', err)
+    return { success: false, error: 'Unerwarteter Fehler' }
+  }
+}
+
+/**
+ * Deaktiviert einen Bewerberlink
+ */
+export async function revokePublicLink(linkId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from('onboarding_public_links')
+      .update({ status: 'revoked' })
+      .eq('id', linkId)
+
+    if (error) return { success: false, error: error.message }
+
+    await logAuditEvent({
+      action: 'onboarding_public_link_revoked',
+      entityType: 'onboarding_public_link',
+      entityId: linkId,
+      severity: 'info'
+    })
+
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: 'Unerwarteter Fehler' }
+  }
+}
+
+/**
+ * Prüft ob ein aktiver Link für einen Kandidaten existiert
+ */
+export async function getActivePublicLink(candidateId: string): Promise<OnboardingPublicLink | null> {
+  try {
+    const { data, error } = await supabase
+      .from('onboarding_public_links')
+      .select('*')
+      .eq('candidate_id', candidateId)
+      .eq('status', 'active')
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (error) return null
+    return data as OnboardingPublicLink
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Generiert die Bewerberlink-URL für einen bestehenden Link
+ */
+export function generatePublicLinkUrl(token: string): string {
+  const baseUrl = typeof window !== 'undefined'
+    ? window.location.origin
+    : process.env.NEXT_PUBLIC_BASE_URL || 'https://transnext.netlify.app'
+  return `${baseUrl}/onboarding/${token}`
+}
+
+// ============================================================
+// PUBLIC API FUNCTIONS (für Bewerber ohne Auth)
+// ============================================================
+
+/**
+ * Validiert einen Token und holt Kandidatendaten (für Bewerber)
+ */
+export async function getPublicCandidateByToken(token: string): Promise<{
+  success: boolean
+  error?: string
+  message?: string
+  already_used?: boolean
+  link_id?: string
+  expires_at?: string
+  candidate?: {
+    id: string
+    first_name: string
+    last_name: string
+    email: string | null
+    phone: string | null
+    city: string | null
+    termin_slot_1: string | null
+    termin_slot_2: string | null
+    termin_slot_3: string | null
+    termin_gewaehlt: number | null
+    appointment_selected_at?: string | null
+  }
+}> {
+  try {
+    const { data, error } = await supabase.rpc('get_candidate_by_public_token', { p_token: token })
+
+    if (error) {
+      console.error('[Onboarding] RPC error:', error)
+      return { success: false, error: 'server_error', message: 'Serverfehler' }
+    }
+
+    return data as {
+      success: boolean
+      error?: string
+      message?: string
+      already_used?: boolean
+      link_id?: string
+      expires_at?: string
+      candidate?: {
+        id: string
+        first_name: string
+        last_name: string
+        email: string | null
+        phone: string | null
+        city: string | null
+        termin_slot_1: string | null
+        termin_slot_2: string | null
+        termin_slot_3: string | null
+        termin_gewaehlt: number | null
+        appointment_selected_at?: string | null
+      }
+    }
+  } catch (err) {
+    console.error('[Onboarding] Error:', err)
+    return { success: false, error: 'server_error', message: 'Serverfehler' }
+  }
+}
+
+/**
+ * Speichert die Terminwahl des Bewerbers
+ */
+export async function submitAppointmentSelection(
+  token: string,
+  selectedSlot: number,
+  email?: string | null,
+  phone?: string | null,
+  city?: string | null,
+  comment?: string | null
+): Promise<{
+  success: boolean
+  error?: string
+  selected_slot?: number
+  selected_date?: string
+}> {
+  try {
+    const { data, error } = await supabase.rpc('submit_appointment_selection', {
+      p_token: token,
+      p_selected_slot: selectedSlot,
+      p_email: email || null,
+      p_phone: phone || null,
+      p_city: city || null,
+      p_comment: comment || null
+    })
+
+    if (error) {
+      console.error('[Onboarding] RPC error:', error)
+      return { success: false, error: 'server_error' }
+    }
+
+    return data as {
+      success: boolean
+      error?: string
+      selected_slot?: number
+      selected_date?: string
+    }
+  } catch (err) {
+    console.error('[Onboarding] Error:', err)
+    return { success: false, error: 'server_error' }
   }
 }
