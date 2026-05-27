@@ -583,15 +583,19 @@ export async function uploadFahrerDocument(
   // Pfad-Struktur: {fahrerId}/{documentType}/{filename}
   const filePath = `${fahrerId}/${sanitizedDocType}/${fileName}`
 
-  // 5. Logging für Diagnose
-  console.log('[uploadFahrerDocument] Upload-Parameter:', {
+  // 5. Logging für Diagnose (inkl. Supabase URL zur Verifikation)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'nicht-gesetzt'
+  console.log('[uploadFahrerDocument] Upload-Start:', {
+    supabaseHost: supabaseUrl ? new URL(supabaseUrl).hostname : 'unbekannt',
     bucket: 'fahrer-dokumente',
     filePath,
     fileSize: file.size,
     fileType: file.type,
-    fileName: file.name,
+    originalFileName: file.name,
     documentType,
-    fahrerId
+    fahrerId,
+    userId: currentUserId,
+    timestamp: new Date().toISOString()
   })
 
   // 6. Upload mit verbesserter Fehlerbehandlung
