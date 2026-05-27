@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { AdminLayout } from "@/components/admin/AdminLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -70,6 +71,7 @@ import {
   type YesNoUnknown
 } from "@/lib/onboarding-api"
 import { supabase } from "@/lib/supabase"
+import { signOut } from "@/lib/api"
 
 // Status Badge Config
 const STATUS_CONFIG: Record<string, { className: string }> = {
@@ -104,6 +106,10 @@ export default function CandidateDetailPage() {
   const router = useRouter()
   const id = params.id as string
 
+  // Auth state
+  const [userName, setUserName] = useState("")
+  const [userRole, setUserRole] = useState<'admin' | 'gf'>('admin')
+
   const [candidate, setCandidate] = useState<OnboardingCandidate | null>(null)
   const [documents, setDocuments] = useState<OnboardingDocument[]>([])
   const [notes, setNotes] = useState<OnboardingNote[]>([])
@@ -137,15 +143,23 @@ export default function CandidateDetailPage() {
       }
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, full_name')
         .eq('id', session.user.id)
         .single()
       if (!profile || !['admin', 'gf'].includes(profile.role)) {
         router.push('/admin/dashboard')
+        return
       }
+      setUserRole(profile.role as 'admin' | 'gf')
+      setUserName(profile.full_name || '')
     }
     checkAuth()
   }, [router])
+
+  const handleLogout = async () => {
+    await signOut()
+    router.push('/admin')
+  }
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -278,20 +292,26 @@ export default function CandidateDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
-      </div>
+      <AdminLayout userName={userName} userRole={userRole} onLogout={handleLogout}>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      </AdminLayout>
     )
   }
 
   if (!candidate) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">Kandidat nicht gefunden</p>
-        <Button onClick={() => router.push('/admin/onboarding')} className="mt-4">
-          Zurück zur Übersicht
-        </Button>
-      </div>
+      <AdminLayout userName={userName} userRole={userRole} onLogout={handleLogout}>
+        <div className="text-center py-12">
+          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+          <p className="text-gray-500">Kandidat nicht gefunden</p>
+          <Button onClick={() => router.push('/admin/onboarding')} className="mt-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Zurück zur Übersicht
+          </Button>
+        </div>
+      </AdminLayout>
     )
   }
 
@@ -300,471 +320,473 @@ export default function CandidateDetailPage() {
   const statusConfig = STATUS_CONFIG[candidate.status] || { className: 'bg-gray-100 text-gray-700' }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={() => router.push('/admin/onboarding')}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Zurück
-          </Button>
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
-              {candidate.first_name} {candidate.last_name}
-            </h1>
-            <p className="text-sm text-gray-500">
-              {TYPE_LABELS[candidate.type]} - {SOURCE_LABELS[candidate.source]}
-            </p>
+    <AdminLayout userName={userName} userRole={userRole} onLogout={handleLogout}>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="sm" onClick={() => router.push('/admin/onboarding')}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Zurück
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">
+                {candidate.first_name} {candidate.last_name}
+              </h1>
+              <p className="text-sm text-gray-500">
+                {TYPE_LABELS[candidate.type]} - {SOURCE_LABELS[candidate.source]}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {hasChanges && (
+              <Button onClick={handleSave} disabled={isSaving} className="bg-primary-blue hover:bg-blue-700">
+                {isSaving ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                Speichern
+              </Button>
+            )}
+            {candidate.status !== 'archiviert' && (
+              <Button variant="outline" onClick={handleArchive} className="text-amber-600 border-amber-200 hover:bg-amber-50">
+                <Archive className="h-4 w-4 mr-2" />
+                Archivieren
+              </Button>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {hasChanges && (
-            <Button onClick={handleSave} disabled={isSaving} className="bg-primary-blue hover:bg-blue-700">
-              {isSaving ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              Speichern
-            </Button>
-          )}
-          {candidate.status !== 'archiviert' && (
-            <Button variant="outline" onClick={handleArchive} className="text-amber-600 border-amber-200 hover:bg-amber-50">
-              <Archive className="h-4 w-4 mr-2" />
-              Archivieren
-            </Button>
-          )}
-        </div>
-      </div>
 
-      {/* Error */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5" />
-          {error}
-        </div>
-      )}
+        {/* Error */}
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            {error}
+          </div>
+        )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Main Info */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Status & Prozess */}
-          <Card className="border-gray-100">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Prozess-Status</CardTitle>
-                <Badge className={cn("text-sm border", statusConfig.className)}>
-                  {STATUS_LABELS[candidate.status]}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <p className="text-xs text-blue-600 font-medium mb-1">Nächste Aktion</p>
-                  <p className="text-sm font-medium text-blue-800 flex items-center gap-2">
-                    <ArrowRight className="h-4 w-4" />
-                    {NEXT_ACTION[candidate.status]}
-                  </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Main Info */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Status & Prozess */}
+            <Card className="border-gray-100">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Prozess-Status</CardTitle>
+                  <Badge className={cn("text-sm border", statusConfig.className)}>
+                    {STATUS_LABELS[candidate.status]}
+                  </Badge>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-600 font-medium mb-1">Dokumente</p>
-                  <p className="text-sm font-medium text-gray-800">
-                    {docProgress.complete} / {docProgress.total} vollständig ({docProgress.percent}%)
-                  </p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <p className="text-xs text-blue-600 font-medium mb-1">Nächste Aktion</p>
+                    <p className="text-sm font-medium text-blue-800 flex items-center gap-2">
+                      <ArrowRight className="h-4 w-4" />
+                      {NEXT_ACTION[candidate.status]}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-600 font-medium mb-1">Dokumente</p>
+                    <p className="text-sm font-medium text-gray-800">
+                      {docProgress.complete} / {docProgress.total} vollständig ({docProgress.percent}%)
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setNewStatus(candidate.status)
-                    setShowStatusModal(true)
-                  }}
-                >
-                  Status ändern
-                </Button>
-                {candidate.status === 'freigegeben' && (
-                  <Button size="sm" disabled className="bg-emerald-600">
-                    <Users className="h-4 w-4 mr-2" />
-                    Fahrer erstellen (Phase 2)
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setNewStatus(candidate.status)
+                      setShowStatusModal(true)
+                    }}
+                  >
+                    Status ändern
                   </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  {candidate.status === 'freigegeben' && (
+                    <Button size="sm" disabled className="bg-emerald-600">
+                      <Users className="h-4 w-4 mr-2" />
+                      Fahrer erstellen (Phase 2)
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Stammdaten */}
-          <Card className="border-gray-100">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <User className="h-5 w-5 text-gray-400" />
-                Stammdaten
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Stammdaten */}
+            <Card className="border-gray-100">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <User className="h-5 w-5 text-gray-400" />
+                  Stammdaten
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Vorname</Label>
+                    <Input
+                      value={editedCandidate.first_name || ''}
+                      onChange={(e) => setEditedCandidate(p => ({ ...p, first_name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nachname</Label>
+                    <Input
+                      value={editedCandidate.last_name || ''}
+                      onChange={(e) => setEditedCandidate(p => ({ ...p, last_name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>E-Mail</Label>
+                    <Input
+                      type="email"
+                      value={editedCandidate.email || ''}
+                      onChange={(e) => setEditedCandidate(p => ({ ...p, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefon</Label>
+                    <Input
+                      value={editedCandidate.phone || ''}
+                      onChange={(e) => setEditedCandidate(p => ({ ...p, phone: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Ort</Label>
+                    <Input
+                      value={editedCandidate.city || ''}
+                      onChange={(e) => setEditedCandidate(p => ({ ...p, city: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Typ</Label>
+                    <Select
+                      value={editedCandidate.type}
+                      onValueChange={(v) => setEditedCandidate(p => ({ ...p, type: v as CandidateType }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="minijobber">Minijobber</SelectItem>
+                        <SelectItem value="subcontractor">Subunternehmer</SelectItem>
+                        <SelectItem value="unknown">Noch offen</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Quelle</Label>
+                    <Select
+                      value={editedCandidate.source}
+                      onValueChange={(v) => setEditedCandidate(p => ({ ...p, source: v as OnboardingSource }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="indeed">Indeed</SelectItem>
+                        <SelectItem value="ebay">eBay Kleinanzeigen</SelectItem>
+                        <SelectItem value="empfehlung">Empfehlung</SelectItem>
+                        <SelectItem value="sonstiges">Sonstiges</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                  <div className="space-y-2">
+                    <Label>Führerschein</Label>
+                    <Select
+                      value={editedCandidate.has_license || 'unknown'}
+                      onValueChange={(v) => setEditedCandidate(p => ({ ...p, has_license: v as YesNoUnknown }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unknown">Unbekannt</SelectItem>
+                        <SelectItem value="yes">Ja</SelectItem>
+                        <SelectItem value="no">Nein</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Erfahrung</Label>
+                    <Select
+                      value={editedCandidate.experience_level || 'unknown'}
+                      onValueChange={(v) => setEditedCandidate(p => ({ ...p, experience_level: v as YesNoUnknown }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unknown">Unbekannt</SelectItem>
+                        <SelectItem value="yes">Ja</SelectItem>
+                        <SelectItem value="no">Nein</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Verfügbarkeit bekannt</Label>
+                    <Select
+                      value={editedCandidate.availability_known || 'unknown'}
+                      onValueChange={(v) => setEditedCandidate(p => ({ ...p, availability_known: v as YesNoUnknown }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unknown">Unbekannt</SelectItem>
+                        <SelectItem value="yes">Ja</SelectItem>
+                        <SelectItem value="no">Nein</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label>Vorname</Label>
+                  <Label>Interview-Datum</Label>
                   <Input
-                    value={editedCandidate.first_name || ''}
-                    onChange={(e) => setEditedCandidate(p => ({ ...p, first_name: e.target.value }))}
+                    type="datetime-local"
+                    value={editedCandidate.interview_date ? editedCandidate.interview_date.slice(0, 16) : ''}
+                    onChange={(e) => setEditedCandidate(p => ({ ...p, interview_date: e.target.value ? new Date(e.target.value).toISOString() : null }))}
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Nachname</Label>
+                  <Label>Teams-Link</Label>
                   <Input
-                    value={editedCandidate.last_name || ''}
-                    onChange={(e) => setEditedCandidate(p => ({ ...p, last_name: e.target.value }))}
+                    value={editedCandidate.teams_link || ''}
+                    onChange={(e) => setEditedCandidate(p => ({ ...p, teams_link: e.target.value }))}
+                    placeholder="https://teams.microsoft.com/..."
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label>E-Mail</Label>
-                  <Input
-                    type="email"
-                    value={editedCandidate.email || ''}
-                    onChange={(e) => setEditedCandidate(p => ({ ...p, email: e.target.value }))}
+                  <Label>Interne Notizen</Label>
+                  <Textarea
+                    value={editedCandidate.notes_internal || ''}
+                    onChange={(e) => setEditedCandidate(p => ({ ...p, notes_internal: e.target.value }))}
+                    rows={3}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Telefon</Label>
-                  <Input
-                    value={editedCandidate.phone || ''}
-                    onChange={(e) => setEditedCandidate(p => ({ ...p, phone: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Ort</Label>
-                  <Input
-                    value={editedCandidate.city || ''}
-                    onChange={(e) => setEditedCandidate(p => ({ ...p, city: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Typ</Label>
-                  <Select
-                    value={editedCandidate.type}
-                    onValueChange={(v) => setEditedCandidate(p => ({ ...p, type: v as CandidateType }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="minijobber">Minijobber</SelectItem>
-                      <SelectItem value="subcontractor">Subunternehmer</SelectItem>
-                      <SelectItem value="unknown">Noch offen</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Quelle</Label>
-                  <Select
-                    value={editedCandidate.source}
-                    onValueChange={(v) => setEditedCandidate(p => ({ ...p, source: v as OnboardingSource }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="indeed">Indeed</SelectItem>
-                      <SelectItem value="ebay">eBay Kleinanzeigen</SelectItem>
-                      <SelectItem value="empfehlung">Empfehlung</SelectItem>
-                      <SelectItem value="sonstiges">Sonstiges</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                <div className="space-y-2">
-                  <Label>Führerschein</Label>
-                  <Select
-                    value={editedCandidate.has_license || 'unknown'}
-                    onValueChange={(v) => setEditedCandidate(p => ({ ...p, has_license: v as YesNoUnknown }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unknown">Unbekannt</SelectItem>
-                      <SelectItem value="yes">Ja</SelectItem>
-                      <SelectItem value="no">Nein</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Erfahrung</Label>
-                  <Select
-                    value={editedCandidate.experience_level || 'unknown'}
-                    onValueChange={(v) => setEditedCandidate(p => ({ ...p, experience_level: v as YesNoUnknown }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unknown">Unbekannt</SelectItem>
-                      <SelectItem value="yes">Ja</SelectItem>
-                      <SelectItem value="no">Nein</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Verfügbarkeit bekannt</Label>
-                  <Select
-                    value={editedCandidate.availability_known || 'unknown'}
-                    onValueChange={(v) => setEditedCandidate(p => ({ ...p, availability_known: v as YesNoUnknown }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unknown">Unbekannt</SelectItem>
-                      <SelectItem value="yes">Ja</SelectItem>
-                      <SelectItem value="no">Nein</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+            {/* Dokumente */}
+            <Card className="border-gray-100">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-gray-400" />
+                  Dokumente / Checkliste
+                </CardTitle>
+                <CardDescription>
+                  {docProgress.complete} von {docProgress.total} Dokumenten vollständig
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {documents.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">Keine Dokumente definiert</p>
+                ) : (
+                  <div className="space-y-3">
+                    {documents.map(doc => {
+                      const docStatusConf = DOC_STATUS_CONFIG[doc.status]
+                      return (
+                        <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50/50">
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-5 w-5 text-gray-400" />
+                            <div>
+                              <p className="text-sm font-medium">{DOCUMENT_TYPE_LABELS[doc.document_type]}</p>
+                              {doc.file_name && (
+                                <p className="text-xs text-gray-500">{doc.file_name}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={doc.status}
+                              onValueChange={(v) => handleDocStatusChange(doc.id, v as OnboardingDocumentStatus)}
+                            >
+                              <SelectTrigger className={cn("w-[140px] h-8 text-xs", docStatusConf.className)}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="offen">Offen</SelectItem>
+                                <SelectItem value="angefordert">Angefordert</SelectItem>
+                                <SelectItem value="erhalten">Erhalten</SelectItem>
+                                <SelectItem value="geprueft">Geprüft</SelectItem>
+                                <SelectItem value="abgelehnt">Abgelehnt</SelectItem>
+                                <SelectItem value="nicht_erforderlich">Nicht erforderlich</SelectItem>
+                              </SelectContent>
+                            </Select>
 
-              <div className="space-y-2">
-                <Label>Interview-Datum</Label>
-                <Input
-                  type="datetime-local"
-                  value={editedCandidate.interview_date ? editedCandidate.interview_date.slice(0, 16) : ''}
-                  onChange={(e) => setEditedCandidate(p => ({ ...p, interview_date: e.target.value ? new Date(e.target.value).toISOString() : null }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Teams-Link</Label>
-                <Input
-                  value={editedCandidate.teams_link || ''}
-                  onChange={(e) => setEditedCandidate(p => ({ ...p, teams_link: e.target.value }))}
-                  placeholder="https://teams.microsoft.com/..."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Interne Notizen</Label>
-                <Textarea
-                  value={editedCandidate.notes_internal || ''}
-                  onChange={(e) => setEditedCandidate(p => ({ ...p, notes_internal: e.target.value }))}
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Dokumente */}
-          <Card className="border-gray-100">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-gray-400" />
-                Dokumente / Checkliste
-              </CardTitle>
-              <CardDescription>
-                {docProgress.complete} von {docProgress.total} Dokumenten vollständig
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {documents.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4">Keine Dokumente definiert</p>
-              ) : (
-                <div className="space-y-3">
-                  {documents.map(doc => {
-                    const docStatusConf = DOC_STATUS_CONFIG[doc.status]
-                    return (
-                      <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50/50">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-gray-400" />
-                          <div>
-                            <p className="text-sm font-medium">{DOCUMENT_TYPE_LABELS[doc.document_type]}</p>
-                            {doc.file_name && (
-                              <p className="text-xs text-gray-500">{doc.file_name}</p>
+                            {doc.file_path ? (
+                              <Button size="sm" variant="outline" onClick={() => handleDocDownload(doc.id)}>
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <>
+                                <input
+                                  type="file"
+                                  ref={fileInputRef}
+                                  className="hidden"
+                                  accept=".pdf,.jpg,.jpeg,.png"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (file) handleDocUpload(doc.id, file)
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={uploadingDocId === doc.id}
+                                  onClick={() => {
+                                    fileInputRef.current?.click()
+                                  }}
+                                >
+                                  {uploadingDocId === doc.id ? (
+                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Upload className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={doc.status}
-                            onValueChange={(v) => handleDocStatusChange(doc.id, v as OnboardingDocumentStatus)}
-                          >
-                            <SelectTrigger className={cn("w-[140px] h-8 text-xs", docStatusConf.className)}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="offen">Offen</SelectItem>
-                              <SelectItem value="angefordert">Angefordert</SelectItem>
-                              <SelectItem value="erhalten">Erhalten</SelectItem>
-                              <SelectItem value="geprueft">Geprüft</SelectItem>
-                              <SelectItem value="abgelehnt">Abgelehnt</SelectItem>
-                              <SelectItem value="nicht_erforderlich">Nicht erforderlich</SelectItem>
-                            </SelectContent>
-                          </Select>
-
-                          {doc.file_path ? (
-                            <Button size="sm" variant="outline" onClick={() => handleDocDownload(doc.id)}>
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          ) : (
-                            <>
-                              <input
-                                type="file"
-                                ref={fileInputRef}
-                                className="hidden"
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0]
-                                  if (file) handleDocUpload(doc.id, file)
-                                }}
-                              />
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={uploadingDocId === doc.id}
-                                onClick={() => {
-                                  fileInputRef.current?.click()
-                                }}
-                              >
-                                {uploadingDocId === doc.id ? (
-                                  <RefreshCw className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Upload className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column - Meta & Notes */}
-        <div className="space-y-6">
-          {/* Meta Info */}
-          <Card className="border-gray-100">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-600">Informationen</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Erstellt am</span>
-                <span className="text-gray-900">{formatDateTime(candidate.created_at)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Aktualisiert am</span>
-                <span className="text-gray-900">{formatDateTime(candidate.updated_at)}</span>
-              </div>
-              {candidate.interview_date && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Interview</span>
-                  <span className="text-gray-900">{formatDateTime(candidate.interview_date)}</span>
-                </div>
-              )}
-              {candidate.teams_link && (
-                <div className="pt-2">
-                  <a
-                    href={candidate.teams_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-primary-blue hover:underline"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Teams-Link öffnen
-                  </a>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Notes */}
-          <Card className="border-gray-100">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-gray-400" />
-                Notizen
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 mb-4">
-                {notes.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-2">Noch keine Notizen</p>
-                ) : (
-                  notes.map(note => (
-                    <div key={note.id} className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.content}</p>
-                      <p className="text-xs text-gray-400 mt-2">
-                        {note.created_by_name || 'Unbekannt'} - {formatDateTime(note.created_at)}
-                      </p>
-                    </div>
-                  ))
+                      )
+                    })}
+                  </div>
                 )}
-              </div>
-
-              <div className="space-y-2">
-                <Textarea
-                  value={newNoteContent}
-                  onChange={(e) => setNewNoteContent(e.target.value)}
-                  placeholder="Neue Notiz hinzufügen..."
-                  rows={2}
-                />
-                <Button
-                  size="sm"
-                  onClick={handleAddNote}
-                  disabled={!newNoteContent.trim() || isAddingNote}
-                  className="w-full"
-                >
-                  {isAddingNote ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                  Notiz hinzufügen
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Status Change Modal */}
-      <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Status ändern</DialogTitle>
-            <DialogDescription>
-              Wählen Sie den neuen Status für diesen Kandidaten.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <Select
-              value={newStatus || undefined}
-              onValueChange={(v) => setNewStatus(v as OnboardingStatus)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Status wählen" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableStatuses.map(status => (
-                  <SelectItem key={status} value={status}>
-                    {STATUS_LABELS[status]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              </CardContent>
+            </Card>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowStatusModal(false)}>
-              Abbrechen
-            </Button>
-            <Button onClick={handleStatusChange} disabled={!newStatus || isSaving}>
-              {isSaving ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
-              Status speichern
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          {/* Right Column - Meta & Notes */}
+          <div className="space-y-6">
+            {/* Meta Info */}
+            <Card className="border-gray-100">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm text-gray-600">Informationen</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Erstellt am</span>
+                  <span className="text-gray-900">{formatDateTime(candidate.created_at)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Aktualisiert am</span>
+                  <span className="text-gray-900">{formatDateTime(candidate.updated_at)}</span>
+                </div>
+                {candidate.interview_date && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Interview</span>
+                    <span className="text-gray-900">{formatDateTime(candidate.interview_date)}</span>
+                  </div>
+                )}
+                {candidate.teams_link && (
+                  <div className="pt-2">
+                    <a
+                      href={candidate.teams_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-primary-blue hover:underline"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Teams-Link öffnen
+                    </a>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Notes */}
+            <Card className="border-gray-100">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-gray-400" />
+                  Notizen
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 mb-4">
+                  {notes.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-2">Noch keine Notizen</p>
+                  ) : (
+                    notes.map(note => (
+                      <div key={note.id} className="p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.content}</p>
+                        <p className="text-xs text-gray-400 mt-2">
+                          {note.created_by_name || 'Unbekannt'} - {formatDateTime(note.created_at)}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Textarea
+                    value={newNoteContent}
+                    onChange={(e) => setNewNoteContent(e.target.value)}
+                    placeholder="Neue Notiz hinzufügen..."
+                    rows={2}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleAddNote}
+                    disabled={!newNoteContent.trim() || isAddingNote}
+                    className="w-full"
+                  >
+                    {isAddingNote ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                    Notiz hinzufügen
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Status Change Modal */}
+        <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle>Status ändern</DialogTitle>
+              <DialogDescription>
+                Wählen Sie den neuen Status für diesen Kandidaten.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <Select
+                value={newStatus || undefined}
+                onValueChange={(v) => setNewStatus(v as OnboardingStatus)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Status wählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableStatuses.map(status => (
+                    <SelectItem key={status} value={status}>
+                      {STATUS_LABELS[status]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowStatusModal(false)}>
+                Abbrechen
+              </Button>
+              <Button onClick={handleStatusChange} disabled={!newStatus || isSaving}>
+                {isSaving ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
+                Status speichern
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </AdminLayout>
   )
 }
