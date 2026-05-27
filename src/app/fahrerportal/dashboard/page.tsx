@@ -28,11 +28,13 @@ import {
   CalendarX,
   FileX,
   CircleAlert,
-  CheckCircle2
+  CheckCircle2,
+  Megaphone
 } from "lucide-react"
 import { getCurrentUser, canAccessFahrerportal, getArbeitsnachweiseByUser, getAuslagennachweiseByUser } from "@/lib/api"
 import { getFahrerTouren, formatTourStatus, getTourStatusColor, formatFahrzeugart } from "@/lib/touren-api"
 import { calculateFahrerAlerts, getAlertColors, type FahrerAlert, type FahrerAlertsResult } from "@/lib/fahrerportal-alerts"
+import { getFahrerAnnouncements, type Announcement } from "@/lib/announcements-api"
 import type { Tour, TourStatus } from "@/lib/supabase"
 
 interface StatusCounts {
@@ -86,6 +88,7 @@ export default function FahrerportalDashboard() {
     alerts: [],
     summary: { high: 0, medium: 0, total: 0 }
   })
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
 
   useEffect(() => {
     checkAuthAndLoad()
@@ -113,11 +116,12 @@ export default function FahrerportalDashboard() {
         : 'Fahrer'
       setFahrerName(name)
 
-      // Lade offene Touren, Status-Counts und Alerts parallel
+      // Lade offene Touren, Status-Counts, Alerts und Hinweise parallel
       await Promise.all([
         loadOffeneTouren(user.id),
         loadStatusCounts(user.id),
-        loadAlerts(user.id)
+        loadAlerts(user.id),
+        loadAnnouncements()
       ])
       setIsLoading(false)
     } catch (error) {
@@ -182,6 +186,49 @@ export default function FahrerportalDashboard() {
       setAlerts(result)
     } catch (error) {
       console.error("Fehler beim Laden der Alerts:", error)
+    }
+  }
+
+  const loadAnnouncements = async () => {
+    try {
+      const result = await getFahrerAnnouncements()
+      // Sortiere nach Priorität und Datum, max 3 anzeigen
+      const sorted = result.sort((a, b) => {
+        const priorityOrder: Record<string, number> = { critical: 0, important: 1, normal: 2 }
+        if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+          return priorityOrder[a.priority] - priorityOrder[b.priority]
+        }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+      setAnnouncements(sorted.slice(0, 3))
+    } catch (error) {
+      console.error("Fehler beim Laden der Hinweise:", error)
+    }
+  }
+
+  const getAnnouncementStyles = (priority: string) => {
+    switch (priority) {
+      case 'critical':
+        return {
+          card: 'border-red-200 bg-red-50/50',
+          icon: 'text-red-600',
+          title: 'text-red-900',
+          badge: 'bg-red-100 text-red-700 border-red-200'
+        }
+      case 'important':
+        return {
+          card: 'border-amber-200 bg-amber-50/50',
+          icon: 'text-amber-600',
+          title: 'text-amber-900',
+          badge: 'bg-amber-100 text-amber-700 border-amber-200'
+        }
+      default:
+        return {
+          card: 'border-blue-200 bg-blue-50/30',
+          icon: 'text-blue-600',
+          title: 'text-gray-900',
+          badge: 'bg-blue-100 text-blue-700 border-blue-200'
+        }
     }
   }
 
@@ -368,6 +415,35 @@ export default function FahrerportalDashboard() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Hinweise / Announcements */}
+        {announcements.length > 0 && (
+          <div className="mb-5">
+            {announcements.map((announcement) => {
+              const styles = getAnnouncementStyles(announcement.priority)
+              return (
+                <Card key={announcement.id} className={`mb-2 ${styles.card}`}>
+                  <CardContent className="p-3 flex items-start gap-3">
+                    <Megaphone className={`h-5 w-5 mt-0.5 flex-shrink-0 ${styles.icon}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className={`font-semibold text-sm ${styles.title}`}>{announcement.title}</span>
+                        <Badge className={`text-xs ${styles.badge}`}>
+                          {announcement.priority === "critical"
+                            ? "Kritisch"
+                            : announcement.priority === "important"
+                            ? "Wichtig"
+                            : "Hinweis"}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-700">{announcement.content}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
         )}
 
         {/* Offene Touren - Wichtigste Aktion */}
