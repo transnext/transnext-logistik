@@ -553,7 +553,7 @@ export async function uploadFahrerDocument(
   if (expiresAt) formData.append('expiresAt', expiresAt)
   if (comment) formData.append('comment', comment)
 
-  console.log('[uploadFahrerDocument] Sende an API:', { fahrerId, documentType, fileName: file.name, fileSize: file.size })
+  console.log('[uploadFahrerDocument] SERVER-UPLOAD-V3 2026-05-27:', { fahrerId, documentType, fileName: file.name, fileSize: file.size })
 
   try {
     const response = await fetch('/api/admin/fahrer-documents/upload', {
