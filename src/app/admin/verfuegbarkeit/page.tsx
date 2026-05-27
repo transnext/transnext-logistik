@@ -36,8 +36,16 @@ import {
   Clock,
   AlertTriangle,
   Users,
-  Info
+  Info,
+  FileDown,
+  FileText,
+  FileSpreadsheet
 } from "lucide-react"
+import {
+  prepareSmartCareExportData,
+  exportSmartCarePDF,
+  exportSmartCareCSV
+} from "@/lib/availability-export"
 
 // Typen
 interface TourExistsMap {
@@ -225,6 +233,41 @@ export default function VerfuegbarkeitPage() {
     return availability.filter(a => activeUserIds.has(a.user_id))
   }, [availability, showOnlyActive, activeUserIds])
 
+  // ============ SMART & CARE EXPORT ============
+
+  /**
+   * Exportiert die aktuelle Wochenverfügbarkeit als PDF für Smart & Care
+   * Enthält NUR: Fahrernamen, Verfügbarkeitsstatus, Kommentare aus Verfügbarkeitsmeldung
+   * Enthält NICHT: Telefon, E-Mail, interne Notizen, Kurz-/Langstreckenwünsche
+   */
+  const handleExportPDF = useCallback(() => {
+    if (!selectedWeek || activeFahrer.length === 0) return
+
+    const exportData = prepareSmartCareExportData(
+      selectedWeek,
+      activeFahrer.map(f => ({ id: f.id, name: f.name })),
+      filteredAvailability
+    )
+
+    exportSmartCarePDF(exportData)
+  }, [selectedWeek, activeFahrer, filteredAvailability])
+
+  /**
+   * Exportiert die aktuelle Wochenverfügbarkeit als CSV für Smart & Care
+   * Format: Eine Zeile pro Fahrer UND Tag (taggenau)
+   */
+  const handleExportCSV = useCallback(() => {
+    if (!selectedWeek || activeFahrer.length === 0) return
+
+    const exportData = prepareSmartCareExportData(
+      selectedWeek,
+      activeFahrer.map(f => ({ id: f.id, name: f.name })),
+      filteredAvailability
+    )
+
+    exportSmartCareCSV(exportData)
+  }, [selectedWeek, activeFahrer, filteredAvailability])
+
   // Day Cards Daten berechnen
   const dayCardsData = useMemo<DayCardData[]>(() => {
     return weekDays.map(day => {
@@ -373,10 +416,31 @@ export default function VerfuegbarkeitPage() {
             <h1 className="text-2xl font-bold text-gray-900">Verfügbarkeit</h1>
             <p className="text-gray-500 mt-1">Wochenplanung und Fahrer-Einsätze</p>
           </div>
-          <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Aktualisieren
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Export-Buttons für Smart & Care */}
+            <Button
+              variant="outline"
+              onClick={handleExportPDF}
+              disabled={!selectedWeek || activeFahrer.length === 0}
+              className="border-primary-blue/30 hover:bg-primary-blue/5 hover:border-primary-blue"
+            >
+              <FileText className="h-4 w-4 mr-2 text-primary-blue" />
+              PDF Export
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleExportCSV}
+              disabled={!selectedWeek || activeFahrer.length === 0}
+              className="border-emerald-500/30 hover:bg-emerald-50 hover:border-emerald-500"
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2 text-emerald-600" />
+              CSV Export
+            </Button>
+            <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Aktualisieren
+            </Button>
+          </div>
         </div>
 
         {/* Wochen-Navigation */}
