@@ -64,6 +64,13 @@ export type AuditAction =
   | 'arbeitsnachweis_deleted'
   | 'arbeitsnachweis_status_changed'
   | 'auslage_status_changed'
+  // Onboarding
+  | 'onboarding_candidate_created'
+  | 'onboarding_candidate_updated'
+  | 'onboarding_status_changed'
+  | 'onboarding_candidate_archived'
+  | 'onboarding_document_status_changed'
+  | 'onboarding_note_created'
   // Sonstige
   | string // Erlaubt auch benutzerdefinierte Aktionen
 
@@ -84,6 +91,9 @@ export type AuditEntityType =
   | 'availability'
   | 'invoice'
   | 'weekly_invoice'
+  | 'onboarding_candidate'
+  | 'onboarding_document'
+  | 'onboarding_note'
   | string // Erlaubt auch benutzerdefinierte Typen
 
 /**
@@ -535,7 +545,14 @@ export function formatAuditAction(action: string): string {
     // Arbeitsnachweise / Auslagen
     arbeitsnachweis_deleted: 'Arbeitsnachweis gelöscht',
     arbeitsnachweis_status_changed: 'Arbeitsnachweis-Status geändert',
-    auslage_status_changed: 'Auslagen-Status geändert'
+    auslage_status_changed: 'Auslagen-Status geändert',
+    // Onboarding
+    onboarding_candidate_created: 'Onboarding-Kandidat erstellt',
+    onboarding_candidate_updated: 'Onboarding-Kandidat bearbeitet',
+    onboarding_status_changed: 'Onboarding-Status geändert',
+    onboarding_candidate_archived: 'Onboarding-Kandidat archiviert',
+    onboarding_document_status_changed: 'Onboarding-Dokument-Status geändert',
+    onboarding_note_created: 'Onboarding-Notiz erstellt'
   }
 
   return actionLabels[action] || action
@@ -558,7 +575,10 @@ export function formatAuditEntityType(entityType: string): string {
     computed_alert: 'Berechneter Alert',
     availability: 'Verfügbarkeit',
     invoice: 'Rechnung',
-    weekly_invoice: 'Wochenabrechnung'
+    weekly_invoice: 'Wochenabrechnung',
+    onboarding_candidate: 'Onboarding-Kandidat',
+    onboarding_document: 'Onboarding-Dokument',
+    onboarding_note: 'Onboarding-Notiz'
   }
 
   return typeLabels[entityType] || entityType

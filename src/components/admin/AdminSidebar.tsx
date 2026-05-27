@@ -20,7 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
-  ClipboardList
+  ClipboardList,
+  UserPlus
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -128,6 +129,13 @@ const navItems: NavItem[] = [
     label: "Audit-Log",
     href: "/admin/audit-log",
     icon: ClipboardList,
+    roles: ['admin', 'gf'],
+    dividerAfter: true
+  },
+  {
+    label: "HR / Onboarding",
+    href: "/admin/onboarding",
+    icon: UserPlus,
     roles: ['admin', 'gf']
   }
 ]
