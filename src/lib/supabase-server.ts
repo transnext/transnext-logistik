@@ -4,13 +4,33 @@ import { cookies } from 'next/headers'
 /**
  * Supabase Admin Client mit Service Role Key
  * NUR SERVERSEITIG VERWENDEN - NIEMALS IM BROWSER!
+ *
+ * Unterstützt mehrere Variablennamen für Kompatibilität:
+ * - SUPABASE_SERVICE_ROLE_KEY (Standard)
+ * - SUPABASE_SERVICE_KEY
+ * - SERVICE_ROLE_KEY
  */
 export function getSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY oder NEXT_PUBLIC_SUPABASE_URL nicht konfiguriert')
+  // Prüfe mehrere mögliche Variablennamen
+  const serviceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SERVICE_ROLE_KEY
+
+  if (!supabaseUrl) {
+    console.error('[getSupabaseAdmin] NEXT_PUBLIC_SUPABASE_URL fehlt!')
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL nicht konfiguriert')
+  }
+
+  if (!serviceRoleKey) {
+    console.error('[getSupabaseAdmin] Service Role Key fehlt! Geprüfte Variablen:', {
+      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      SUPABASE_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_KEY,
+      SERVICE_ROLE_KEY: !!process.env.SERVICE_ROLE_KEY
+    })
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY nicht konfiguriert. Bitte in Netlify Environment Variables hinzufügen.')
   }
 
   return createClient(supabaseUrl, serviceRoleKey, {

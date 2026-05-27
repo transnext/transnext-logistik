@@ -120,7 +120,16 @@ export async function POST(request: NextRequest): Promise<NextResponse<UploadRes
     }
 
     // 5. Supabase Admin Client (Service Role)
-    const supabaseAdmin = getSupabaseAdmin()
+    let supabaseAdmin
+    try {
+      supabaseAdmin = getSupabaseAdmin()
+    } catch (adminErr: any) {
+      console.error('[API Upload] Admin-Client Fehler:', adminErr.message)
+      return NextResponse.json(
+        { success: false, error: 'Server-Konfigurationsfehler. Bitte Administrator kontaktieren.' },
+        { status: 500 }
+      )
+    }
 
     // 6. Fahrer existiert prüfen
     const { data: fahrerData, error: fahrerError } = await supabaseAdmin
