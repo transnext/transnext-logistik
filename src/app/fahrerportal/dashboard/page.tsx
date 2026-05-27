@@ -19,9 +19,15 @@ import {
   AlertTriangle,
   ArrowRight,
   Wallet,
-  CalendarCheck
+  CalendarCheck,
+  Play,
+  MapPin,
+  Zap,
+  Truck
 } from "lucide-react"
 import { getCurrentUser, canAccessFahrerportal, getArbeitsnachweiseByUser, getAuslagennachweiseByUser } from "@/lib/api"
+import { getFahrerTouren, formatTourStatus, getTourStatusColor, formatFahrzeugart } from "@/lib/touren-api"
+import type { Tour, TourStatus } from "@/lib/supabase"
 
 interface StatusCounts {
   arbeitsnachweise: {
@@ -43,6 +49,7 @@ export default function FahrerportalDashboard() {
   const router = useRouter()
   const [fahrerName, setFahrerName] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [offeneTouren, setOffeneTouren] = useState<Tour[]>([])
   const [statusCounts, setStatusCounts] = useState<StatusCounts>({
     arbeitsnachweise: { total: 0, pending: 0, approved: 0, rejected: 0 },
     auslagen: { total: 0, pending: 0, approved: 0, rejected: 0, paid: 0 }
@@ -61,7 +68,6 @@ export default function FahrerportalDashboard() {
         return
       }
 
-      // Nutze die neue Zugriffsprüfung (erlaubt Admin/GF mit Fahrer-Datensatz)
       const accessResult = await canAccessFahrerportal(user.id)
 
       if (!accessResult.canAccess) {
@@ -70,18 +76,35 @@ export default function FahrerportalDashboard() {
         return
       }
 
-      // Fahrername aus Fahrer-Datensatz
       const name = accessResult.fahrer
         ? `${accessResult.fahrer.vorname} ${accessResult.fahrer.nachname}`
         : 'Fahrer'
       setFahrerName(name)
 
-      // Lade Status-Counts
-      await loadStatusCounts(user.id)
+      // Lade offene Touren und Status-Counts parallel
+      await Promise.all([
+        loadOffeneTouren(user.id),
+        loadStatusCounts(user.id)
+      ])
       setIsLoading(false)
     } catch (error) {
       console.error("Auth Fehler:", error)
       router.push("/fahrerportal")
+    }
+  }
+
+  const loadOffeneTouren = async (userId: string) => {
+    try {
+      const touren = await getFahrerTouren(userId)
+      // Sortiere: Abgabe offen zuerst, dann Übernahme offen
+      const sorted = touren.sort((a, b) => {
+        if (a.status === 'abgabe_offen' && b.status !== 'abgabe_offen') return -1
+        if (b.status === 'abgabe_offen' && a.status !== 'abgabe_offen') return 1
+        return 0
+      })
+      setOffeneTouren(sorted.slice(0, 3)) // Max 3 auf Dashboard
+    } catch (error) {
+      console.error("Fehler beim Laden der Touren:", error)
     }
   }
 
@@ -129,6 +152,32 @@ export default function FahrerportalDashboard() {
     })
   }
 
+  const getFahrzeugIcon = (art: string) => {
+    switch (art) {
+      case 'e-auto':
+        return <Zap className="h-4 w-4 text-green-600" />
+      case 'transporter':
+        return <Truck className="h-4 w-4 text-gray-600" />
+      default:
+        return <Car className="h-4 w-4 text-blue-600" />
+    }
+  }
+
+  const getProtocolAction = (tour: Tour) => {
+    if (tour.status === 'abgabe_offen') {
+      return {
+        label: "Abgabe",
+        href: `/fahrerportal/touren/protokoll?tourId=${tour.id}&typ=abgabe`,
+        color: "bg-blue-600 hover:bg-blue-700"
+      }
+    }
+    return {
+      label: "Übernahme",
+      href: `/fahrerportal/touren/protokoll?tourId=${tour.id}&typ=uebernahme`,
+      color: "bg-green-600 hover:bg-green-700"
+    }
+  }
+
   const quickActions = [
     {
       title: "Arbeitsnachweis",
@@ -155,15 +204,24 @@ export default function FahrerportalDashboard() {
       icon: Car,
       href: "/fahrerportal/touren",
       iconBg: "bg-sky-50",
-      iconColor: "text-sky-600"
+      iconColor: "text-sky-600",
+      badge: offeneTouren.length > 0 ? offeneTouren.length : undefined
+    },
+    {
+      title: "Statistiken",
+      description: "Arbeitsnachweise & Leistung",
+      icon: BarChart3,
+      href: "/fahrerportal/statistiken",
+      iconBg: "bg-violet-50",
+      iconColor: "text-violet-600"
     },
     {
       title: "Monatsabrechnung",
       description: "Touren & Verdienst",
-      icon: BarChart3,
+      icon: FileText,
       href: "/fahrerportal/monatsabrechnung",
-      iconBg: "bg-violet-50",
-      iconColor: "text-violet-600"
+      iconBg: "bg-indigo-50",
+      iconColor: "text-indigo-600"
     },
     {
       title: "Auslagenübersicht",
@@ -206,6 +264,67 @@ export default function FahrerportalDashboard() {
           </h2>
           <p className="text-sm text-gray-500 mt-0.5">{formatDate()}</p>
         </div>
+
+        {/* Offene Touren - Wichtigste Aktion */}
+        {offeneTouren.length > 0 && (
+          <Card className="mb-5 border-primary-blue/20 bg-blue-50/30">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <Car className="h-5 w-5 text-primary-blue" />
+                  Offene Touren
+                </CardTitle>
+                <Link href="/fahrerportal/touren">
+                  <Button variant="ghost" size="sm" className="text-primary-blue">
+                    Alle anzeigen
+                    <ArrowRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {offeneTouren.map((tour) => {
+                const action = getProtocolAction(tour)
+                const colors = getTourStatusColor(tour.status)
+                return (
+                  <div
+                    key={tour.id}
+                    className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-sm transition-shadow"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        <div className="flex-shrink-0 mt-0.5">
+                          {getFahrzeugIcon(tour.fahrzeugart)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-gray-900">Tour {tour.tour_nummer}</span>
+                            <Badge variant="outline" className={`${colors.bg} ${colors.text} ${colors.border} text-xs`}>
+                              {formatTourStatus(tour.status)}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <MapPin className="h-3 w-3 text-green-600" />
+                            <span className="truncate">{tour.abholort_ort}</span>
+                            <span>→</span>
+                            <MapPin className="h-3 w-3 text-red-600" />
+                            <span className="truncate">{tour.abgabeort_ort}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Link href={action.href} className="flex-shrink-0">
+                        <Button size="sm" className={`${action.color} text-white`}>
+                          <Play className="h-3 w-3 mr-1" />
+                          {action.label}
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Hinweis bei abgelehnten Nachweisen */}
         {hasRejected && (
@@ -255,7 +374,7 @@ export default function FahrerportalDashboard() {
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <FileText className="h-4 w-4 text-gray-400" />
-                  <span className="text-xs text-gray-500">Touren</span>
+                  <span className="text-xs text-gray-500">Nachweise</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{statusCounts.arbeitsnachweise.total}</p>
                 <p className="text-xs text-gray-500">eingereicht</p>
@@ -270,7 +389,7 @@ export default function FahrerportalDashboard() {
                   <span className="text-xs text-emerald-600">Genehmigt</span>
                 </div>
                 <p className="text-2xl font-bold text-emerald-700">{statusCounts.arbeitsnachweise.approved}</p>
-                <p className="text-xs text-gray-500">Touren</p>
+                <p className="text-xs text-gray-500">Nachweise</p>
               </CardContent>
             </Card>
 
@@ -321,7 +440,14 @@ export default function FahrerportalDashboard() {
                     <item.icon className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">{item.title}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900">{item.title}</p>
+                      {item.badge && (
+                        <Badge className="bg-primary-blue text-white text-xs px-1.5 py-0">
+                          {item.badge}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500">{item.description}</p>
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-300 group-hover:text-primary-blue group-hover:translate-x-1 transition-all" />
