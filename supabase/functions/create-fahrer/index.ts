@@ -107,6 +107,16 @@ serve(async (req) => {
       )
     }
 
+    // E-Mail-Format validieren
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(fahrerData.email)) {
+      console.error('[create-fahrer] step: validate_payload - FAILED - Invalid email:', fahrerData.email)
+      return new Response(
+        JSON.stringify({ error: 'Ungültiges E-Mail-Format', code: 'INVALID_EMAIL' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     console.log('[create-fahrer] step: create_auth_user for email:', fahrerData.email)
 
     // 1. Erstelle Auth-User mit Admin-Rechten
