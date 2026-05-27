@@ -514,7 +514,12 @@ export async function getFahrerDocument(documentId: string): Promise<FahrerDocum
 }
 
 /**
- * Lädt ein Dokument hoch
+ * Lädt ein Dokument hoch.
+ * Verbesserte Version mit:
+ * - Session-Validierung vor Upload
+ * - Try-Catch für Netzwerkfehler
+ * - Detailliertes Logging für Diagnose
+ * - Bessere Fehlerbehandlung für "Failed to fetch"
  */
 export async function uploadFahrerDocument(
   fahrerId: string,
@@ -523,6 +528,7 @@ export async function uploadFahrerDocument(
   expiresAt?: string,
   comment?: string
 ): Promise<{ success: boolean; document?: FahrerDocument; error?: string }> {
+  // 1. Berechtigungsprüfung
   if (!(await hasHRAccess())) {
     return { success: false, error: 'Keine Berechtigung' }
   }
@@ -532,101 +538,211 @@ export async function uploadFahrerDocument(
     return { success: false, error: 'Nicht angemeldet' }
   }
 
-  // Validierung
+  // 2. Session validieren vor Upload
+  try {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError || !sessionData.session) {
+      console.error('[uploadFahrerDocument] Session ungültig:', sessionError)
+      return {
+        success: false,
+        error: 'Sitzung abgelaufen. Bitte Seite neu laden und erneut anmelden.'
+      }
+    }
+  } catch (sessionCheckErr) {
+    console.error('[uploadFahrerDocument] Session-Check fehlgeschlagen:', sessionCheckErr)
+    return {
+      success: false,
+      error: 'Verbindungsfehler. Bitte Seite neu laden.'
+    }
+  }
+
+  // 3. Datei-Validierung
   const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/heif']
-  if (!allowedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.heic')) {
-    return { success: false, error: 'Nur PDF oder Bilder (JPG, PNG, HEIC) erlaubt' }
+  // Erlaube auch leeren MIME-Type bei HEIC-Dateien (iOS)
+  const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')
+  if (!allowedTypes.includes(file.type) && !isHeic && file.type !== '') {
+    console.log('[uploadFahrerDocument] Ungültiger Dateityp:', file.type, file.name)
+    return { success: false, error: `Dateityp "${file.type || 'unbekannt'}" nicht erlaubt. Nur PDF, JPG, PNG oder HEIC.` }
   }
 
   if (file.size > 50 * 1024 * 1024) { // 50MB
     return { success: false, error: 'Datei zu groß (max. 50MB)' }
   }
 
-  // Dateiname generieren
+  if (file.size === 0) {
+    return { success: false, error: 'Datei ist leer (0 Bytes)' }
+  }
+
+  // 4. Dateiname und Pfad generieren (alle ASCII, keine Sonderzeichen)
   const timestamp = Date.now()
-  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'pdf'
-  const sanitizedType = documentType.replace(/[^a-zA-Z0-9]/g, '_')
-  const fileName = `${sanitizedType}_${timestamp}.${fileExt}`
-  // WICHTIG: Der Bucket heißt 'fahrer-dokumente', daher NICHT nochmal im Pfad!
+  // Sanitize file extension
+  const fileExt = (file.name.split('.').pop()?.toLowerCase() || 'pdf').replace(/[^a-z0-9]/g, '')
+  // documentType ist bereits ein sicherer Slug (ausweis, fuehrerschein, etc.)
+  const sanitizedDocType = documentType.toLowerCase()
+  const fileName = `${sanitizedDocType}_${timestamp}.${fileExt}`
   // Pfad-Struktur: {fahrerId}/{documentType}/{filename}
-  const filePath = `${fahrerId}/${documentType}/${fileName}`
+  const filePath = `${fahrerId}/${sanitizedDocType}/${fileName}`
 
-  // Upload zu Supabase Storage
-  const { error: uploadError } = await supabase.storage
-    .from('fahrer-dokumente')
-    .upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: false
-    })
-
-  if (uploadError) {
-    console.error('Storage Upload-Fehler:', uploadError)
-    // Detaillierte Fehlermeldung für bessere Diagnose
-    let errorMessage = 'Fehler beim Hochladen'
-    if (uploadError.message?.includes('Bucket not found')) {
-      errorMessage = 'Storage-Bucket "fahrer-dokumente" existiert nicht. Bitte Administrator kontaktieren.'
-    } else if (uploadError.message?.includes('policy')) {
-      errorMessage = 'Keine Berechtigung für Upload. Storage-Policy prüfen.'
-    } else if (uploadError.message?.includes('size')) {
-      errorMessage = 'Datei zu groß für Upload.'
-    } else if (uploadError.message) {
-      errorMessage = `Storage-Fehler: ${uploadError.message}`
-    }
-    return { success: false, error: errorMessage }
-  }
-
-  // Datensatz in DB erstellen
-  const { data: document, error: dbError } = await supabase
-    .from('fahrer_documents')
-    .insert({
-      fahrer_id: fahrerId,
-      document_type: documentType,
-      file_name: file.name,
-      file_path: filePath,
-      file_size: file.size,
-      mime_type: file.type,
-      uploaded_by: currentUserId,
-      status: 'hochgeladen',
-      expires_at: expiresAt || null,
-      comment: comment || null
-    })
-    .select()
-    .single()
-
-  if (dbError) {
-    console.error('DB-Fehler beim Dokument-Insert:', dbError)
-    // Versuche Upload rückgängig zu machen
-    await supabase.storage.from('fahrer-dokumente').remove([filePath])
-    // Detaillierte Fehlermeldung
-    let errorMessage = 'Fehler beim Speichern in der Datenbank'
-    if (dbError.code === '42P01') {
-      errorMessage = 'Tabelle "fahrer_documents" existiert nicht. Migration ausstehend.'
-    } else if (dbError.code === '42501' || dbError.message?.includes('policy')) {
-      errorMessage = 'Keine Berechtigung für DB-Insert. RLS-Policy prüfen.'
-    } else if (dbError.code === '23503') {
-      errorMessage = 'Fahrer-ID ungültig oder Fahrer existiert nicht.'
-    } else if (dbError.message) {
-      errorMessage = `DB-Fehler: ${dbError.message}`
-    }
-    return { success: false, error: errorMessage }
-  }
-
-  // Audit-Log
-  await logAuditEvent({
-    action: 'fahrer_document_uploaded',
-    entityType: 'fahrer_document',
-    entityId: document.id,
-    entityLabel: `${getDocumentTypeLabel(documentType)} - ${file.name}`,
-    severity: 'info',
-    isFinancial: false,
-    metadata: {
-      fahrer_id: fahrerId,
-      document_type: documentType,
-      file_name: file.name
-    }
+  // 5. Logging für Diagnose
+  console.log('[uploadFahrerDocument] Upload-Parameter:', {
+    bucket: 'fahrer-dokumente',
+    filePath,
+    fileSize: file.size,
+    fileType: file.type,
+    fileName: file.name,
+    documentType,
+    fahrerId
   })
 
-  return { success: true, document }
+  // 6. Upload mit verbesserter Fehlerbehandlung
+  let uploadSuccessful = false
+  try {
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('fahrer-dokumente')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (uploadError) {
+      console.error('[uploadFahrerDocument] Storage Upload-Fehler:', {
+        message: uploadError.message,
+        name: (uploadError as any).name,
+        cause: (uploadError as any).cause
+      })
+
+      // Detaillierte Fehlermeldung
+      let errorMessage = 'Fehler beim Hochladen'
+      const errMsg = (uploadError.message || '').toLowerCase()
+
+      if (errMsg.includes('failed to fetch') || errMsg.includes('networkerror') || errMsg.includes('network')) {
+        errorMessage = 'Netzwerkfehler beim Upload. Bitte Internetverbindung prüfen und Seite neu laden.'
+      } else if (errMsg.includes('bucket not found') || errMsg.includes('bucket')) {
+        errorMessage = 'Storage-Bucket "fahrer-dokumente" nicht gefunden. Bitte Administrator kontaktieren.'
+      } else if (errMsg.includes('policy') || errMsg.includes('unauthorized') || errMsg.includes('403')) {
+        errorMessage = 'Keine Berechtigung für Upload. Storage-Policy prüfen.'
+      } else if (errMsg.includes('size') || errMsg.includes('too large') || errMsg.includes('413')) {
+        errorMessage = 'Datei zu groß für Upload.'
+      } else if (errMsg.includes('duplicate') || errMsg.includes('already exists')) {
+        errorMessage = 'Datei existiert bereits. Bitte anderen Namen wählen.'
+      } else if (errMsg.includes('invalid') || errMsg.includes('mime')) {
+        errorMessage = 'Ungültiger Dateityp oder Dateiformat.'
+      } else if (uploadError.message) {
+        errorMessage = `Storage-Fehler: ${uploadError.message}`
+      }
+
+      return { success: false, error: errorMessage }
+    }
+
+    uploadSuccessful = true
+    console.log('[uploadFahrerDocument] Upload erfolgreich:', uploadData?.path)
+
+  } catch (networkError: any) {
+    // Fängt TypeError und andere Netzwerkfehler ab
+    console.error('[uploadFahrerDocument] Netzwerk-Exception:', {
+      name: networkError?.name,
+      message: networkError?.message,
+      stack: networkError?.stack
+    })
+
+    if (networkError?.name === 'TypeError' || networkError?.message?.toLowerCase().includes('fetch')) {
+      return {
+        success: false,
+        error: 'Netzwerkverbindung fehlgeschlagen. Bitte Internetverbindung prüfen, Seite neu laden und erneut versuchen.'
+      }
+    }
+
+    return {
+      success: false,
+      error: `Unerwarteter Fehler beim Upload: ${networkError?.message || 'Unbekannt'}`
+    }
+  }
+
+  // 7. Datensatz in DB erstellen
+  try {
+    const { data: document, error: dbError } = await supabase
+      .from('fahrer_documents')
+      .insert({
+        fahrer_id: fahrerId,
+        document_type: documentType,
+        file_name: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        mime_type: file.type || 'application/octet-stream',
+        uploaded_by: currentUserId,
+        status: 'hochgeladen',
+        expires_at: expiresAt || null,
+        comment: comment || null
+      })
+      .select()
+      .single()
+
+    if (dbError) {
+      console.error('[uploadFahrerDocument] DB-Fehler beim Insert:', dbError)
+
+      // Versuche Upload rückgängig zu machen
+      if (uploadSuccessful) {
+        try {
+          await supabase.storage.from('fahrer-dokumente').remove([filePath])
+          console.log('[uploadFahrerDocument] Upload rückgängig gemacht')
+        } catch (removeErr) {
+          console.error('[uploadFahrerDocument] Konnte Upload nicht rückgängig machen:', removeErr)
+        }
+      }
+
+      // Detaillierte Fehlermeldung
+      let errorMessage = 'Fehler beim Speichern in der Datenbank'
+      if (dbError.code === '42P01') {
+        errorMessage = 'Tabelle "fahrer_documents" existiert nicht. Migration ausstehend.'
+      } else if (dbError.code === '42501' || dbError.message?.includes('policy')) {
+        errorMessage = 'Keine Berechtigung für DB-Insert. RLS-Policy prüfen.'
+      } else if (dbError.code === '23503') {
+        errorMessage = 'Fahrer-ID ungültig oder Fahrer existiert nicht.'
+      } else if (dbError.code === '23505') {
+        errorMessage = 'Dokument existiert bereits.'
+      } else if (dbError.message) {
+        errorMessage = `DB-Fehler: ${dbError.message}`
+      }
+      return { success: false, error: errorMessage }
+    }
+
+    // 8. Audit-Log
+    await logAuditEvent({
+      action: 'fahrer_document_uploaded',
+      entityType: 'fahrer_document',
+      entityId: document.id,
+      entityLabel: `${getDocumentTypeLabel(documentType)} - ${file.name}`,
+      severity: 'info',
+      isFinancial: false,
+      metadata: {
+        fahrer_id: fahrerId,
+        document_type: documentType,
+        file_name: file.name,
+        file_path: filePath,
+        file_size: file.size
+      }
+    })
+
+    console.log('[uploadFahrerDocument] Dokument erfolgreich gespeichert:', document.id)
+    return { success: true, document }
+
+  } catch (dbException: any) {
+    console.error('[uploadFahrerDocument] DB-Exception:', dbException)
+
+    // Versuche Upload rückgängig zu machen
+    if (uploadSuccessful) {
+      try {
+        await supabase.storage.from('fahrer-dokumente').remove([filePath])
+      } catch (removeErr) {
+        console.error('[uploadFahrerDocument] Konnte Upload nicht rückgängig machen:', removeErr)
+      }
+    }
+
+    return {
+      success: false,
+      error: `Datenbankfehler: ${dbException?.message || 'Unbekannt'}`
+    }
+  }
 }
 
 /**
