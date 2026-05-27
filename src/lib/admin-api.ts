@@ -108,6 +108,8 @@ export async function createFahrer(data: {
     switch (errorCode) {
       case 'EMAIL_EXISTS':
         throw new Error('Diese E-Mail-Adresse ist bereits registriert.')
+      case 'INVALID_EMAIL':
+        throw new Error('Ungültiges E-Mail-Format.')
       case 'WEAK_PASSWORD':
         throw new Error('Das Passwort muss mindestens 6 Zeichen lang sein.')
       case 'FORBIDDEN':
@@ -134,6 +136,8 @@ export async function createFahrer(data: {
     switch (result.code) {
       case 'EMAIL_EXISTS':
         throw new Error('Diese E-Mail-Adresse ist bereits registriert.')
+      case 'INVALID_EMAIL':
+        throw new Error('Ungültiges E-Mail-Format.')
       case 'WEAK_PASSWORD':
         throw new Error('Das Passwort muss mindestens 6 Zeichen lang sein.')
       case 'FORBIDDEN':
