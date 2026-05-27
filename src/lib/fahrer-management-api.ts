@@ -514,10 +514,7 @@ export async function getFahrerDocument(documentId: string): Promise<FahrerDocum
 }
 
 /**
- * Lädt ein Dokument hoch.
- * 
- * Direkter Browser-Upload wie bei uploadBeleg() für Touren/Auslagen.
- * Funktioniert nachdem der Bucket auf public=true gesetzt wurde.
+ * Lädt ein Dokument hoch über serverseitige API Route.
  */
 export async function uploadFahrerDocument(
   fahrerId: string,
@@ -526,22 +523,12 @@ export async function uploadFahrerDocument(
   expiresAt?: string,
   comment?: string
 ): Promise<{ success: boolean; document?: FahrerDocument; error?: string }> {
-  // 1. Berechtigungsprüfung
-  if (!(await hasHRAccess())) {
-    return { success: false, error: 'Keine Berechtigung' }
-  }
-
-  const currentUserId = await getCurrentUserId()
-  if (!currentUserId) {
-    return { success: false, error: 'Nicht angemeldet' }
-  }
-
-  // 2. Datei-Validierung
+  // Client-seitige Validierung für schnelles Feedback
   const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/heif']
   const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')
   
   if (!allowedTypes.includes(file.type) && !isHeic && file.type !== '') {
-    return { success: false, error: `Dateityp "${file.type || 'unbekannt'}" nicht erlaubt. Nur PDF, JPG, PNG oder HEIC.` }
+    return { success: false, error: `Dateityp nicht erlaubt. Nur PDF, JPG, PNG oder HEIC.` }
   }
 
   if (file.size > 50 * 1024 * 1024) {
@@ -549,89 +536,68 @@ export async function uploadFahrerDocument(
   }
 
   if (file.size === 0) {
-    return { success: false, error: 'Datei ist leer (0 Bytes)' }
+    return { success: false, error: 'Datei ist leer' }
   }
 
-  // 3. Dateiname und Pfad generieren
-  const timestamp = Date.now()
-  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'pdf'
-  const sanitizedDocType = documentType.toLowerCase()
-  const fileName = `${sanitizedDocType}_${timestamp}.${fileExt}`
-  const filePath = `${fahrerId}/${sanitizedDocType}/${fileName}`
+  // Session Token holen
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+  if (sessionError || !sessionData.session?.access_token) {
+    return { success: false, error: 'Nicht angemeldet. Bitte Seite neu laden.' }
+  }
 
-  console.log('[uploadFahrerDocument] Upload-Start:', {
-    bucket: 'fahrer-dokumente',
-    filePath,
-    fileSize: file.size,
-    fileType: file.type
-  })
+  // FormData erstellen
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('fahrerId', fahrerId)
+  formData.append('documentType', documentType)
+  if (expiresAt) formData.append('expiresAt', expiresAt)
+  if (comment) formData.append('comment', comment)
 
-  // 4. Upload zu Supabase Storage (wie bei uploadBeleg)
-  const { data: uploadData, error: uploadError } = await supabase.storage
-    .from('fahrer-dokumente')
-    .upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: false
+  console.log('[uploadFahrerDocument] Sende an API:', { fahrerId, documentType, fileName: file.name, fileSize: file.size })
+
+  try {
+    const response = await fetch('/api/admin/fahrer-documents/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${sessionData.session.access_token}`
+      },
+      body: formData
     })
 
-  if (uploadError) {
-    console.error('[uploadFahrerDocument] Storage-Fehler:', uploadError)
-    
-    if (uploadError.message?.includes('row-level security') || uploadError.message?.includes('policy')) {
-      return { success: false, error: 'Keine Berechtigung zum Hochladen. Bitte erneut anmelden.' }
-    } else if (uploadError.message?.includes('duplicate') || uploadError.message?.includes('already exists')) {
-      return { success: false, error: 'Diese Datei existiert bereits.' }
-    } else if (uploadError.message?.includes('too large') || uploadError.message?.includes('size')) {
-      return { success: false, error: 'Datei ist zu groß (max. 50MB).' }
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      console.error('[uploadFahrerDocument] API-Fehler:', result)
+      return { success: false, error: result.error || 'Upload fehlgeschlagen' }
     }
-    return { success: false, error: `Upload fehlgeschlagen: ${uploadError.message || 'Unbekannter Fehler'}` }
-  }
 
-  console.log('[uploadFahrerDocument] Upload erfolgreich:', uploadData?.path)
+    console.log('[uploadFahrerDocument] Erfolg:', result.document)
 
-  // 5. Datensatz in DB erstellen
-  const { data: document, error: dbError } = await supabase
-    .from('fahrer_documents')
-    .insert({
-      fahrer_id: fahrerId,
-      document_type: documentType,
-      file_name: file.name,
-      file_path: filePath,
-      file_size: file.size,
-      mime_type: file.type || 'application/octet-stream',
-      uploaded_by: currentUserId,
-      status: 'hochgeladen',
-      expires_at: expiresAt || null,
-      comment: comment || null
-    })
-    .select()
-    .single()
-
-  if (dbError) {
-    console.error('[uploadFahrerDocument] DB-Fehler:', dbError)
-    // Rollback: Upload löschen
-    await supabase.storage.from('fahrer-dokumente').remove([filePath])
-    return { success: false, error: `Datenbank-Fehler: ${dbError.message}` }
-  }
-
-  // 6. Audit-Log
-  await logAuditEvent({
-    action: 'fahrer_document_uploaded',
-    entityType: 'fahrer_document',
-    entityId: document.id,
-    entityLabel: `${getDocumentTypeLabel(documentType)} - ${file.name}`,
-    severity: 'info',
-    isFinancial: false,
-    metadata: {
-      fahrer_id: fahrerId,
-      document_type: documentType,
-      file_name: file.name,
-      file_size: file.size
+    // FahrerDocument Objekt zurückgeben
+    const now = new Date().toISOString()
+    return {
+      success: true,
+      document: {
+        id: result.document.id,
+        fahrer_id: fahrerId,
+        document_type: result.document.document_type as DocumentType,
+        file_name: result.document.file_name,
+        file_path: result.document.file_path,
+        file_size: file.size,
+        mime_type: file.type || 'application/octet-stream',
+        uploaded_at: now,
+        uploaded_by: sessionData.session.user.id,
+        status: 'hochgeladen',
+        created_at: now,
+        updated_at: now
+      }
     }
-  })
 
-  console.log('[uploadFahrerDocument] Dokument gespeichert:', document.id)
-  return { success: true, document }
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Netzwerkfehler'
+    console.error('[uploadFahrerDocument] Netzwerk-Fehler:', err)
+    return { success: false, error: `Netzwerkfehler. Bitte erneut versuchen. (${errorMessage})` }
+  }
 }
 
 /**
