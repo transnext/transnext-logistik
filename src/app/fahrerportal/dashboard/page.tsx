@@ -23,10 +23,16 @@ import {
   Play,
   MapPin,
   Zap,
-  Truck
+  Truck,
+  CalendarClock,
+  CalendarX,
+  FileX,
+  CircleAlert,
+  CheckCircle2
 } from "lucide-react"
 import { getCurrentUser, canAccessFahrerportal, getArbeitsnachweiseByUser, getAuslagennachweiseByUser } from "@/lib/api"
 import { getFahrerTouren, formatTourStatus, getTourStatusColor, formatFahrzeugart } from "@/lib/touren-api"
+import { calculateFahrerAlerts, getAlertColors, type FahrerAlert, type FahrerAlertsResult } from "@/lib/fahrerportal-alerts"
 import type { Tour, TourStatus } from "@/lib/supabase"
 
 interface StatusCounts {
@@ -45,6 +51,28 @@ interface StatusCounts {
   }
 }
 
+// Alert Icon Komponente
+function AlertIcon({ type, className }: { type: string; className?: string }) {
+  switch (type) {
+    case 'verfuegbarkeit_fehlt':
+      return <CalendarClock className={className} />
+    case 'verfuegbarkeit_deadline_ueberschritten':
+      return <CalendarX className={className} />
+    case 'tour_offen':
+      return <Car className={className} />
+    case 'protokoll_offen':
+      return <FileText className={className} />
+    case 'arbeitsnachweis_fehlt':
+      return <Upload className={className} />
+    case 'arbeitsnachweis_abgelehnt':
+      return <FileX className={className} />
+    case 'auslage_abgelehnt':
+      return <Receipt className={className} />
+    default:
+      return <CircleAlert className={className} />
+  }
+}
+
 export default function FahrerportalDashboard() {
   const router = useRouter()
   const [fahrerName, setFahrerName] = useState("")
@@ -53,6 +81,10 @@ export default function FahrerportalDashboard() {
   const [statusCounts, setStatusCounts] = useState<StatusCounts>({
     arbeitsnachweise: { total: 0, pending: 0, approved: 0, rejected: 0 },
     auslagen: { total: 0, pending: 0, approved: 0, rejected: 0, paid: 0 }
+  })
+  const [alerts, setAlerts] = useState<FahrerAlertsResult>({
+    alerts: [],
+    summary: { high: 0, medium: 0, total: 0 }
   })
 
   useEffect(() => {
@@ -81,10 +113,11 @@ export default function FahrerportalDashboard() {
         : 'Fahrer'
       setFahrerName(name)
 
-      // Lade offene Touren und Status-Counts parallel
+      // Lade offene Touren, Status-Counts und Alerts parallel
       await Promise.all([
         loadOffeneTouren(user.id),
-        loadStatusCounts(user.id)
+        loadStatusCounts(user.id),
+        loadAlerts(user.id)
       ])
       setIsLoading(false)
     } catch (error) {
@@ -140,6 +173,15 @@ export default function FahrerportalDashboard() {
       })
     } catch (error) {
       console.error("Fehler beim Laden der Status-Counts:", error)
+    }
+  }
+
+  const loadAlerts = async (userId: string) => {
+    try {
+      const result = await calculateFahrerAlerts(userId)
+      setAlerts(result)
+    } catch (error) {
+      console.error("Fehler beim Laden der Alerts:", error)
     }
   }
 
@@ -265,6 +307,69 @@ export default function FahrerportalDashboard() {
           <p className="text-sm text-gray-500 mt-0.5">{formatDate()}</p>
         </div>
 
+        {/* Offene Aufgaben / Alerts */}
+        {alerts.summary.total > 0 ? (
+          <Card className="mb-5 border-gray-200">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <CircleAlert className="h-5 w-5 text-gray-600" />
+                <CardTitle className="text-base font-semibold text-gray-900">
+                  Offene Aufgaben
+                </CardTitle>
+                {alerts.summary.high > 0 && (
+                  <Badge className="bg-red-100 text-red-700 border-red-200 text-xs">
+                    {alerts.summary.high} dringend
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {alerts.alerts.map((alert) => {
+                const colors = getAlertColors(alert.priority)
+                return (
+                  <div
+                    key={alert.id}
+                    className={`${colors.bg} ${colors.border} border rounded-lg p-3 flex items-start gap-3`}
+                  >
+                    <div className={`flex-shrink-0 mt-0.5 ${colors.icon}`}>
+                      <AlertIcon type={alert.type} className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-medium text-sm ${colors.text}`}>
+                        {alert.title}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        {alert.message}
+                      </p>
+                    </div>
+                    <Link href={alert.actionHref} className="flex-shrink-0">
+                      <Button
+                        size="sm"
+                        variant={alert.priority === 'high' ? 'default' : 'outline'}
+                        className={alert.priority === 'high' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+                      >
+                        {alert.actionLabel}
+                      </Button>
+                    </Link>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="mb-5 border-emerald-200 bg-emerald-50/50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-emerald-900">Alles erledigt!</p>
+                <p className="text-sm text-emerald-700">
+                  Aktuell sind keine offenen Aufgaben vorhanden.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Offene Touren - Wichtigste Aktion */}
         {offeneTouren.length > 0 && (
           <Card className="mb-5 border-primary-blue/20 bg-blue-50/30">
@@ -322,28 +427,6 @@ export default function FahrerportalDashboard() {
                   </div>
                 )
               })}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Hinweis bei abgelehnten Nachweisen */}
-        {hasRejected && (
-          <Card className="mb-4 border-red-200 bg-red-50/50">
-            <CardContent className="p-4 flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-red-900">Abgelehnte Nachweise</p>
-                <p className="text-sm text-red-700">
-                  {statusCounts.arbeitsnachweise.rejected > 0 && (
-                    <span>{statusCounts.arbeitsnachweise.rejected} Arbeitsnachweis(e) </span>
-                  )}
-                  {statusCounts.arbeitsnachweise.rejected > 0 && statusCounts.auslagen.rejected > 0 && "und "}
-                  {statusCounts.auslagen.rejected > 0 && (
-                    <span>{statusCounts.auslagen.rejected} Auslage(n) </span>
-                  )}
-                  wurden abgelehnt. Bitte prüfen.
-                </p>
-              </div>
             </CardContent>
           </Card>
         )}
