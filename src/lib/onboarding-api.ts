@@ -910,3 +910,286 @@ export async function submitAppointmentSelection(
     return { success: false, error: 'server_error' }
   }
 }
+
+// ============================================================
+// QUESTIONNAIRE TYPES (Phase 3b)
+// ============================================================
+
+export type QuestionnaireStatus = 'draft' | 'submitted' | 'reviewed' | 'rejected'
+export type QuestionnaireEmploymentType = 'minijob' | 'teilzeit' | 'vollzeit' | 'subcontractor' | 'unknown'
+
+export interface OnboardingQuestionnaire {
+  id: string
+  candidate_id: string
+  status: QuestionnaireStatus
+  // Persönliche Daten
+  birth_date: string | null
+  street: string | null
+  house_number: string | null
+  postal_code: string | null
+  city: string | null
+  country: string | null
+  phone_confirmed: string | null
+  email_confirmed: string | null
+  // Beschäftigungsdaten
+  employment_type: QuestionnaireEmploymentType
+  has_other_employment: boolean | null
+  other_employment_note: string | null
+  tax_id: string | null
+  social_security_number: string | null
+  health_insurance: string | null
+  // Bankdaten
+  iban: string | null
+  account_holder: string | null
+  // Führerscheindaten
+  has_license: boolean | null
+  license_classes: string | null
+  license_number: string | null
+  license_issued_at: string | null
+  license_authority: string | null
+  // Einwilligungen
+  privacy_accepted: boolean
+  data_accuracy_confirmed: boolean
+  onboarding_terms_accepted: boolean
+  // Timestamps
+  submitted_at: string | null
+  reviewed_at: string | null
+  reviewed_by: string | null
+  reviewed_by_name: string | null
+  review_note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface QuestionnaireFormData {
+  birth_date?: string | null
+  street?: string | null
+  house_number?: string | null
+  postal_code?: string | null
+  city?: string | null
+  country?: string | null
+  phone_confirmed?: string | null
+  email_confirmed?: string | null
+  employment_type?: QuestionnaireEmploymentType
+  has_other_employment?: boolean | null
+  other_employment_note?: string | null
+  tax_id?: string | null
+  social_security_number?: string | null
+  health_insurance?: string | null
+  iban?: string | null
+  account_holder?: string | null
+  has_license?: boolean | null
+  license_classes?: string | null
+  license_number?: string | null
+  license_issued_at?: string | null
+  license_authority?: string | null
+  privacy_accepted: boolean
+  data_accuracy_confirmed: boolean
+  onboarding_terms_accepted: boolean
+}
+
+export const QUESTIONNAIRE_STATUS_LABELS: Record<QuestionnaireStatus, string> = {
+  'draft': 'Entwurf',
+  'submitted': 'Eingereicht',
+  'reviewed': 'Geprüft',
+  'rejected': 'Zurückgewiesen'
+}
+
+export const EMPLOYMENT_TYPE_LABELS: Record<QuestionnaireEmploymentType, string> = {
+  'minijob': 'Minijob (520€)',
+  'teilzeit': 'Teilzeit',
+  'vollzeit': 'Vollzeit',
+  'subcontractor': 'Subunternehmer',
+  'unknown': 'Noch offen'
+}
+
+// ============================================================
+// QUESTIONNAIRE API FUNCTIONS (Phase 3b)
+// ============================================================
+
+/**
+ * Holt den Fragebogen für einen Kandidaten (Admin-Seite)
+ */
+export async function getQuestionnaireByCandidate(candidateId: string): Promise<OnboardingQuestionnaire | null> {
+  try {
+    const { data, error } = await supabase
+      .from('onboarding_questionnaires')
+      .select('*')
+      .eq('candidate_id', candidateId)
+      .single()
+
+    if (error) return null
+    return data as OnboardingQuestionnaire
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Holt Fragebogendaten via Token (für Bewerber)
+ */
+export async function getQuestionnaireByToken(token: string): Promise<{
+  success: boolean
+  error?: string
+  already_submitted?: boolean
+  submitted_at?: string
+  candidate?: {
+    id: string
+    first_name: string
+    last_name: string
+    email: string | null
+    phone: string | null
+    city: string | null
+  }
+  questionnaire?: Partial<QuestionnaireFormData>
+}> {
+  try {
+    const { data, error } = await supabase.rpc('get_questionnaire_by_token', { p_token: token })
+
+    if (error) {
+      console.error('[Onboarding] RPC error:', error)
+      return { success: false, error: 'server_error' }
+    }
+
+    return data as {
+      success: boolean
+      error?: string
+      already_submitted?: boolean
+      submitted_at?: string
+      candidate?: {
+        id: string
+        first_name: string
+        last_name: string
+        email: string | null
+        phone: string | null
+        city: string | null
+      }
+      questionnaire?: Partial<QuestionnaireFormData>
+    }
+  } catch (err) {
+    console.error('[Onboarding] Error:', err)
+    return { success: false, error: 'server_error' }
+  }
+}
+
+/**
+ * Reicht den Fragebogen ein (für Bewerber via Token)
+ */
+export async function submitQuestionnaire(
+  token: string,
+  data: QuestionnaireFormData
+): Promise<{
+  success: boolean
+  error?: string
+  questionnaire_id?: string
+}> {
+  try {
+    const { data: result, error } = await supabase.rpc('submit_questionnaire', {
+      p_token: token,
+      p_data: data
+    })
+
+    if (error) {
+      console.error('[Onboarding] RPC error:', error)
+      return { success: false, error: 'server_error' }
+    }
+
+    return result as {
+      success: boolean
+      error?: string
+      questionnaire_id?: string
+    }
+  } catch (err) {
+    console.error('[Onboarding] Error:', err)
+    return { success: false, error: 'server_error' }
+  }
+}
+
+/**
+ * Markiert einen Fragebogen als geprüft (Admin)
+ */
+export async function markQuestionnaireReviewed(
+  questionnaireId: string,
+  note?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Nicht authentifiziert' }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+
+    const { error } = await supabase
+      .from('onboarding_questionnaires')
+      .update({
+        status: 'reviewed',
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: user.id,
+        reviewed_by_name: profile?.full_name || null,
+        review_note: note || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', questionnaireId)
+
+    if (error) return { success: false, error: error.message }
+
+    await logAuditEvent({
+      action: 'questionnaire_reviewed',
+      entityType: 'onboarding_questionnaire',
+      entityId: questionnaireId,
+      severity: 'info'
+    })
+
+    return { success: true }
+  } catch {
+    return { success: false, error: 'Unerwarteter Fehler' }
+  }
+}
+
+/**
+ * Markiert einen Fragebogen als zurückgewiesen (Admin)
+ */
+export async function rejectQuestionnaire(
+  questionnaireId: string,
+  note: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Nicht authentifiziert' }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+
+    const { error } = await supabase
+      .from('onboarding_questionnaires')
+      .update({
+        status: 'rejected',
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: user.id,
+        reviewed_by_name: profile?.full_name || null,
+        review_note: note,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', questionnaireId)
+
+    if (error) return { success: false, error: error.message }
+
+    await logAuditEvent({
+      action: 'questionnaire_rejected',
+      entityType: 'onboarding_questionnaire',
+      entityId: questionnaireId,
+      severity: 'warning',
+      afterData: { note }
+    })
+
+    return { success: true }
+  } catch {
+    return { success: false, error: 'Unerwarteter Fehler' }
+  }
+}

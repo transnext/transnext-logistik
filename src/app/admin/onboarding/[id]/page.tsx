@@ -48,7 +48,13 @@ import {
   History,
   Link2,
   LinkIcon,
-  Trash2
+  Trash2,
+  CreditCard,
+  Car,
+  Building,
+  Shield,
+  Eye,
+  EyeOff
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -57,6 +63,8 @@ import {
   getCandidateNotes,
   getCandidateCommunications,
   getCandidatePublicLinks,
+  getQuestionnaireByCandidate,
+  markQuestionnaireReviewed,
   createCommunication,
   updateCommunicationStatus,
   updateOnboardingCandidate,
@@ -79,11 +87,14 @@ import {
   COMM_TYPE_LABELS,
   COMM_STATUS_LABELS,
   LINK_STATUS_LABELS,
+  QUESTIONNAIRE_STATUS_LABELS,
+  EMPLOYMENT_TYPE_LABELS,
   type OnboardingCandidate,
   type OnboardingDocument,
   type OnboardingNote,
   type OnboardingCommunication,
   type OnboardingPublicLink,
+  type OnboardingQuestionnaire,
   type OnboardingStatus,
   type OnboardingDocumentStatus,
   type OnboardingCommType,
@@ -143,6 +154,7 @@ export default function CandidateDetailPage() {
   const [notes, setNotes] = useState<OnboardingNote[]>([])
   const [communications, setCommunications] = useState<OnboardingCommunication[]>([])
   const [publicLinks, setPublicLinks] = useState<OnboardingPublicLink[]>([])
+  const [questionnaire, setQuestionnaire] = useState<OnboardingQuestionnaire | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState("")
@@ -151,6 +163,10 @@ export default function CandidateDetailPage() {
   const [isCreatingLink, setIsCreatingLink] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const [generatedLinkUrl, setGeneratedLinkUrl] = useState<string | null>(null)
+
+  // Questionnaire State
+  const [isReviewingQuestionnaire, setIsReviewingQuestionnaire] = useState(false)
+  const [showSensitiveData, setShowSensitiveData] = useState(false)
 
   // Kommunikation Modal State
   const [showCommModal, setShowCommModal] = useState(false)
@@ -207,12 +223,13 @@ export default function CandidateDetailPage() {
   const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const [candidateData, docsData, notesData, commsData, linksData] = await Promise.all([
+      const [candidateData, docsData, notesData, commsData, linksData, questionnaireData] = await Promise.all([
         getOnboardingCandidate(id),
         getCandidateDocuments(id),
         getCandidateNotes(id),
         getCandidateCommunications(id),
-        getCandidatePublicLinks(id)
+        getCandidatePublicLinks(id),
+        getQuestionnaireByCandidate(id)
       ])
       if (!candidateData) {
         router.push('/admin/onboarding')
@@ -224,6 +241,7 @@ export default function CandidateDetailPage() {
       setNotes(notesData)
       setCommunications(commsData)
       setPublicLinks(linksData)
+      setQuestionnaire(questionnaireData)
     } catch (err) {
       console.error('Fehler beim Laden:', err)
       setError('Fehler beim Laden der Daten')
@@ -453,6 +471,18 @@ export default function CandidateDetailPage() {
 
     setShowCommModal(false)
     await loadData()
+  }
+
+  const handleQuestionnaireReviewed = async () => {
+    if (!questionnaire) return
+    setIsReviewingQuestionnaire(true)
+    const result = await markQuestionnaireReviewed(questionnaire.id)
+    setIsReviewingQuestionnaire(false)
+    if (!result.success) {
+      setError(result.error || "Fehler beim Markieren als geprüft")
+    } else {
+      await loadData()
+    }
   }
 
   const formatDate = (dateStr: string | null): string => {
@@ -887,6 +917,181 @@ export default function CandidateDetailPage() {
                         </div>
                       )
                     })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Personalfragebogen */}
+            <Card className="border-gray-100">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-gray-400" />
+                  Personalfragebogen
+                </CardTitle>
+                <CardDescription>
+                  {questionnaire
+                    ? (
+                      <span className="flex items-center gap-2">
+                        Status:{" "}
+                        <Badge className={cn({
+                          "bg-emerald-100 text-emerald-700": questionnaire.status === "reviewed",
+                          "bg-blue-100 text-blue-700": questionnaire.status === "submitted",
+                          "bg-gray-100 text-gray-600": questionnaire.status === "draft"
+                        })}>
+                          {QUESTIONNAIRE_STATUS_LABELS[questionnaire.status]}
+                        </Badge>
+                      </span>
+                    )
+                    : "Noch kein Fragebogen ausgefüllt"
+                  }
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!questionnaire && (
+                  <div className="text-sm text-gray-500 text-center py-4">
+                    Der Bewerber hat den Personalfragebogen noch nicht ausgefüllt.
+                  </div>
+                )}
+                {questionnaire && (
+                  <div className="space-y-4">
+                    {/* Meta-Daten */}
+                    <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg text-sm">
+                      <div>
+                        <span className="text-gray-500">Eingereicht:</span>{" "}
+                        <span className="text-gray-800">{questionnaire.submitted_at ? formatDateTime(questionnaire.submitted_at) : "-"}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Geprüft:</span>{" "}
+                        <span className="text-gray-800">{questionnaire.reviewed_at ? formatDateTime(questionnaire.reviewed_at) : "-"}</span>
+                      </div>
+                    </div>
+
+                    {/* Toggle für sensible Daten */}
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowSensitiveData(v => !v)}
+                        className="text-xs"
+                      >
+                        {showSensitiveData ? <EyeOff className="h-3 w-3 mr-1" /> : <Eye className="h-3 w-3 mr-1" />}
+                        {showSensitiveData ? "Sensible Daten ausblenden" : "Sensible Daten anzeigen"}
+                      </Button>
+                    </div>
+
+                    {/* Persönliche Daten */}
+                    <div className="border-t pt-3">
+                      <h4 className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                        <User className="h-3 w-3" /> Persönliche Daten
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div><span className="text-gray-500">Geburtsdatum:</span> <span className="text-gray-800">{questionnaire.birth_date ? formatDate(questionnaire.birth_date) : "-"}</span></div>
+                        <div><span className="text-gray-500">E-Mail:</span> <span className="text-gray-800">{questionnaire.email_confirmed || "-"}</span></div>
+                        <div><span className="text-gray-500">Telefon:</span> <span className="text-gray-800">{questionnaire.phone_confirmed || "-"}</span></div>
+                        <div className="col-span-2">
+                          <span className="text-gray-500">Adresse:</span>{" "}
+                          <span className="text-gray-800">
+                            {questionnaire.street && questionnaire.house_number
+                              ? `${questionnaire.street} ${questionnaire.house_number}, ${questionnaire.postal_code || ""} ${questionnaire.city || ""}`
+                              : "-"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Beschäftigungsdaten */}
+                    <div className="border-t pt-3">
+                      <h4 className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                        <Building className="h-3 w-3" /> Beschäftigung
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div><span className="text-gray-500">Beschäftigungsart:</span> <span className="text-gray-800">{EMPLOYMENT_TYPE_LABELS[questionnaire.employment_type]}</span></div>
+                        <div><span className="text-gray-500">Weitere Beschäftigung:</span> <span className="text-gray-800">{questionnaire.has_other_employment === true ? "Ja" : questionnaire.has_other_employment === false ? "Nein" : "-"}</span></div>
+                        {questionnaire.other_employment_note && (
+                          <div className="col-span-2"><span className="text-gray-500">Details:</span> <span className="text-gray-800">{questionnaire.other_employment_note}</span></div>
+                        )}
+                        <div><span className="text-gray-500">Krankenkasse:</span> <span className="text-gray-800">{questionnaire.health_insurance || "-"}</span></div>
+                      </div>
+                    </div>
+
+                    {/* Sensible Daten */}
+                    {showSensitiveData && (
+                      <div className="border-t pt-3 bg-amber-50 -mx-6 px-6 py-3">
+                        <h4 className="text-xs font-medium text-amber-700 mb-2 flex items-center gap-1">
+                          <Shield className="h-3 w-3" /> Sensible Daten (nur für Admin/GF)
+                        </h4>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div><span className="text-gray-500">Steuer-ID:</span> <span className="text-gray-800 font-mono">{questionnaire.tax_id || "-"}</span></div>
+                          <div><span className="text-gray-500">SV-Nummer:</span> <span className="text-gray-800 font-mono">{questionnaire.social_security_number || "-"}</span></div>
+                          <div><span className="text-gray-500">IBAN:</span> <span className="text-gray-800 font-mono">{questionnaire.iban || "-"}</span></div>
+                          <div><span className="text-gray-500">Kontoinhaber:</span> <span className="text-gray-800">{questionnaire.account_holder || "-"}</span></div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Führerscheindaten */}
+                    <div className="border-t pt-3">
+                      <h4 className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                        <Car className="h-3 w-3" /> Führerschein
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div><span className="text-gray-500">Führerschein:</span> <span className="text-gray-800">{questionnaire.has_license === true ? "Ja" : questionnaire.has_license === false ? "Nein" : "-"}</span></div>
+                        <div><span className="text-gray-500">Klassen:</span> <span className="text-gray-800">{questionnaire.license_classes || "-"}</span></div>
+                        {showSensitiveData && questionnaire.license_number && (
+                          <div><span className="text-gray-500">Nummer:</span> <span className="text-gray-800 font-mono">{questionnaire.license_number}</span></div>
+                        )}
+                        {questionnaire.license_issued_at && (
+                          <div><span className="text-gray-500">Ausgestellt:</span> <span className="text-gray-800">{formatDate(questionnaire.license_issued_at)}</span></div>
+                        )}
+                        {questionnaire.license_authority && (
+                          <div><span className="text-gray-500">Behörde:</span> <span className="text-gray-800">{questionnaire.license_authority}</span></div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Einwilligungen */}
+                    <div className="border-t pt-3">
+                      <h4 className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                        <Shield className="h-3 w-3" /> Einwilligungen
+                      </h4>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <Badge className={cn("text-xs", questionnaire.privacy_accepted ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
+                          {questionnaire.privacy_accepted ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                          Datenschutz
+                        </Badge>
+                        <Badge className={cn("text-xs", questionnaire.data_accuracy_confirmed ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
+                          {questionnaire.data_accuracy_confirmed ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                          Richtigkeit
+                        </Badge>
+                        <Badge className={cn("text-xs", questionnaire.onboarding_terms_accepted ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
+                          {questionnaire.onboarding_terms_accepted ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                          Onboarding
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Aktionen */}
+                    <div className="flex gap-2 pt-4 border-t">
+                      {questionnaire.status === "submitted" && (
+                        <Button
+                          size="sm"
+                          onClick={handleQuestionnaireReviewed}
+                          disabled={isReviewingQuestionnaire}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          {isReviewingQuestionnaire ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                          Als geprüft markieren
+                        </Button>
+                      )}
+                      {questionnaire.status === "reviewed" && (
+                        <div className="flex items-center gap-2 text-sm text-emerald-700">
+                          <CheckCircle className="h-4 w-4" />
+                          <span>Geprüft am {formatDateTime(questionnaire.reviewed_at)}</span>
+                          {questionnaire.reviewed_by_name && <span className="text-gray-500">von {questionnaire.reviewed_by_name}</span>}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardContent>
