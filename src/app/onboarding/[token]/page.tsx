@@ -816,7 +816,7 @@ export default function PublicOnboardingPage() {
           <h1 className="text-2xl font-bold text-slate-800 mb-2">
             TransNext Logistik
           </h1>
-          <p className="text-slate-600">Terminwahl für Ihr Bewerbungsgespräch</p>
+          <p className="text-slate-600">Onboarding-Bereich für Ihre Bewerbung</p>
         </div>
 
         {/* Welcome */}
@@ -832,7 +832,7 @@ export default function PublicOnboardingPage() {
                     Hallo {candidate.first_name} {candidate.last_name}!
                   </CardTitle>
                   <CardDescription>
-                    Bitte wählen Sie Ihren bevorzugten Gesprächstermin.
+                    Wählen Sie zunächst Ihren Gesprächstermin. Danach können Sie den Personalfragebogen ausfüllen.
                   </CardDescription>
                 </div>
               </div>

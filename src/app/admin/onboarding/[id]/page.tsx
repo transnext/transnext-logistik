@@ -1184,12 +1184,15 @@ export default function CandidateDetailPage() {
                   </Button>
                 </div>
 
-                {/* Bewerberlink Bereich */}
+                {/* Onboarding-Link Bereich */}
                 <div className="border-t pt-4 mb-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     <Link2 className="h-4 w-4" />
-                    Bewerberlink (Terminwahl)
+                    Onboarding-Link für Bewerber
                   </h4>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Über diesen Link kann der Bewerber einen Termin auswählen und den Personalfragebogen ausfüllen.
+                  </p>
 
                   {/* Aktiver Link anzeigen */}
                   {(() => {
@@ -1198,7 +1201,7 @@ export default function CandidateDetailPage() {
                       return (
                         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg mb-3">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-emerald-800">Aktiver Link</span>
+                            <span className="text-sm font-medium text-emerald-800">Aktiver Onboarding-Link</span>
                             <Badge className="bg-emerald-100 text-emerald-700 text-xs">
                               Gültig bis {formatDateTime(activeLink.expires_at)}
                             </Badge>
@@ -1214,6 +1217,7 @@ export default function CandidateDetailPage() {
                               variant="outline"
                               onClick={() => handleCopyPublicLink(activeLink.token)}
                               className={cn(linkCopied && "bg-emerald-50 text-emerald-700")}
+                              title="Link kopieren"
                             >
                               {linkCopied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                             </Button>
@@ -1222,6 +1226,7 @@ export default function CandidateDetailPage() {
                               variant="outline"
                               onClick={() => handleRevokePublicLink(activeLink.id)}
                               className="text-red-600 hover:text-red-700"
+                              title="Link deaktivieren"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1274,7 +1279,7 @@ export default function CandidateDetailPage() {
                       ) : (
                         <>
                           <LinkIcon className="h-4 w-4 mr-2" />
-                          Bewerberlink erstellen (7 Tage gültig)
+                          Onboarding-Link erstellen (7 Tage gültig)
                         </>
                       )}
                     </Button>
@@ -1283,7 +1288,7 @@ export default function CandidateDetailPage() {
                   {!candidate?.termin_slot_1 && (
                     <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
                       <AlertTriangle className="h-3 w-3" />
-                      Bitte zuerst Terminvorschläge eintragen und speichern.
+                      Bitte zuerst mindestens einen Terminvorschlag eintragen und speichern.
                     </p>
                   )}
 

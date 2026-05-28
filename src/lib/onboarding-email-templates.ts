@@ -109,22 +109,24 @@ TransNext Logistik GmbH`,
 
   personalfragebogen: {
     id: 'personalfragebogen',
-    name: 'Personalfragebogen senden',
-    subject: 'Personalfragebogen - TransNext Logistik',
+    name: 'Personalfragebogen-Link senden',
+    subject: 'Bitte Personalfragebogen ausfüllen - TransNext Logistik',
     body: `Guten Tag {{vorname}} {{nachname}},
 
 vielen Dank für das gute Gespräch!
 
-Für die weitere Bearbeitung benötigen wir noch einige Unterlagen von Ihnen:
+Für die weitere Bearbeitung benötigen wir noch einige Angaben von Ihnen.
 
-📋 Personalfragebogen (siehe Anhang)
+Bitte öffnen Sie folgenden Link und füllen Sie den digitalen Personalfragebogen vollständig aus:
 
-Bitte füllen Sie den Fragebogen vollständig aus und senden Sie ihn zusammen mit folgenden Dokumenten zurück:
+{{bewerber_link}}
 
-• Kopie Ihres Führerscheins (Vorder- und Rückseite)
-• Kopie Ihres Personalausweises (Vorder- und Rückseite)
+Was Sie dort erledigen können:
+• Ihren Gesprächstermin bestätigen (falls noch nicht erledigt)
+• Den Personalfragebogen mit Ihren persönlichen Daten ausfüllen
+• Alle Angaben prüfen und absenden
 
-Sie können die Dokumente als Scan oder gut lesbares Foto per E-Mail senden.
+Bitte füllen Sie den Fragebogen zeitnah aus, damit wir Ihre Bewerbung weiter bearbeiten können.
 
 Bei Fragen stehen wir Ihnen gerne zur Verfügung.
 
