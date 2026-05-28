@@ -25,7 +25,10 @@ import {
   Car,
   Shield,
   Building,
-  Info
+  Info,
+  Upload,
+  XCircle,
+  File
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -33,8 +36,16 @@ import {
   submitAppointmentSelection,
   getQuestionnaireByToken,
   submitQuestionnaire,
+  getApplicantDocumentsByToken,
+  getUploadDocumentTypesForCandidateType,
+  getApplicantDocumentDisplayStatus,
+  APPLICANT_DOCUMENT_STATUS_LABELS,
+  DOCUMENT_TYPE_LABELS,
   type QuestionnaireFormData,
   type QuestionnaireEmploymentType,
+  type CandidateType,
+  type ApplicantDocument,
+  type OnboardingDocumentType,
   EMPLOYMENT_TYPE_LABELS
 } from "@/lib/onboarding-api"
 import { formatTerminSlot } from "@/lib/onboarding-email-templates"
@@ -112,6 +123,13 @@ export default function PublicOnboardingPage() {
     onboarding_terms_accepted: false
   })
 
+  // Dokument-Upload State (Phase 3c)
+  const [documents, setDocuments] = useState<ApplicantDocument[]>([])
+  const [candidateType, setCandidateType] = useState<CandidateType>('unknown')
+  const [uploadingDocType, setUploadingDocType] = useState<OnboardingDocumentType | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
+
   // Load candidate data
   useEffect(() => {
     const loadData = async () => {
@@ -165,6 +183,13 @@ export default function PublicOnboardingPage() {
             city: qResult.candidate?.city || prev.city
           }))
         }
+      }
+
+      // Lade Dokumente (Phase 3c)
+      const docsResult = await getApplicantDocumentsByToken(token)
+      if (docsResult.success) {
+        setDocuments(docsResult.documents || [])
+        setCandidateType(docsResult.candidate_type || 'unknown')
       }
 
       setIsLoading(false)
@@ -221,6 +246,62 @@ export default function PublicOnboardingPage() {
     setQuestionnaireSubmitted(true)
     setQuestionnaireSubmittedAt(new Date().toISOString())
     setIsSubmittingQuestionnaire(false)
+  }
+
+  // Dokument-Upload Handler (Phase 3c)
+  const handleDocumentUpload = async (docType: OnboardingDocumentType, file: File) => {
+    setUploadingDocType(docType)
+    setUploadError(null)
+    setUploadSuccess(null)
+
+    // Client-seitige Validierung
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif']
+    if (!allowedTypes.includes(file.type.toLowerCase())) {
+      setUploadError('Ungültiger Dateityp. Erlaubt: PDF, JPG, PNG, HEIC.')
+      setUploadingDocType(null)
+      return
+    }
+
+    const maxSize = 50 * 1024 * 1024 // 50 MB
+    if (file.size > maxSize) {
+      setUploadError('Die Datei ist zu groß. Maximale Größe: 50 MB.')
+      setUploadingDocType(null)
+      return
+    }
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('document_type', docType)
+
+      const response = await fetch(`/api/onboarding/${token}/documents/upload`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        setUploadError(result.message || 'Upload fehlgeschlagen.')
+        setUploadingDocType(null)
+        return
+      }
+
+      // Erfolg - Dokumente neu laden
+      setUploadSuccess(`${DOCUMENT_TYPE_LABELS[docType]} erfolgreich hochgeladen.`)
+      const docsResult = await getApplicantDocumentsByToken(token)
+      if (docsResult.success) {
+        setDocuments(docsResult.documents || [])
+      }
+
+      // Erfolgsmeldung nach 3 Sekunden ausblenden
+      setTimeout(() => setUploadSuccess(null), 3000)
+    } catch (err) {
+      console.error('Upload error:', err)
+      setUploadError('Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
+    } finally {
+      setUploadingDocType(null)
+    }
   }
 
   const getErrorMessage = (code: string): string => {
@@ -366,7 +447,7 @@ export default function PublicOnboardingPage() {
       )
     }
 
-    // Termin gewählt, aber Fragebogen noch offen - zeige Fragebogen-Formular
+    // Termin gewählt, aber Fragebogen noch offen - zeige Fragebogen-Formular und Dokument-Upload
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
         <div className="max-w-2xl mx-auto space-y-6">
@@ -393,6 +474,9 @@ export default function PublicOnboardingPage() {
 
           {/* Fragebogen */}
           {renderQuestionnaireForm()}
+
+          {/* Dokument-Upload (Phase 3c) */}
+          {renderDocumentsSection()}
         </div>
       </div>
     )
@@ -804,6 +888,158 @@ export default function PublicOnboardingPage() {
           <p className="text-xs text-slate-400">Ihr Partner für Fahrzeugüberführungen</p>
         </div>
       </>
+    )
+  }
+
+  // Dokument-Upload Sektion (Phase 3c)
+  function renderDocumentsSection() {
+    const uploadableTypes = getUploadDocumentTypesForCandidateType(candidateType)
+
+    return (
+      <Card className="border-0 shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Upload className="h-5 w-5 text-slate-400" />
+            Dokumente hochladen
+          </CardTitle>
+          <CardDescription>
+            Bitte laden Sie die erforderlichen Dokumente hoch.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Hinweis */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex items-start gap-2">
+            <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium mb-1">Erlaubte Dateitypen:</p>
+              <p>PDF, JPG, PNG, HEIC - Maximal 50 MB pro Datei</p>
+            </div>
+          </div>
+
+          {/* Erfolgsmeldung */}
+          {uploadSuccess && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 flex-shrink-0" />
+              <span>{uploadSuccess}</span>
+            </div>
+          )}
+
+          {/* Fehlermeldung */}
+          {uploadError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span>{uploadError}</span>
+            </div>
+          )}
+
+          {/* Dokument-Liste */}
+          <div className="space-y-3">
+            {uploadableTypes.map(docType => {
+              const existingDoc = documents.find(d => d.document_type === docType)
+              const displayStatus = existingDoc ? getApplicantDocumentDisplayStatus(existingDoc.status) : 'offen'
+              const isUploading = uploadingDocType === docType
+
+              return (
+                <div
+                  key={docType}
+                  className={cn(
+                    "p-4 rounded-lg border transition-all",
+                    displayStatus === 'hochgeladen' && "bg-emerald-50 border-emerald-200",
+                    displayStatus === 'abgelehnt' && "bg-red-50 border-red-200",
+                    displayStatus === 'offen' && "bg-gray-50 border-gray-200"
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <File className={cn(
+                        "h-5 w-5",
+                        displayStatus === 'hochgeladen' && "text-emerald-600",
+                        displayStatus === 'abgelehnt' && "text-red-600",
+                        displayStatus === 'offen' && "text-gray-400"
+                      )} />
+                      <div>
+                        <p className="font-medium text-slate-800">{DOCUMENT_TYPE_LABELS[docType]}</p>
+                        {existingDoc?.file_name && displayStatus === 'hochgeladen' && (
+                          <p className="text-xs text-emerald-600 flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" />
+                            {existingDoc.file_name}
+                          </p>
+                        )}
+                        {existingDoc?.rejection_reason && displayStatus === 'abgelehnt' && (
+                          <p className="text-xs text-red-600 flex items-center gap-1">
+                            <XCircle className="h-3 w-3" />
+                            {existingDoc.rejection_reason}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Status Badge */}
+                      <span className={cn(
+                        "text-xs px-2 py-1 rounded-full",
+                        displayStatus === 'hochgeladen' && "bg-emerald-100 text-emerald-700",
+                        displayStatus === 'abgelehnt' && "bg-red-100 text-red-700",
+                        displayStatus === 'offen' && "bg-gray-100 text-gray-600"
+                      )}>
+                        {APPLICANT_DOCUMENT_STATUS_LABELS[displayStatus]}
+                      </span>
+
+                      {/* Upload Button */}
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept=".pdf,.jpg,.jpeg,.png,.heic,.heif"
+                          disabled={isUploading}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              handleDocumentUpload(docType, file)
+                            }
+                            // Reset input
+                            e.target.value = ''
+                          }}
+                        />
+                        <span className={cn(
+                          "inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                          isUploading
+                            ? "bg-gray-100 text-gray-400 cursor-wait"
+                            : displayStatus === 'offen' || displayStatus === 'abgelehnt'
+                              ? "bg-slate-700 text-white hover:bg-slate-800"
+                              : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                        )}>
+                          {isUploading ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                              Wird hochgeladen...
+                            </>
+                          ) : displayStatus === 'hochgeladen' ? (
+                            <>
+                              <Upload className="h-4 w-4" />
+                              Ersetzen
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-4 w-4" />
+                              Hochladen
+                            </>
+                          )}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Hinweis Sonstiges */}
+          <p className="text-xs text-slate-500">
+            Falls Sie weitere Dokumente haben, nutzen Sie bitte die Kategorie „Sonstiges".
+          </p>
+        </CardContent>
+      </Card>
     )
   }
 

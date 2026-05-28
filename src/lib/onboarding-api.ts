@@ -84,6 +84,11 @@ export interface OnboardingDocument {
   file_name: string | null
   file_size: number | null
   comment: string | null
+  // Phase 3c: Bewerber-Upload
+  uploaded_by_applicant?: boolean
+  uploaded_at?: string | null
+  rejection_reason?: string | null
+  // Timestamps
   created_at: string
   updated_at: string
 }
@@ -1186,6 +1191,141 @@ export async function rejectQuestionnaire(
       entityId: questionnaireId,
       severity: 'warning',
       afterData: { note }
+    })
+
+    return { success: true }
+  } catch {
+    return { success: false, error: 'Unerwarteter Fehler' }
+  }
+}
+
+// ============================================================
+// DOCUMENT UPLOAD API (Phase 3c)
+// ============================================================
+
+/**
+ * Erlaubte Dokumenttypen für Minijobber (Bewerber-Upload)
+ */
+export const MINIJOBBER_UPLOAD_DOCUMENT_TYPES: OnboardingDocumentType[] = [
+  'fuehrerschein', 'ausweis', 'vertrag', 'schulungsnachweis', 'sonstiges'
+]
+
+/**
+ * Erlaubte Dokumenttypen für Subunternehmer (Bewerber-Upload)
+ */
+export const SUBCONTRACTOR_UPLOAD_DOCUMENT_TYPES: OnboardingDocumentType[] = [
+  'gewerbeanmeldung', 'versicherungsnachweis', 'ausweis_gf', 'subunternehmervertrag', 'fahrerliste', 'sonstiges'
+]
+
+/**
+ * Alle erlaubten Dokumenttypen für Bewerber-Upload
+ */
+export const ALL_UPLOAD_DOCUMENT_TYPES: OnboardingDocumentType[] = [
+  'fuehrerschein', 'ausweis', 'vertrag', 'schulungsnachweis',
+  'gewerbeanmeldung', 'versicherungsnachweis', 'ausweis_gf', 'subunternehmervertrag', 'fahrerliste',
+  'sonstiges'
+]
+
+export interface ApplicantDocument {
+  id: string
+  document_type: OnboardingDocumentType
+  status: OnboardingDocumentStatus
+  file_name: string | null
+  uploaded_at: string | null
+  uploaded_by_applicant: boolean
+  rejection_reason: string | null
+}
+
+/**
+ * Holt Dokumente für einen Bewerber via Token
+ */
+export async function getApplicantDocumentsByToken(token: string): Promise<{
+  success: boolean
+  error?: string
+  candidate_type?: CandidateType
+  documents?: ApplicantDocument[]
+}> {
+  try {
+    const { data, error } = await supabase.rpc('get_applicant_documents_by_token', { p_token: token })
+
+    if (error) {
+      console.error('[Onboarding] RPC error:', error)
+      return { success: false, error: 'server_error' }
+    }
+
+    return data as {
+      success: boolean
+      error?: string
+      candidate_type?: CandidateType
+      documents?: ApplicantDocument[]
+    }
+  } catch (err) {
+    console.error('[Onboarding] Error:', err)
+    return { success: false, error: 'server_error' }
+  }
+}
+
+/**
+ * Gibt die erlaubten Dokumenttypen für einen Kandidatentyp zurück
+ */
+export function getUploadDocumentTypesForCandidateType(type: CandidateType): OnboardingDocumentType[] {
+  if (type === 'minijobber') return MINIJOBBER_UPLOAD_DOCUMENT_TYPES
+  if (type === 'subcontractor') return SUBCONTRACTOR_UPLOAD_DOCUMENT_TYPES
+  // Für "unknown": Allgemeine Basisdokumente anbieten
+  return ['fuehrerschein', 'ausweis', 'sonstiges']
+}
+
+/**
+ * Dokument-Status für Bewerber-Ansicht
+ */
+export type ApplicantDocumentDisplayStatus = 'offen' | 'hochgeladen' | 'abgelehnt'
+
+/**
+ * Mappt den internen Status auf den Bewerber-Anzeigestatus
+ */
+export function getApplicantDocumentDisplayStatus(status: OnboardingDocumentStatus): ApplicantDocumentDisplayStatus {
+  switch (status) {
+    case 'erhalten':
+    case 'geprueft':
+      return 'hochgeladen'
+    case 'abgelehnt':
+      return 'abgelehnt'
+    default:
+      return 'offen'
+  }
+}
+
+export const APPLICANT_DOCUMENT_STATUS_LABELS: Record<ApplicantDocumentDisplayStatus, string> = {
+  'offen': 'Noch hochzuladen',
+  'hochgeladen': 'Hochgeladen',
+  'abgelehnt': 'Bitte erneut hochladen'
+}
+
+/**
+ * Aktualisiert den Ablehnungsgrund für ein Dokument (Admin)
+ */
+export async function setDocumentRejectionReason(
+  documentId: string,
+  reason: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from('onboarding_documents')
+      .update({
+        status: 'abgelehnt',
+        rejection_reason: reason,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', documentId)
+
+    if (error) return { success: false, error: error.message }
+
+    await logAuditEvent({
+      action: 'onboarding_document_rejected',
+      entityType: 'onboarding_document',
+      entityId: documentId,
+      severity: 'warning',
+      afterData: { reason }
     })
 
     return { success: true }

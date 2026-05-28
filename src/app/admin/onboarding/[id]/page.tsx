@@ -78,6 +78,7 @@ import {
   createPublicLink,
   revokePublicLink,
   generatePublicLinkUrl,
+  setDocumentRejectionReason,
   STATUS_LABELS,
   SOURCE_LABELS,
   TYPE_LABELS,
@@ -191,6 +192,12 @@ export default function CandidateDetailPage() {
   // Status change modal
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [newStatus, setNewStatus] = useState<OnboardingStatus | null>(null)
+
+  // Document rejection modal (Phase 3c)
+  const [showRejectDocModal, setShowRejectDocModal] = useState(false)
+  const [rejectingDocId, setRejectingDocId] = useState<string | null>(null)
+  const [rejectionReason, setRejectionReason] = useState("")
+  const [isRejectingDoc, setIsRejectingDoc] = useState(false)
 
   // Auth check
   useEffect(() => {
@@ -329,6 +336,26 @@ export default function CandidateDetailPage() {
       window.open(result.url, '_blank')
     } else {
       alert(result.error || 'Fehler beim Download')
+    }
+  }
+
+  // Dokument ablehnen (Phase 3c)
+  const handleOpenRejectDoc = (docId: string) => {
+    setRejectingDocId(docId)
+    setRejectionReason("")
+    setShowRejectDocModal(true)
+  }
+
+  const handleRejectDocument = async () => {
+    if (!rejectingDocId || !rejectionReason.trim()) return
+    setIsRejectingDoc(true)
+    const result = await setDocumentRejectionReason(rejectingDocId, rejectionReason.trim())
+    setIsRejectingDoc(false)
+    if (result.success) {
+      setShowRejectDocModal(false)
+      await loadData()
+    } else {
+      alert(result.error || 'Fehler beim Ablehnen')
     }
   }
 
@@ -852,14 +879,35 @@ export default function CandidateDetailPage() {
                   <div className="space-y-3">
                     {documents.map(doc => {
                       const docStatusConf = DOC_STATUS_CONFIG[doc.status]
+                      const docWithMeta = doc as OnboardingDocument & { uploaded_by_applicant?: boolean; uploaded_at?: string; rejection_reason?: string }
                       return (
-                        <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50/50">
+                        <div key={doc.id} className={cn(
+                          "flex items-center justify-between p-3 border rounded-lg",
+                          docWithMeta.uploaded_by_applicant ? "bg-blue-50/50 border-blue-200" : "bg-gray-50/50"
+                        )}>
                           <div className="flex items-center gap-3">
-                            <FileText className="h-5 w-5 text-gray-400" />
+                            <FileText className={cn("h-5 w-5", docWithMeta.uploaded_by_applicant ? "text-blue-500" : "text-gray-400")} />
                             <div>
-                              <p className="text-sm font-medium">{DOCUMENT_TYPE_LABELS[doc.document_type]}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium">{DOCUMENT_TYPE_LABELS[doc.document_type]}</p>
+                                {docWithMeta.uploaded_by_applicant && (
+                                  <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                                    Bewerber-Upload
+                                  </Badge>
+                                )}
+                              </div>
                               {doc.file_name && (
                                 <p className="text-xs text-gray-500">{doc.file_name}</p>
+                              )}
+                              {docWithMeta.uploaded_at && (
+                                <p className="text-xs text-gray-400">
+                                  Hochgeladen: {formatDateTime(docWithMeta.uploaded_at)}
+                                </p>
+                              )}
+                              {doc.status === 'abgelehnt' && docWithMeta.rejection_reason && (
+                                <p className="text-xs text-red-600 mt-1">
+                                  Grund: {docWithMeta.rejection_reason}
+                                </p>
                               )}
                             </div>
                           </div>
@@ -880,6 +928,19 @@ export default function CandidateDetailPage() {
                                 <SelectItem value="nicht_erforderlich">Nicht erforderlich</SelectItem>
                               </SelectContent>
                             </Select>
+
+                            {/* Ablehnen-Button mit Grund (Phase 3c) */}
+                            {doc.file_path && doc.status !== 'abgelehnt' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => handleOpenRejectDoc(doc.id)}
+                                title="Dokument ablehnen"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            )}
 
                             {doc.file_path ? (
                               <Button size="sm" variant="outline" onClick={() => handleDocDownload(doc.id)}>
@@ -1565,6 +1626,48 @@ export default function CandidateDetailPage() {
               <Button onClick={handleMarkAsSent} className="bg-primary-blue hover:bg-blue-700">
                 <Send className="h-4 w-4 mr-2" />
                 Als gesendet markieren
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dokument Ablehnen Modal (Phase 3c) */}
+        <Dialog open={showRejectDocModal} onOpenChange={setShowRejectDocModal}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <XCircle className="h-5 w-5 text-red-500" />
+                Dokument ablehnen
+              </DialogTitle>
+              <DialogDescription>
+                Der Bewerber sieht diesen Grund und kann das Dokument erneut hochladen.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="rejectionReason">Ablehnungsgrund *</Label>
+                <Textarea
+                  id="rejectionReason"
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="z.B. Dokument nicht lesbar, falsches Dokument..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRejectDocModal(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                onClick={handleRejectDocument}
+                disabled={!rejectionReason.trim() || isRejectingDoc}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isRejectingDoc ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
+                Ablehnen
               </Button>
             </DialogFooter>
           </DialogContent>
