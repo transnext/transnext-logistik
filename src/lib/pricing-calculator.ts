@@ -77,12 +77,20 @@ function wartezeitStringToUnits(wartezeit: string | null | undefined): number {
 /**
  * Berechnet den Preis aus km_ranges
  *
- * Die Schwellen markieren den BEGINN einer Stufe:
- * - max_km: 50 bedeutet "ab 50 km gilt dieser Preis"
- * - Bei exakt 50 km gilt die 50er-Stufe
- * - Bei 49,99 km gilt die vorherige Stufe (30er)
+ * Die Schwellen markieren die OBERGRENZE einer Stufe:
+ * - max_km: 10 bedeutet "für 0-10 km gilt dieser Preis"
+ * - max_km: 20 bedeutet "für 11-20 km gilt dieser Preis"
+ * - max_km: 30 bedeutet "für 21-30 km gilt dieser Preis"
  *
- * Logik: Finde die höchste Schwelle, die <= km ist
+ * Logik: Finde die erste Range, in die km passt (km <= max_km)
+ *
+ * Beispiele:
+ * - 9 km → Range max_km=10 → erster Preis
+ * - 10 km → Range max_km=10 → erster Preis
+ * - 11 km → Range max_km=20 → zweiter Preis
+ * - 28 km → Range max_km=30 → dritter Preis
+ * - 30 km → Range max_km=30 → dritter Preis
+ * - 31 km → Range max_km=50 → vierter Preis
  */
 function calculatePriceFromRanges(km: number, ranges: KmRange[]): number {
   if (!ranges || ranges.length === 0) return 0
@@ -91,22 +99,16 @@ function calculatePriceFromRanges(km: number, ranges: KmRange[]): number {
   // Sortiere nach max_km aufsteigend
   const sorted = [...ranges].sort((a, b) => (a.max_km ?? 0) - (b.max_km ?? 0))
 
-  // Finde die höchste Schwelle, die <= km ist
-  // Die Schwelle markiert den Beginn der Stufe
-  let result = sorted[0]?.amount ?? 0  // Default: erste Stufe (für km < erste Schwelle)
-
+  // Finde die erste Range, in die km passt (km <= max_km)
   for (const range of sorted) {
     const threshold = range.max_km ?? 0
-    if (threshold <= km) {
-      // Diese Schwelle gilt - aber es könnte noch eine höhere geben
-      result = range.amount ?? 0
-    } else {
-      // Schwelle ist größer als km, also fertig
-      break
+    if (km <= threshold) {
+      return range.amount ?? 0
     }
   }
 
-  return result
+  // Fallback: Letzte/höchste Stufe wenn km alle Ranges überschreitet
+  return sorted[sorted.length - 1]?.amount ?? 0
 }
 
 // =====================================================
