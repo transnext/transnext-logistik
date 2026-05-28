@@ -76,19 +76,22 @@ export function getCustomerKmRangesForAuftraggeber(auftraggeber?: Auftraggeber):
  * Berechnet den Kundenpreis basierend auf gefahrenen Kilometern
  * Optional: auftraggeber für auftraggeberspezifische Tabellen
  *
- * Die Schwellen markieren die OBERGRENZE einer Stufe:
- * - maxKm: 10 bedeutet "für 0-10 km gilt dieser Preis"
- * - maxKm: 20 bedeutet "für 11-20 km gilt dieser Preis"
- * - maxKm: 30 bedeutet "für 21-30 km gilt dieser Preis"
+ * Die Schwellen markieren die EXKLUSIVE OBERGRENZE einer Stufe:
+ * - maxKm: 10 bedeutet "für 0-9 km gilt dieser Preis" (km < 10)
+ * - maxKm: 20 bedeutet "für 10-19 km gilt dieser Preis" (km < 20)
+ * - maxKm: 30 bedeutet "für 20-29 km gilt dieser Preis" (km < 30)
+ * - maxKm: 50 bedeutet "für 30-49 km gilt dieser Preis" (km < 50)
  *
- * Logik: Finde die erste Range, in die km passt (km <= maxKm)
+ * Logik: Finde die erste Range, in die km passt (km < maxKm)
  *
  * Beispiele:
  * - 9 km → Range maxKm=10 → 19€
- * - 10 km → Range maxKm=10 → 19€
- * - 11 km → Range maxKm=20 → 23€
+ * - 10 km → Range maxKm=20 → 23€
+ * - 19 km → Range maxKm=20 → 23€
+ * - 20 km → Range maxKm=30 → 39€
  * - 28 km → Range maxKm=30 → 39€
- * - 30 km → Range maxKm=30 → 39€
+ * - 29 km → Range maxKm=30 → 39€
+ * - 30 km → Range maxKm=50 → 50€
  * - 31 km → Range maxKm=50 → 50€
  */
 export function calculateCustomerPrice(km: number, auftraggeber?: Auftraggeber): number {
@@ -99,9 +102,9 @@ export function calculateCustomerPrice(km: number, auftraggeber?: Auftraggeber):
   // Sortiere nach maxKm aufsteigend (sollte bereits sortiert sein, aber sicher ist sicher)
   const sorted = [...ranges].sort((a, b) => a.maxKm - b.maxKm)
 
-  // Finde die erste Range, in die km passt (km <= maxKm)
+  // Finde die erste Range, in die km passt (km < maxKm = exklusive Obergrenze)
   for (const range of sorted) {
-    if (km <= range.maxKm) {
+    if (km < range.maxKm) {
       return range.kundenpreis
     }
   }

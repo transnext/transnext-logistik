@@ -77,20 +77,23 @@ function wartezeitStringToUnits(wartezeit: string | null | undefined): number {
 /**
  * Berechnet den Preis aus km_ranges
  *
- * Die Schwellen markieren die OBERGRENZE einer Stufe:
- * - max_km: 10 bedeutet "für 0-10 km gilt dieser Preis"
- * - max_km: 20 bedeutet "für 11-20 km gilt dieser Preis"
- * - max_km: 30 bedeutet "für 21-30 km gilt dieser Preis"
+ * Die Schwellen markieren die EXKLUSIVE OBERGRENZE einer Stufe:
+ * - max_km: 10 bedeutet "für 0-9 km gilt dieser Preis" (km < 10)
+ * - max_km: 20 bedeutet "für 10-19 km gilt dieser Preis" (km < 20)
+ * - max_km: 30 bedeutet "für 20-29 km gilt dieser Preis" (km < 30)
+ * - max_km: 50 bedeutet "für 30-49 km gilt dieser Preis" (km < 50)
  *
- * Logik: Finde die erste Range, in die km passt (km <= max_km)
+ * Logik: Finde die erste Range, in die km passt (km < max_km)
  *
  * Beispiele:
- * - 9 km → Range max_km=10 → erster Preis
- * - 10 km → Range max_km=10 → erster Preis
- * - 11 km → Range max_km=20 → zweiter Preis
- * - 28 km → Range max_km=30 → dritter Preis
- * - 30 km → Range max_km=30 → dritter Preis
- * - 31 km → Range max_km=50 → vierter Preis
+ * - 9 km → Range max_km=10 → erster Preis (19€)
+ * - 10 km → Range max_km=20 → zweiter Preis (23€)
+ * - 19 km → Range max_km=20 → zweiter Preis (23€)
+ * - 20 km → Range max_km=30 → dritter Preis (39€)
+ * - 28 km → Range max_km=30 → dritter Preis (39€)
+ * - 29 km → Range max_km=30 → dritter Preis (39€)
+ * - 30 km → Range max_km=50 → vierter Preis (50€)
+ * - 31 km → Range max_km=50 → vierter Preis (50€)
  */
 function calculatePriceFromRanges(km: number, ranges: KmRange[]): number {
   if (!ranges || ranges.length === 0) return 0
@@ -99,10 +102,10 @@ function calculatePriceFromRanges(km: number, ranges: KmRange[]): number {
   // Sortiere nach max_km aufsteigend
   const sorted = [...ranges].sort((a, b) => (a.max_km ?? 0) - (b.max_km ?? 0))
 
-  // Finde die erste Range, in die km passt (km <= max_km)
+  // Finde die erste Range, in die km passt (km < max_km = exklusive Obergrenze)
   for (const range of sorted) {
     const threshold = range.max_km ?? 0
-    if (km <= threshold) {
+    if (km < threshold) {
       return range.amount ?? 0
     }
   }
