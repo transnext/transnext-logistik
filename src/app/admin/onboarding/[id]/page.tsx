@@ -1,4 +1,5 @@
 "use client"
+
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { AdminLayout } from "@/components/admin/AdminLayout"
@@ -44,7 +45,10 @@ import {
   Send,
   Video,
   ClipboardList,
-  History
+  History,
+  Link2,
+  LinkIcon,
+  Trash2
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -52,6 +56,7 @@ import {
   getCandidateDocuments,
   getCandidateNotes,
   getCandidateCommunications,
+  getCandidatePublicLinks,
   createCommunication,
   updateCommunicationStatus,
   updateOnboardingCandidate,
@@ -62,6 +67,9 @@ import {
   archiveCandidate,
   calculateDocumentProgress,
   getStatusesForType,
+  createPublicLink,
+  revokePublicLink,
+  generatePublicLinkUrl,
   STATUS_LABELS,
   SOURCE_LABELS,
   TYPE_LABELS,
@@ -70,10 +78,12 @@ import {
   DOCUMENT_STATUS_LABELS,
   COMM_TYPE_LABELS,
   COMM_STATUS_LABELS,
+  LINK_STATUS_LABELS,
   type OnboardingCandidate,
   type OnboardingDocument,
   type OnboardingNote,
   type OnboardingCommunication,
+  type OnboardingPublicLink,
   type OnboardingStatus,
   type OnboardingDocumentStatus,
   type OnboardingCommType,
@@ -90,6 +100,7 @@ import {
 } from "@/lib/onboarding-email-templates"
 import { supabase } from "@/lib/supabase"
 import { signOut } from "@/lib/api"
+
 // Status Badge Config
 const STATUS_CONFIG: Record<string, { className: string }> = {
   'neu': { className: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -108,6 +119,7 @@ const STATUS_CONFIG: Record<string, { className: string }> = {
   'aktiv': { className: 'bg-green-50 text-green-700 border-green-200' },
   'archiviert': { className: 'bg-gray-100 text-gray-500 border-gray-300' },
 }
+
 const DOC_STATUS_CONFIG: Record<OnboardingDocumentStatus, { className: string; icon: React.ReactNode }> = {
   'offen': { className: 'bg-gray-100 text-gray-600', icon: <Clock className="h-3 w-3" /> },
   'angefordert': { className: 'bg-blue-50 text-blue-700', icon: <Mail className="h-3 w-3" /> },
@@ -116,20 +128,30 @@ const DOC_STATUS_CONFIG: Record<OnboardingDocumentStatus, { className: string; i
   'abgelehnt': { className: 'bg-red-50 text-red-700', icon: <XCircle className="h-3 w-3" /> },
   'nicht_erforderlich': { className: 'bg-gray-50 text-gray-500', icon: <XCircle className="h-3 w-3" /> },
 }
+
 export default function CandidateDetailPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
+
   // Auth state
   const [userName, setUserName] = useState("")
   const [userRole, setUserRole] = useState<'admin' | 'gf'>('admin')
+
   const [candidate, setCandidate] = useState<OnboardingCandidate | null>(null)
   const [documents, setDocuments] = useState<OnboardingDocument[]>([])
   const [notes, setNotes] = useState<OnboardingNote[]>([])
   const [communications, setCommunications] = useState<OnboardingCommunication[]>([])
+  const [publicLinks, setPublicLinks] = useState<OnboardingPublicLink[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState("")
+
+  // Public Link State
+  const [isCreatingLink, setIsCreatingLink] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [generatedLinkUrl, setGeneratedLinkUrl] = useState<string | null>(null)
+
   // Kommunikation Modal State
   const [showCommModal, setShowCommModal] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplateType | null>(null)
@@ -137,18 +159,23 @@ export default function CandidateDetailPage() {
   const [generatedBody, setGeneratedBody] = useState("")
   const [suggestedStatus, setSuggestedStatus] = useState<OnboardingStatus | null>(null)
   const [isCopied, setIsCopied] = useState(false)
+
   // Edit state
   const [editedCandidate, setEditedCandidate] = useState<Partial<OnboardingCandidate>>({})
   const [hasChanges, setHasChanges] = useState(false)
+
   // Notes
   const [newNoteContent, setNewNoteContent] = useState("")
   const [isAddingNote, setIsAddingNote] = useState(false)
+
   // Document upload
   const [uploadingDocId, setUploadingDocId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
   // Status change modal
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [newStatus, setNewStatus] = useState<OnboardingStatus | null>(null)
+
   // Auth check
   useEffect(() => {
     const checkAuth = async () => {
@@ -171,18 +198,21 @@ export default function CandidateDetailPage() {
     }
     checkAuth()
   }, [router])
+
   const handleLogout = async () => {
     await signOut()
     router.push('/admin')
   }
+
   const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const [candidateData, docsData, notesData, commsData] = await Promise.all([
+      const [candidateData, docsData, notesData, commsData, linksData] = await Promise.all([
         getOnboardingCandidate(id),
         getCandidateDocuments(id),
         getCandidateNotes(id),
-        getCandidateCommunications(id)
+        getCandidateCommunications(id),
+        getCandidatePublicLinks(id)
       ])
       if (!candidateData) {
         router.push('/admin/onboarding')
@@ -193,6 +223,7 @@ export default function CandidateDetailPage() {
       setDocuments(docsData)
       setNotes(notesData)
       setCommunications(commsData)
+      setPublicLinks(linksData)
     } catch (err) {
       console.error('Fehler beim Laden:', err)
       setError('Fehler beim Laden der Daten')
@@ -200,15 +231,18 @@ export default function CandidateDetailPage() {
       setIsLoading(false)
     }
   }, [id, router])
+
   useEffect(() => {
     loadData()
   }, [loadData])
+
   // Track changes
   useEffect(() => {
     if (!candidate) return
     const changed = JSON.stringify(editedCandidate) !== JSON.stringify(candidate)
     setHasChanges(changed)
   }, [editedCandidate, candidate])
+
   const handleSave = async () => {
     if (!candidate || !hasChanges) return
     setIsSaving(true)
@@ -223,6 +257,7 @@ export default function CandidateDetailPage() {
       setIsSaving(false)
     }
   }
+
   const handleStatusChange = async () => {
     if (!candidate || !newStatus) return
     setIsSaving(true)
@@ -237,6 +272,7 @@ export default function CandidateDetailPage() {
       setIsSaving(false)
     }
   }
+
   const handleArchive = async () => {
     if (!candidate) return
     if (!confirm('Kandidat wirklich archivieren? Dies kann nicht rückgängig gemacht werden.')) return
@@ -247,6 +283,7 @@ export default function CandidateDetailPage() {
       setError(result.error || 'Fehler beim Archivieren')
     }
   }
+
   const handleDocStatusChange = async (docId: string, status: OnboardingDocumentStatus) => {
     const result = await updateDocumentStatus(docId, status)
     if (result.success) {
@@ -255,6 +292,7 @@ export default function CandidateDetailPage() {
       alert(result.error || 'Fehler beim Aktualisieren')
     }
   }
+
   const handleDocUpload = async (docId: string, file: File) => {
     if (!candidate) return
     setUploadingDocId(docId)
@@ -266,6 +304,7 @@ export default function CandidateDetailPage() {
       alert(result.error || 'Fehler beim Upload')
     }
   }
+
   const handleDocDownload = async (docId: string) => {
     const result = await getDocumentDownloadUrl(docId)
     if (result.success && result.url) {
@@ -274,6 +313,7 @@ export default function CandidateDetailPage() {
       alert(result.error || 'Fehler beim Download')
     }
   }
+
   const handleAddNote = async () => {
     if (!newNoteContent.trim()) return
     setIsAddingNote(true)
@@ -286,10 +326,17 @@ export default function CandidateDetailPage() {
       alert(result.error || 'Fehler beim Erstellen der Notiz')
     }
   }
+
   // Kommunikation: Template auswählen und generieren
   const handleOpenCommModal = (templateType: EmailTemplateType) => {
     if (!candidate) return
+
     setSelectedTemplate(templateType)
+
+    // Aktiven Link finden für bewerber_link Variable
+    const activeLink = publicLinks.find(l => l.status === 'active' && new Date(l.expires_at) > new Date())
+    const bewerberLinkUrl = activeLink ? generatePublicLinkUrl(activeLink.token) : undefined
+
     const variables: TemplateVariables = {
       vorname: candidate.first_name,
       nachname: candidate.last_name,
@@ -297,8 +344,10 @@ export default function CandidateDetailPage() {
       termin_2: formatTerminSlot(candidate.termin_slot_2),
       termin_3: formatTerminSlot(candidate.termin_slot_3),
       teams_link: candidate.teams_link || '[Teams-Link hier einfügen]',
-      ansprechpartner: userName || 'TransNext Team'
+      ansprechpartner: userName || 'TransNext Team',
+      bewerber_link: bewerberLinkUrl
     }
+
     const { subject, body, suggestedStatus: newStatus } = generateEmail(templateType, variables)
     setGeneratedSubject(subject)
     setGeneratedBody(body)
@@ -306,11 +355,64 @@ export default function CandidateDetailPage() {
     setIsCopied(false)
     setShowCommModal(true)
   }
+
+  // Public Link erstellen
+  const handleCreatePublicLink = async () => {
+    if (!candidate) return
+    setIsCreatingLink(true)
+    setError("")
+
+    const result = await createPublicLink(candidate.id, 'appointment_selection', 7)
+    setIsCreatingLink(false)
+
+    if (!result.success) {
+      setError(result.error || 'Fehler beim Erstellen des Links')
+      return
+    }
+
+    if (result.url) {
+      setGeneratedLinkUrl(result.url)
+      // Link direkt kopieren
+      try {
+        await navigator.clipboard.writeText(result.url)
+        setLinkCopied(true)
+        setTimeout(() => setLinkCopied(false), 3000)
+      } catch {
+        // Clipboard nicht verfügbar
+      }
+    }
+
+    await loadData()
+  }
+
+  // Link kopieren
+  const handleCopyPublicLink = async (token: string) => {
+    const url = generatePublicLinkUrl(token)
+    try {
+      await navigator.clipboard.writeText(url)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch {
+      alert('Link konnte nicht kopiert werden: ' + url)
+    }
+  }
+
+  // Link deaktivieren
+  const handleRevokePublicLink = async (linkId: string) => {
+    if (!confirm('Diesen Link wirklich deaktivieren?')) return
+    const result = await revokePublicLink(linkId)
+    if (!result.success) {
+      alert(result.error || 'Fehler beim Deaktivieren')
+    }
+    await loadData()
+  }
+
   const handleCopyText = async () => {
     const fullText = `Betreff: ${generatedSubject}\n\n${generatedBody}`
     try {
       await navigator.clipboard.writeText(fullText)
       setIsCopied(true)
+
       // Kommunikation in Historie speichern
       if (selectedTemplate) {
         await createCommunication(
@@ -322,13 +424,16 @@ export default function CandidateDetailPage() {
         )
         await loadData()
       }
+
       setTimeout(() => setIsCopied(false), 2000)
     } catch (err) {
       alert('Text konnte nicht kopiert werden')
     }
   }
+
   const handleMarkAsSent = async () => {
     if (!selectedTemplate) return
+
     // Kommunikation als manuell gesendet speichern
     await createCommunication(
       id,
@@ -337,6 +442,7 @@ export default function CandidateDetailPage() {
       generatedBody,
       'sent_manual'
     )
+
     // Optional: Status aktualisieren
     if (suggestedStatus && candidate?.status !== suggestedStatus) {
       const result = await updateOnboardingCandidate(id, { status: suggestedStatus })
@@ -344,17 +450,21 @@ export default function CandidateDetailPage() {
         alert(result.error || 'Fehler beim Status-Update')
       }
     }
+
     setShowCommModal(false)
     await loadData()
   }
+
   const formatDate = (dateStr: string | null): string => {
     if (!dateStr) return '-'
     return new Date(dateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
+
   const formatDateTime = (dateStr: string | null): string => {
     if (!dateStr) return '-'
     return new Date(dateStr).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
+
   if (isLoading) {
     return (
       <AdminLayout userName={userName} userRole={userRole} onLogout={handleLogout}>
@@ -364,6 +474,7 @@ export default function CandidateDetailPage() {
       </AdminLayout>
     )
   }
+
   if (!candidate) {
     return (
       <AdminLayout userName={userName} userRole={userRole} onLogout={handleLogout}>
@@ -378,9 +489,11 @@ export default function CandidateDetailPage() {
       </AdminLayout>
     )
   }
+
   const docProgress = calculateDocumentProgress(documents)
   const availableStatuses = getStatusesForType(candidate.type)
   const statusConfig = STATUS_CONFIG[candidate.status] || { className: 'bg-gray-100 text-gray-700' }
+
   return (
     <AdminLayout userName={userName} userRole={userRole} onLogout={handleLogout}>
       <div className="space-y-6">
@@ -415,6 +528,7 @@ export default function CandidateDetailPage() {
             )}
           </div>
         </div>
+
         {/* Error */}
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-2">
@@ -422,6 +536,7 @@ export default function CandidateDetailPage() {
             {error}
           </div>
         )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Info */}
           <div className="lg:col-span-2 space-y-6">
@@ -451,6 +566,7 @@ export default function CandidateDetailPage() {
                     </p>
                   </div>
                 </div>
+
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button
                     size="sm"
@@ -471,6 +587,7 @@ export default function CandidateDetailPage() {
                 </div>
               </CardContent>
             </Card>
+
             {/* Stammdaten */}
             <Card className="border-gray-100">
               <CardHeader className="pb-3">
@@ -551,6 +668,7 @@ export default function CandidateDetailPage() {
                     </Select>
                   </div>
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                   <div className="space-y-2">
                     <Label>Führerschein</Label>
@@ -601,6 +719,7 @@ export default function CandidateDetailPage() {
                     </Select>
                   </div>
                 </div>
+
                 {/* Termin-Slots */}
                 <div className="md:col-span-2 pt-4 border-t">
                   <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
@@ -642,6 +761,7 @@ export default function CandidateDetailPage() {
                     />
                   </div>
                 </div>
+
                 <div className="space-y-2">
                   <Label>Bestätigter Termin</Label>
                   <Input
@@ -650,6 +770,7 @@ export default function CandidateDetailPage() {
                     onChange={(e) => setEditedCandidate(p => ({ ...p, interview_date: e.target.value ? new Date(e.target.value).toISOString() : null }))}
                   />
                 </div>
+
                 <div className="space-y-2">
                   <Label>Teams-Link</Label>
                   <div className="flex gap-2">
@@ -671,6 +792,7 @@ export default function CandidateDetailPage() {
                     )}
                   </div>
                 </div>
+
                 <div className="space-y-2">
                   <Label>Interne Notizen</Label>
                   <Textarea
@@ -681,6 +803,7 @@ export default function CandidateDetailPage() {
                 </div>
               </CardContent>
             </Card>
+
             {/* Dokumente */}
             <Card className="border-gray-100">
               <CardHeader className="pb-3">
@@ -727,6 +850,7 @@ export default function CandidateDetailPage() {
                                 <SelectItem value="nicht_erforderlich">Nicht erforderlich</SelectItem>
                               </SelectContent>
                             </Select>
+
                             {doc.file_path ? (
                               <Button size="sm" variant="outline" onClick={() => handleDocDownload(doc.id)}>
                                 <Download className="h-4 w-4" />
@@ -767,6 +891,7 @@ export default function CandidateDetailPage() {
                 )}
               </CardContent>
             </Card>
+
             {/* Kommunikation */}
             <Card className="border-gray-100">
               <CardHeader className="pb-3">
@@ -853,6 +978,138 @@ export default function CandidateDetailPage() {
                     <span className="text-xs">Absage</span>
                   </Button>
                 </div>
+
+                {/* Bewerberlink Bereich */}
+                <div className="border-t pt-4 mb-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <Link2 className="h-4 w-4" />
+                    Bewerberlink (Terminwahl)
+                  </h4>
+
+                  {/* Aktiver Link anzeigen */}
+                  {(() => {
+                    const activeLink = publicLinks.find(l => l.status === 'active' && new Date(l.expires_at) > new Date())
+                    if (activeLink) {
+                      return (
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg mb-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-emerald-800">Aktiver Link</span>
+                            <Badge className="bg-emerald-100 text-emerald-700 text-xs">
+                              Gültig bis {formatDateTime(activeLink.expires_at)}
+                            </Badge>
+                          </div>
+                          <div className="flex gap-2">
+                            <Input
+                              readOnly
+                              value={generatePublicLinkUrl(activeLink.token)}
+                              className="text-xs font-mono bg-white"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCopyPublicLink(activeLink.token)}
+                              className={cn(linkCopied && "bg-emerald-50 text-emerald-700")}
+                            >
+                              {linkCopied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRevokePublicLink(activeLink.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+
+                  {/* Gewählter Termin anzeigen */}
+                  {candidate?.termin_gewaehlt && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <CheckCircle className="h-4 w-4 text-blue-600" />
+                        <span className="text-blue-800">
+                          <span className="font-medium">Bewerber hat Termin {candidate.termin_gewaehlt} gewählt</span>
+                          {candidate.appointment_selected_at && (
+                            <span className="text-blue-600 ml-1">
+                              (am {formatDateTime(candidate.appointment_selected_at)})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bewerber-Kommentar anzeigen */}
+                  {candidate?.applicant_comment && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-3">
+                      <p className="text-xs text-amber-600 font-medium mb-1">Kommentar vom Bewerber:</p>
+                      <p className="text-sm text-amber-800">{candidate.applicant_comment}</p>
+                    </div>
+                  )}
+
+                  {/* Neuen Link erstellen Button */}
+                  {!publicLinks.find(l => l.status === 'active' && new Date(l.expires_at) > new Date()) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCreatePublicLink}
+                      disabled={isCreatingLink || !candidate?.termin_slot_1}
+                      className="w-full"
+                    >
+                      {isCreatingLink ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                          Link wird erstellt...
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="h-4 w-4 mr-2" />
+                          Bewerberlink erstellen (7 Tage gültig)
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {!candidate?.termin_slot_1 && (
+                    <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Bitte zuerst Terminvorschläge eintragen und speichern.
+                    </p>
+                  )}
+
+                  {/* Link-Historie */}
+                  {publicLinks.length > 0 && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-xs text-gray-500 mb-2">Bisherige Links:</p>
+                      <div className="space-y-1 max-h-[100px] overflow-y-auto">
+                        {publicLinks.slice(0, 5).map(link => (
+                          <div key={link.id} className="flex items-center justify-between text-xs p-1.5 bg-gray-50 rounded">
+                            <span className="text-gray-600 truncate max-w-[150px]">
+                              {formatDateTime(link.created_at)}
+                            </span>
+                            <Badge className={cn("text-xs", {
+                              'bg-emerald-100 text-emerald-700': link.status === 'active' && new Date(link.expires_at) > new Date(),
+                              'bg-blue-100 text-blue-700': link.status === 'used',
+                              'bg-gray-100 text-gray-600': link.status === 'expired' || (link.status === 'active' && new Date(link.expires_at) <= new Date()),
+                              'bg-red-100 text-red-700': link.status === 'revoked'
+                            })}>
+                              {link.status === 'active' && new Date(link.expires_at) <= new Date()
+                                ? 'Abgelaufen'
+                                : LINK_STATUS_LABELS[link.status]
+                              }
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Kommunikationshistorie */}
                 <div className="border-t pt-4">
                   <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
@@ -888,6 +1145,7 @@ export default function CandidateDetailPage() {
               </CardContent>
             </Card>
           </div>
+
           {/* Right Column - Meta & Notes */}
           <div className="space-y-6">
             {/* Meta Info */}
@@ -925,6 +1183,7 @@ export default function CandidateDetailPage() {
                 )}
               </CardContent>
             </Card>
+
             {/* Notes */}
             <Card className="border-gray-100">
               <CardHeader className="pb-3">
@@ -948,6 +1207,7 @@ export default function CandidateDetailPage() {
                     ))
                   )}
                 </div>
+
                 <div className="space-y-2">
                   <Textarea
                     value={newNoteContent}
@@ -969,6 +1229,7 @@ export default function CandidateDetailPage() {
             </Card>
           </div>
         </div>
+
         {/* Status Change Modal */}
         <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
           <DialogContent className="sm:max-w-[400px]">
@@ -978,6 +1239,7 @@ export default function CandidateDetailPage() {
                 Wählen Sie den neuen Status für diesen Kandidaten.
               </DialogDescription>
             </DialogHeader>
+
             <div className="space-y-4">
               <Select
                 value={newStatus || undefined}
@@ -995,6 +1257,7 @@ export default function CandidateDetailPage() {
                 </SelectContent>
               </Select>
             </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowStatusModal(false)}>
                 Abbrechen
@@ -1006,27 +1269,32 @@ export default function CandidateDetailPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
         {/* Kommunikation Modal */}
         <Dialog open={showCommModal} onOpenChange={setShowCommModal}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Send className="h-5 w-5" />
-                {selectedTemplate && COMM_TYPE_LABELS[selectedTemplate as OnboardingCommType]}
+                <Mail className="h-5 w-5" />
+                {selectedTemplate ? EMAIL_TEMPLATES[selectedTemplate].name : 'E-Mail vorbereiten'}
               </DialogTitle>
               <DialogDescription>
-                Text kopieren und per E-Mail / WhatsApp versenden
+                Text kopieren und per E-Mail versenden
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+
+            <div className="space-y-4">
+              {/* Betreff */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Betreff</Label>
                 <Input
                   value={generatedSubject}
                   onChange={(e) => setGeneratedSubject(e.target.value)}
-                  className="font-mono text-sm"
+                  className="font-medium"
                 />
               </div>
+
+              {/* Body */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Nachricht</Label>
                 <Textarea
@@ -1036,26 +1304,55 @@ export default function CandidateDetailPage() {
                   className="font-mono text-sm"
                 />
               </div>
+
+              {/* Hinweis zu Termin-Slots */}
+              {selectedTemplate === 'terminangebot' && (!candidate?.termin_slot_1 || !candidate?.termin_slot_2 || !candidate?.termin_slot_3) && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                  <span>Bitte speichern Sie zuerst die Termin-Slots oben, um sie automatisch einzufügen.</span>
+                </div>
+              )}
+
+              {/* Hinweis zu Teams-Link */}
+              {selectedTemplate === 'teams_link' && !candidate?.teams_link && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                  <span>Bitte speichern Sie zuerst den Teams-Link oben.</span>
+                </div>
+              )}
+
+              {/* Vorgeschlagener Status */}
               {suggestedStatus && candidate?.status !== suggestedStatus && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                  <p className="font-medium">Vorgeschlagene Status-Änderung:</p>
-                  <p>{STATUS_LABELS[candidate?.status || 'neu']} → {STATUS_LABELS[suggestedStatus]}</p>
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                  <p className="text-blue-700">
+                    <span className="font-medium">Nach dem Senden:</span> Status wird auf „{STATUS_LABELS[suggestedStatus]}" gesetzt.
+                  </p>
                 </div>
               )}
             </div>
-            <DialogFooter className="flex gap-2">
+
+            <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button variant="outline" onClick={() => setShowCommModal(false)}>
                 Abbrechen
               </Button>
               <Button
                 variant="outline"
                 onClick={handleCopyText}
-                className={cn(isCopied && "bg-green-50 border-green-500 text-green-700")}
+                className={cn(isCopied && "bg-green-50 text-green-700 border-green-200")}
               >
-                {isCopied ? <CheckCircle className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                {isCopied ? 'Kopiert!' : 'Text kopieren'}
+                {isCopied ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Kopiert!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Text kopieren
+                  </>
+                )}
               </Button>
-              <Button onClick={handleMarkAsSent}>
+              <Button onClick={handleMarkAsSent} className="bg-primary-blue hover:bg-blue-700">
                 <Send className="h-4 w-4 mr-2" />
                 Als gesendet markieren
               </Button>

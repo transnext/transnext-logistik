@@ -11,6 +11,7 @@
  * - {{ansprechpartner}} - Name des HR-Ansprechpartners
  * - {{firma}} - Firmenname (TransNext Logistik)
  * - {{portal_link}} - Link zum Fahrer-Portal (zukünftig)
+ * - {{bewerber_link}} - Öffentlicher Bewerberlink für Terminwahl (Phase 3a)
  */
 
 export type EmailTemplateType =
@@ -67,7 +68,10 @@ Gerne möchten wir Sie in einem kurzen Gespräch kennenlernen. Bitte wählen Sie
 • {{termin_2}}
 • {{termin_3}}
 
-Teilen Sie uns einfach Ihren Wunschtermin per E-Mail oder Telefon mit.
+
+Klicken Sie einfach auf folgenden Link, um Ihren Wunschtermin auszuwählen:
+{{bewerber_link}}
+
 
 Das Gespräch dauert ca. 20 Minuten und findet per Microsoft Teams statt. Den Link erhalten Sie nach Ihrer Terminbestätigung.
 
@@ -261,6 +265,7 @@ export interface TemplateVariables {
   ansprechpartner: string
   firma?: string
   portal_link?: string
+  bewerber_link?: string
 }
 
 /**
@@ -278,6 +283,7 @@ export function processTemplate(template: string, variables: TemplateVariables):
   result = result.replace(/\{\{ansprechpartner\}\}/g, variables.ansprechpartner || 'Ihr TransNext Team')
   result = result.replace(/\{\{firma\}\}/g, variables.firma || 'TransNext Logistik GmbH')
   result = result.replace(/\{\{portal_link\}\}/g, variables.portal_link || '[Portal-Link]')
+  result = result.replace(/\{\{bewerber_link\}\}/g, variables.bewerber_link || '[Bewerber-Link wird nach Speichern generiert]')
 
   return result
 }
