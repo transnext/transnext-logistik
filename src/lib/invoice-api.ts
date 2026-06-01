@@ -119,6 +119,45 @@ export interface BillableItemsResult<T> {
 }
 
 // =====================================================
+// BILLING SYSTEM CUTOFF
+// =====================================================
+
+/**
+ * WICHTIG: Die neue Abrechnungs-/Nachberechnungslogik greift erst ab KW21/2026.
+ *
+ * Begründung:
+ * - Viele alte Touren/Auslagen vor KW21/2026 wurden bereits manuell/außerhalb
+ *   des Portals abgerechnet, aber im System steht noch weekly_invoice_id = NULL.
+ * - Diese Altlasten dürfen NICHT automatisch in neue Abrechnungen gezogen werden.
+ * - Ab KW21/2026 gilt die neue Logik vollständig.
+ *
+ * Regel:
+ * - Nur Positionen mit Leistungsdatum >= 2026-05-18 (Start KW21/2026) werden
+ *   durch die neue Abrechnungslogik berücksichtigt.
+ * - Alle Positionen davor werden ignoriert (nicht gelöscht, nur ausgeschlossen).
+ */
+export const BILLING_SYSTEM_START_YEAR = 2026
+export const BILLING_SYSTEM_START_WEEK = 21
+// KW21/2026 beginnt am Montag, 18. Mai 2026
+export const BILLING_SYSTEM_START_DATE = '2026-05-18'
+
+/**
+ * Prüft ob ein Datum im gültigen Abrechnungszeitraum liegt (ab KW21/2026)
+ */
+export function isDateInBillingScope(dateStr: string): boolean {
+  return dateStr >= BILLING_SYSTEM_START_DATE
+}
+
+/**
+ * Prüft ob eine KW im gültigen Abrechnungszeitraum liegt (ab KW21/2026)
+ */
+export function isWeekInBillingScope(year: number, week: number): boolean {
+  if (year > BILLING_SYSTEM_START_YEAR) return true
+  if (year < BILLING_SYSTEM_START_YEAR) return false
+  return week >= BILLING_SYSTEM_START_WEEK
+}
+
+// =====================================================
 // HELPER FUNCTIONS
 // =====================================================
 
@@ -337,6 +376,9 @@ export async function getBillableTours(
   // Lade alle offenen Touren:
   // 1. Touren mit Datum in der gewählten KW (regulär)
   // 2. Touren aus geschlossenen Perioden, die noch nicht abgerechnet wurden (Nachberechnung)
+  //
+  // WICHTIG: Cutoff-Regel - nur Touren ab KW21/2026 (Datum >= 2026-05-18) werden berücksichtigt!
+  // Ältere Touren wurden bereits manuell abgerechnet und dürfen nicht automatisch gezogen werden.
   const { data, error } = await supabase
     .from('arbeitsnachweise')
     .select(`
@@ -361,6 +403,7 @@ export async function getBillableTours(
     .or(`customer_billing_status.is.null,customer_billing_status.eq.nicht_abgerechnet`)
     .is('weekly_invoice_id', null)
     .is('locked_at', null)
+    .gte('datum', BILLING_SYSTEM_START_DATE) // Cutoff: nur ab KW21/2026
     .order('datum', { ascending: true })
 
   if (error) {
@@ -527,6 +570,9 @@ export async function getBillableExpenses(
   const { start, end } = getWeekDates(year, week)
 
   // Lade alle offenen Auslagen
+  //
+  // WICHTIG: Cutoff-Regel - nur Auslagen ab KW21/2026 (Datum >= 2026-05-18) werden berücksichtigt!
+  // Ältere Auslagen wurden bereits manuell abgerechnet und dürfen nicht automatisch gezogen werden.
   const { data, error } = await supabase
     .from('auslagennachweise')
     .select(`
@@ -550,6 +596,7 @@ export async function getBillableExpenses(
     .or(`customer_billing_status.is.null,customer_billing_status.eq.nicht_abgerechnet`)
     .is('weekly_invoice_id', null)
     .is('locked_at', null)
+    .gte('datum', BILLING_SYSTEM_START_DATE) // Cutoff: nur ab KW21/2026
     .order('datum', { ascending: true })
 
   if (error) {
