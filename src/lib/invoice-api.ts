@@ -453,7 +453,8 @@ export async function getBillableTours(
     auftraggeber: t.auftraggeber
   })))
 
-  return filtered.map(t => {
+  // Verarbeite alle Touren und ermittle Zugehörigkeit zur Abrechnung
+  const processedTours = filtered.map(t => {
     const priceResult = priceResults.get(t.id)
     let customerAmount = t.customer_amount
     let amountCalculated = false
@@ -492,12 +493,19 @@ export async function getBillableTours(
     const tourClient = mapAuftraggeberToClient(t.auftraggeber)
     const closedPeriods = tourClient === 'onlogist' ? closedPeriodsOL : closedPeriodsSC
 
-    // Tour ist Nachberechnung, wenn:
-    // 1. Das Datum NICHT in der aktuell ausgewählten KW liegt UND
-    // 2. Die ursprüngliche KW der Tour bereits geschlossen ist
+    // Bestimme Zugehörigkeit zur Abrechnung:
+    // 1. isInSelectedPeriod: Leistungsdatum liegt in der gewählten KW (= regulär)
+    // 2. isFromClosedPeriod: Ursprüngliche KW ist bereits geschlossen (= Nachberechnung möglich)
+    // 3. isRetroactive: Nicht in gewählter KW, aber aus geschlossener früherer KW
     const isInSelectedPeriod = t.datum >= start && t.datum <= end
     const isFromClosedPeriod = closedPeriods.has(tourPeriod)
     const isRetroactive = !isInSelectedPeriod && isFromClosedPeriod
+
+    // WICHTIG: Tour gehört NUR in diese Abrechnung, wenn:
+    // - Sie in der gewählten KW liegt (regulär) ODER
+    // - Sie aus einer geschlossenen früheren KW stammt (Nachberechnung)
+    // Touren aus anderen offenen KWs (zukünftig oder vergangen-offen) werden NICHT inkludiert!
+    const belongsToThisBilling = isInSelectedPeriod || isRetroactive
 
     // Bestimme billing_type
     let billingType: BillingPositionType = t.billing_type || 'regulaer'
@@ -520,9 +528,25 @@ export async function getBillableTours(
       calculation_warnings: calculationWarnings,
       billing_type: billingType,
       original_billing_period: originalPeriod,
-      is_retroactive: isRetroactive
+      is_retroactive: isRetroactive,
+      // Internes Flag für Filterung
+      _belongsToThisBilling: belongsToThisBilling
     }
-  }) as BillableTour[]
+  })
+
+  // FILTER: Nur Touren behalten, die zu dieser Abrechnung gehören
+  // - Regulär: Leistungsdatum in gewählter KW
+  // - Nachberechnung: Aus geschlossener früherer KW
+  // - NICHT: Touren aus anderen offenen KWs oder zukünftigen KWs
+  const result = processedTours
+    .filter(t => (t as any)._belongsToThisBilling)
+    .map(t => {
+      // Entferne internes Flag
+      const { _belongsToThisBilling, ...tour } = t as any
+      return tour
+    }) as BillableTour[]
+
+  return result
 }
 
 /**
@@ -621,15 +645,26 @@ export async function getBillableExpenses(
 
   const profilesMap = new Map(profiles?.map(p => [p.id, p.full_name]) || [])
 
-  return data.map(e => {
+  // Verarbeite alle Auslagen und ermittle Zugehörigkeit zur Abrechnung
+  const processedExpenses = data.map(e => {
     // Ermittle ob diese Auslage eine Nachberechnung ist
     const expenseDate = new Date(e.datum)
     const expenseWeekInfo = getISOWeek(expenseDate)
     const expensePeriod = formatWeekPeriod(expenseWeekInfo.year, expenseWeekInfo.week)
 
+    // Bestimme Zugehörigkeit zur Abrechnung:
+    // 1. isInSelectedPeriod: Leistungsdatum liegt in der gewählten KW (= regulär)
+    // 2. isFromClosedPeriod: Ursprüngliche KW ist bereits geschlossen (= Nachberechnung möglich)
+    // 3. isRetroactive: Nicht in gewählter KW, aber aus geschlossener früherer KW
     const isInSelectedPeriod = e.datum >= start && e.datum <= end
     const isFromClosedPeriod = closedPeriods.has(expensePeriod)
     const isRetroactive = !isInSelectedPeriod && isFromClosedPeriod
+
+    // WICHTIG: Auslage gehört NUR in diese Abrechnung, wenn:
+    // - Sie in der gewählten KW liegt (regulär) ODER
+    // - Sie aus einer geschlossenen früheren KW stammt (Nachberechnung)
+    // Auslagen aus anderen offenen KWs (zukünftig oder vergangen-offen) werden NICHT inkludiert!
+    const belongsToThisBilling = isInSelectedPeriod || isRetroactive
 
     let billingType: BillingPositionType = e.billing_type || 'regulaer'
     let originalPeriod: string | null = e.original_billing_period || null
@@ -644,9 +679,25 @@ export async function getBillableExpenses(
       fahrer_name: profilesMap.get(e.user_id) || 'Unbekannt',
       billing_type: billingType,
       original_billing_period: originalPeriod,
-      is_retroactive: isRetroactive
+      is_retroactive: isRetroactive,
+      // Internes Flag für Filterung
+      _belongsToThisBilling: belongsToThisBilling
     }
-  }) as BillableAuslage[]
+  })
+
+  // FILTER: Nur Auslagen behalten, die zu dieser Abrechnung gehören
+  // - Regulär: Leistungsdatum in gewählter KW
+  // - Nachberechnung: Aus geschlossener früherer KW
+  // - NICHT: Auslagen aus anderen offenen KWs oder zukünftigen KWs
+  const result = processedExpenses
+    .filter(e => (e as any)._belongsToThisBilling)
+    .map(e => {
+      // Entferne internes Flag
+      const { _belongsToThisBilling, ...expense } = e as any
+      return expense
+    }) as BillableAuslage[]
+
+  return result
 }
 
 /**
