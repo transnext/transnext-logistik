@@ -33,6 +33,8 @@ import {
   lockInvoice,
   markInvoiceExported,
   generateWeekOptions,
+  BILLING_SYSTEM_START_WEEK,
+  BILLING_SYSTEM_START_YEAR,
   type BillableTour,
   type BillableAuslage,
   type WeeklyInvoice,
@@ -613,6 +615,15 @@ export default function AbrechnungPage() {
                 <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingWeekly ? 'animate-spin' : ''}`} />
                 Aktualisieren
               </Button>
+            </div>
+
+            {/* Hinweis: Cutoff-Regel */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-start gap-2 text-slate-600 text-sm">
+              <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span>
+                Die automatische Nachberechnung berücksichtigt Positionen ab KW{BILLING_SYSTEM_START_WEEK}/{BILLING_SYSTEM_START_YEAR}.
+                Ältere Positionen wurden bereits manuell abgerechnet.
+              </span>
             </div>
 
             {/* Nachrichten */}
