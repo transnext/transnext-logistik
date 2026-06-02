@@ -257,6 +257,14 @@ export interface FahrerLeistungKPI {
   umsatzProMonatsArbeitstag: number | null
   /** Differenz zum Tagesziel (Umsatz pro Monatsarbeitstag - Tagesziel) */
   differenzZumTagesziel: number | null
+  /** NEU: Saldo gegen Plan-Monatskosten (Umsatz - 2400€) für Festgehalt */
+  saldoGegenPlan: number | null
+  /** NEU: Bisherige Arbeitstage im aktuellen Monat */
+  bisherigArbeitstage: number | null
+  /** NEU: Anteilige Plan-Kosten bis heute */
+  anteiligePlanKosten: number | null
+  /** NEU: Anteiliger Saldo bis heute */
+  anteiligenSaldo: number | null
 }
 
 export interface FahrerKPIs {
@@ -322,6 +330,14 @@ export interface MonthlyTrendDataPoint {
   tageszielKostendeckung: number | null
   /** Umsatz pro Soll-Arbeitstag (nur für Vollzeit-Festgehalt) */
   umsatzProSollArbeitstag: number | null
+  /** NEU: Fahrerlohn im Monat (für Minijob tourbasiert) */
+  fahrerlohn: number
+  /** NEU: Arbeitgeberkosten im Monat */
+  arbeitgeberkosten: number
+  /** NEU: Marge/Deckungsbeitrag (Umsatz - Fahrerlohn - AG-Kosten) */
+  marge: number
+  /** NEU: Margenquote in % */
+  margenquote: number | null
 }
 
 /** Trend-Daten für einen Fahrer oder aggregiert */
@@ -438,8 +454,10 @@ export interface AnalyticsData {
   fahrer: FahrerKPIs
   /** NEU: Compliance-KPIs */
   compliance: ComplianceKPIs
-  /** NEU: Monatstrend-Daten */
+  /** NEU: Monatstrend-Daten (für aktuellen Filter-Zeitraum) */
   trend: TrendData | null
+  /** NEU: 6-Monats-Trend (immer die letzten 6 Monate, unabhängig vom Filter) */
+  trendSixMonths: TrendData | null
   /** Zeitpunkt der Berechnung */
   berechnetAm: string
 }
@@ -1081,6 +1099,10 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     | "monatsArbeitstage"
     | "umsatzProMonatsArbeitstag"
     | "differenzZumTagesziel"
+    | "saldoGegenPlan"
+    | "bisherigArbeitstage"
+    | "anteiligePlanKosten"
+    | "anteiligenSaldo"
   > & {
     tageSet: Set<string>
     umsatz: number
@@ -1226,6 +1248,11 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     let umsatzProMonatsArbeitstag: number | null = null
     let differenzZumTagesziel: number | null = null
     let bewertung: FahrerBewertung = "inaktiv"
+    // NEU: Saldo-Felder für Festgehalt
+    let saldoGegenPlan: number | null = null
+    let bisherigArbeitstage: number | null = null
+    let anteiligePlanKosten: number | null = null
+    let anteiligenSaldo: number | null = null
 
     if (f.compensationModel === 'tour_based_minijob') {
       // Minijob-Fahrer: 6-Tage-Ziel nur im Monat
@@ -1255,22 +1282,41 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
       planMonatskosten = calculateFixedSalaryMonthlyCost()
       tageszielKostendeckung = calculateDailyBreakEvenRevenue(monatsArbeitstage)
 
+      // NEU: Saldo gegen Plan (Umsatz - Plan-Monatskosten)
+      saldoGegenPlan = f.umsatz - planMonatskosten
+
+      // NEU: Bisherige Arbeitstage (für anteilige Berechnung im laufenden Monat)
+      const heute = new Date()
+      const zeitraumStart = new Date(dateRange.start)
+      const zeitraumEnde = new Date(dateRange.end)
+      // Wenn aktueller Monat, berechne bisherige Arbeitstage
+      if (heute >= zeitraumStart && heute <= zeitraumEnde) {
+        const bisHeuteDateStr = heute.toISOString().split('T')[0]
+        bisherigArbeitstage = countWorkdays(dateRange.start, bisHeuteDateStr)
+        // Anteilige Plankosten = (Plan-Kosten / Monatsarbeitstage) * bisherige Arbeitstage
+        if (monatsArbeitstage > 0 && bisherigArbeitstage !== null) {
+          anteiligePlanKosten = (planMonatskosten / monatsArbeitstage) * bisherigArbeitstage
+          anteiligenSaldo = f.umsatz - anteiligePlanKosten
+        }
+      } else {
+        // Vergangener Zeitraum - volle Monatskosten
+        bisherigArbeitstage = monatsArbeitstage
+        anteiligePlanKosten = planMonatskosten
+        anteiligenSaldo = saldoGegenPlan
+      }
+
       // Differenz zum Tagesziel
       if (umsatzProMonatsArbeitstag !== null && tageszielKostendeckung !== null) {
         differenzZumTagesziel = umsatzProMonatsArbeitstag - tageszielKostendeckung
       }
 
-      // Kostendeckungs-Status ermitteln
-      const umsatzProTag = umsatzProMonatsArbeitstag ?? 0
-      if (tageszielKostendeckung > 0) {
-        const deckungsgrad = umsatzProTag / tageszielKostendeckung
-        if (deckungsgrad >= 1.0) {
-          kostendeckungsStatus = 'ueber_ziel'
-        } else if (deckungsgrad >= 0.8) {
-          kostendeckungsStatus = 'nahe_ziel'
-        } else {
-          kostendeckungsStatus = 'unter_ziel'
-        }
+      // Kostendeckungs-Status ermitteln basierend auf Saldo
+      if (saldoGegenPlan >= 0) {
+        kostendeckungsStatus = 'ueber_ziel'
+      } else if (saldoGegenPlan >= -(planMonatskosten * 0.2)) {
+        kostendeckungsStatus = 'nahe_ziel'
+      } else {
+        kostendeckungsStatus = 'unter_ziel'
       }
 
       // Bewertung für Festgehalt: IMMER "pruefen" (wird im Controlling bewertet)
@@ -1290,6 +1336,26 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
       // Plankosten und Tagesziel als Orientierungswert
       planMonatskosten = calculateFixedSalaryMonthlyCost()
       tageszielKostendeckung = calculateDailyBreakEvenRevenue(monatsArbeitstage)
+
+      // NEU: Saldo gegen Plan auch für Teilzeit (Orientierungswert)
+      saldoGegenPlan = f.umsatz - planMonatskosten
+
+      // NEU: Bisherige Arbeitstage (für anteilige Berechnung im laufenden Monat)
+      const heute = new Date()
+      const zeitraumStart = new Date(dateRange.start)
+      const zeitraumEnde = new Date(dateRange.end)
+      if (heute >= zeitraumStart && heute <= zeitraumEnde) {
+        const bisHeuteDateStr = heute.toISOString().split('T')[0]
+        bisherigArbeitstage = countWorkdays(dateRange.start, bisHeuteDateStr)
+        if (monatsArbeitstage > 0 && bisherigArbeitstage !== null) {
+          anteiligePlanKosten = (planMonatskosten / monatsArbeitstage) * bisherigArbeitstage
+          anteiligenSaldo = f.umsatz - anteiligePlanKosten
+        }
+      } else {
+        bisherigArbeitstage = monatsArbeitstage
+        anteiligePlanKosten = planMonatskosten
+        anteiligenSaldo = saldoGegenPlan
+      }
 
       // Differenz zum Tagesziel (als Orientierung)
       if (umsatzProMonatsArbeitstag !== null && tageszielKostendeckung !== null) {
@@ -1332,7 +1398,11 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
       kostendeckungsStatus,
       monatsArbeitstage,
       umsatzProMonatsArbeitstag,
-      differenzZumTagesziel
+      differenzZumTagesziel,
+      saldoGegenPlan,
+      bisherigArbeitstage,
+      anteiligePlanKosten,
+      anteiligenSaldo
     }
   })
 
@@ -1812,14 +1882,17 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
   // ============================================================
 
   let trend: TrendData | null = null
+  let trendSixMonths: TrendData | null = null
 
   try {
     // Monatstrend-Berechnung (aggregiert für alle Fahrer)
-    // Gruppiere Touren nach Monat
+    // Gruppiere Touren nach Monat - jetzt mit Fahrerlohn und AG-Kosten
     const tourenProMonat = new Map<string, {
       umsatz: number
       touren: number
       einsatztagsSet: Set<string>
+      fahrerlohn: number
+      arbeitgeberkosten: number
     }>()
 
     for (const tour of relevantTouren) {
@@ -1827,16 +1900,43 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
       const monat = tour.datum.substring(0, 7) // YYYY-MM
 
       if (!tourenProMonat.has(monat)) {
-        tourenProMonat.set(monat, { umsatz: 0, touren: 0, einsatztagsSet: new Set() })
+        tourenProMonat.set(monat, {
+          umsatz: 0,
+          touren: 0,
+          einsatztagsSet: new Set(),
+          fahrerlohn: 0,
+          arbeitgeberkosten: 0
+        })
       }
 
       const priceResult = preisMap.get(tour.id)
       const tourUmsatz = priceResult?.amount ?? 0
 
+      // Fahrerlohn für diesen Tour
+      let tourFahrerlohn = 0
+      if (tour.driver_amount_final !== null && tour.driver_amount_final !== undefined) {
+        tourFahrerlohn = safeNumber(tour.driver_amount_final, 0)
+      } else {
+        const km = safeNumber(tour.gefahrene_km, 0)
+        const wartezeit = tour.wartezeit || undefined
+        const fahrerName = getProfileName(tour.profiles)
+        tourFahrerlohn = calculateTourVerdienst(km, wartezeit, fahrerName)
+      }
+
+      // AG-Kosten für diesen Tour
+      let tourArbeitgeberkosten = 0
+      if (tour.estimated_employer_costs !== null && tour.estimated_employer_costs !== undefined) {
+        tourArbeitgeberkosten = safeNumber(tour.estimated_employer_costs, 0)
+      } else {
+        tourArbeitgeberkosten = tourFahrerlohn * employerContributionRate
+      }
+
       const entry = tourenProMonat.get(monat)!
       entry.umsatz += tourUmsatz
       entry.touren += 1
       entry.einsatztagsSet.add(tour.datum)
+      entry.fahrerlohn += tourFahrerlohn
+      entry.arbeitgeberkosten += tourArbeitgeberkosten
     }
 
     // Konvertiere zu MonthlyTrendDataPoint-Array
@@ -1862,6 +1962,10 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
         year: '2-digit'
       })
 
+      // Marge = Umsatz - Fahrerlohn - AG-Kosten
+      const marge = data.umsatz - data.fahrerlohn - data.arbeitgeberkosten
+      const margenquote = data.umsatz > 0 ? (marge / data.umsatz) * 100 : null
+
       monatsDaten.push({
         monat,
         monatLabel,
@@ -1876,7 +1980,11 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
         tageszielKostendeckung: calculateDailyBreakEvenRevenue(sollArbeitstageDieserMonat),
         umsatzProSollArbeitstag: sollArbeitstageDieserMonat > 0
           ? data.umsatz / sollArbeitstageDieserMonat
-          : null
+          : null,
+        fahrerlohn: data.fahrerlohn,
+        arbeitgeberkosten: data.arbeitgeberkosten,
+        marge,
+        margenquote
       })
     }
 
@@ -1904,6 +2012,35 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
       monatsDaten,
       trend: trendDirection
     }
+
+    // 6-Monats-Trend (immer die letzten 6 Monate, unabhängig vom Filter)
+    // Falls weniger Daten vorhanden, nutzen wir was da ist
+    if (monatsDaten.length > 0) {
+      const lastSix = monatsDaten.slice(-6)
+      let trendSixDirection: MonthlyTrendType = 'n/a'
+      if (lastSix.length >= 2) {
+        const letztesMonat = lastSix[lastSix.length - 1]
+        const vorletzterMonat = lastSix[lastSix.length - 2]
+        const diff = letztesMonat.umsatz - vorletzterMonat.umsatz
+        const threshold = vorletzterMonat.umsatz * 0.05
+
+        if (diff > threshold) {
+          trendSixDirection = 'up'
+        } else if (diff < -threshold) {
+          trendSixDirection = 'down'
+        } else {
+          trendSixDirection = 'flat'
+        }
+      }
+
+      trendSixMonths = {
+        fahrerName: 'Alle Fahrer',
+        fahrerId: null,
+        compensationModel: null,
+        monatsDaten: lastSix,
+        trend: trendSixDirection
+      }
+    }
   } catch (err) {
     console.error("Trend-Berechnung Fehler:", err)
     // trend bleibt null
@@ -1921,6 +2058,7 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     fahrer: fahrerKPIs,
     compliance,
     trend,
+    trendSixMonths,
     berechnetAm: new Date().toISOString()
   }
 }

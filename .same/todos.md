@@ -2,6 +2,43 @@
 
 ## ✅ Abgeschlossen
 
+### 2026-06-02: Analytics fachliche Korrektur - Festgehalt vs Minijob Trennung - VOLLSTÄNDIG
+
+#### A) Top-Fahrer-Bereich korrigiert
+- [x] "Top Minijobfahrer nach Ertrag" - nur tour_based_minijob
+- [x] "Top Fahrer nach Umsatz" - alle Fahrer (Umsatz modell-unabhängig)
+- [x] Festgehaltfahrer aus tourbasierter Ertragsrangliste ausgeschlossen
+
+#### B) Einsatztage-Charts getrennt
+- [x] "Einsatztage Minijobfahrer" mit 6-Tage-Zielmarke
+- [x] "Einsatztage Festgehaltfahrer" ohne 6-Tage-Ziel
+- [x] Hinweis: "Teilzeit: Solltage individuell. Vollzeit: X Soll-Arbeitstage"
+
+#### C) Festgehaltfahrer-Controlling erweitert
+- [x] Monatsarbeitstage (Mo-Fr abzgl. NRW-Feiertage) für ALLE Festgehaltfahrer
+- [x] Umsatz pro Monatsarbeitstag (auch für Teilzeit als Orientierung)
+- [x] Tagesziel zur Kostendeckung (auch für Teilzeit als Orientierung)
+- [x] Differenz zum Tagesziel
+- [x] Teilzeit-Werte mit * als Orientierungswert markiert
+- [x] Gelber Hinweis für Teilzeit: "Individuelle Solltage nicht hinterlegt"
+
+#### D) Fahrer-Performance-Tabelle korrigiert
+- [x] Festgehalt: Ertrag = "—" (nicht tourbasiert)
+- [x] Festgehalt: Marge = "—" (nicht tourbasiert)
+- [x] Festgehalt: Bewertung = "Controlling" Badge (violett)
+- [x] Minijob: weiterhin Ertrag/Marge/Bewertung nach alter Logik
+
+#### E) Finanzübersicht korrigiert
+- [x] Badge "Tourbasiert" hinzugefügt
+- [x] Sublabel "tourbasiert" bei Fahrerlohn und AG-Kosten
+- [x] Hinweis bei Festgehaltfahrern: "Festgehaltkosten werden im Bereich Festgehaltfahrer-Controlling separat dargestellt"
+
+#### F) Monatstrend-Grafik
+- [x] Jetzt auch mit 1 Monat sichtbar (war > 1 Bedingung)
+- [x] Balkendiagramm für Umsatz pro Monat
+- [x] Balkendiagramm für Einsatztage pro Monat
+- [x] Umsatz pro Einsatztag als Zahlen
+
 ### 2026-06-02: Analytics Festgehaltfahrer-Controlling & Monatstrend - VOLLSTÄNDIG IMPLEMENTIERT
 
 #### Neu implementiert:
@@ -170,3 +207,64 @@ Tagesziel = 2.400 € / Soll-Arbeitstage
 - Build: ✅ Erfolgreich
 - Push nach main: ✅ Erfolgreich (c205aa8)
 - Version: ✅ 275
+
+---
+
+### 2026-06-02: Analytics Management-Auswertung - VOLLSTÄNDIG VERBESSERT
+
+#### A) Echtes Liniendiagramm für Leistungsentwicklung
+- [x] Recharts-Integration hinzugefügt
+- [x] Neue `MonthlyLineChart` Komponente mit ResponsiveContainer
+- [x] Zwei Linien: Umsatz (grün) und Marge/Deckungsbeitrag (violett)
+- [x] Custom Tooltip mit Euro-Formatierung
+- [x] X-Achse: Monate (z.B. "Jan 26", "Feb 26")
+- [x] Y-Achse: Euro-Werte (automatische Skalierung)
+- [x] KPI-Zeile unter dem Chart mit Marge pro Monat und Touren
+- [x] Verwendet `trendSixMonths` - letzte 6 Monate unabhängig vom Filter
+
+#### B) Marge/Deckungsbeitrag Definition
+- [x] Neue Felder in `MonthlyTrendDataPoint`: `fahrerlohn`, `arbeitgeberkosten`, `marge`, `margenquote`
+- [x] Marge-Berechnung pro Monat: Umsatz - Fahrerlohn - AG-Kosten
+- [x] Für Minijob: tourbasierte Marge weiterhin gültig
+- [x] Für Festgehalt: Saldo = Umsatz - Plan-Kosten (2.400€)
+
+#### C) Festgehaltfahrer-Controlling mit klarem Plus/Minus
+- [x] Neue `SaldoDisplay` Komponente für prominente Anzeige
+- [x] Große Zahl mit Saldo-Betrag
+- [x] Badge "Im Plus" / "Im Minus" mit farblicher Hervorhebung
+- [x] Grün bei Plus, Rot bei Minus
+- [x] Aufschlüsselung: Umsatz vs Plan-Kosten
+- [x] Teilzeit-Hinweis bei Orientierungswerten
+
+#### D) Neue FahrerLeistungKPI-Felder für Festgehalt
+- [x] `saldoGegenPlan`: Umsatz - 2.400€
+- [x] `bisherigArbeitstage`: Arbeitstage bis heute im laufenden Monat
+- [x] `anteiligePlanKosten`: (2.400€ / Monatsarbeitstage) * bisherige Tage
+- [x] `anteiligenSaldo`: Umsatz - anteilige Plan-Kosten
+
+#### E) Kostendeckungs-Status verbessert
+- [x] Status basiert jetzt auf Saldo statt nur Tagesziel
+- [x] `ueber_ziel`: Saldo >= 0
+- [x] `nahe_ziel`: Saldo >= -20% der Plan-Kosten
+- [x] `unter_ziel`: Saldo < -20% der Plan-Kosten
+- [x] `operativ_pruefen`: Teilzeit (immer individuell)
+
+#### F) UI-Verbesserungen
+- [x] Recharts LineChart ersetzt CSS-Balkendiagramm
+- [x] SaldoDisplay als erste Komponente in Festgehaltfahrer-Karten
+- [x] Beschriftung "Monatliche Leistungsentwicklung" statt "Leistungsentwicklung"
+- [x] Untertitel "Umsatz und Marge im Monatsvergleich"
+
+### Dustin Wett (fixed_salary_part_time) - Beispiel
+
+**Aktuelle Werte (Juni 2026):**
+- Umsatz: 272 €
+- Plan-Kosten: 2.400 €
+- **Saldo: -2.128 €** (klar sichtbar in roter SaldoDisplay)
+- Status: "Im Minus"
+
+**Wo sichtbar:**
+1. Admin > Analytics > "Festgehaltfahrer – Controlling"
+2. Große rote Saldo-Karte mit -2.128 €
+3. Badge "Im Minus"
+4. Aufschlüsselung: 272 € Umsatz vs 2.400 € Plan-Kosten

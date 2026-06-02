@@ -67,8 +67,18 @@ import {
   Info,
   Briefcase,
   DollarSign,
-  LineChart
+  LineChart as LineChartIcon
 } from "lucide-react"
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from "recharts"
 
 // ============================================================
 // HELPER COMPONENTS
@@ -187,6 +197,132 @@ function SimpleBarChart({
 }
 
 /** Einfache Linien-/Balkengrafik für Monatstrend (CSS-basiert) */
+/** Formatierung für Euro-Werte im Tooltip */
+function formatEuro(value: number): string {
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value)
+}
+
+/** Custom Tooltip für Recharts */
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload || !payload.length) return null
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
+      <p className="font-semibold text-gray-900 mb-2">{label}</p>
+      {payload.map((entry: any, index: number) => (
+        <div key={index} className="flex items-center gap-2 mb-1">
+          <div
+            className="w-3 h-3 rounded-full"
+            style={{ backgroundColor: entry.color }}
+          />
+          <span className="text-gray-600">{entry.name}:</span>
+          <span className="font-medium text-gray-900">
+            {entry.name.includes('quote') ? `${entry.value?.toFixed(1)}%` : formatEuro(entry.value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Echtes Liniendiagramm für Monatsentwicklung mit Recharts */
+function MonthlyLineChart({
+  data,
+  showMarge = true
+}: {
+  data: MonthlyTrendDataPoint[]
+  showMarge?: boolean
+}) {
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-400">
+        <p>Keine Daten für Trend verfügbar</p>
+      </div>
+    )
+  }
+
+  // Formatiere Daten für Recharts
+  const chartData = data.map(d => ({
+    name: d.monatLabel,
+    monat: d.monat,
+    Umsatz: Math.round(d.umsatz),
+    Marge: Math.round(d.marge),
+    Touren: d.touren,
+    Einsatztage: d.einsatztage,
+    'Umsatz/Tag': d.umsatzProEinsatztag ? Math.round(d.umsatzProEinsatztag) : 0
+  }))
+
+  return (
+    <div className="w-full">
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart
+          data={chartData}
+          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis
+            dataKey="name"
+            tick={{ fontSize: 12, fill: '#6b7280' }}
+            axisLine={{ stroke: '#d1d5db' }}
+          />
+          <YAxis
+            tick={{ fontSize: 12, fill: '#6b7280' }}
+            axisLine={{ stroke: '#d1d5db' }}
+            tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend
+            wrapperStyle={{ fontSize: '12px' }}
+          />
+          <Line
+            type="monotone"
+            dataKey="Umsatz"
+            stroke="#10b981"
+            strokeWidth={3}
+            dot={{ fill: '#10b981', strokeWidth: 2, r: 5 }}
+            activeDot={{ r: 8 }}
+            name="Umsatz"
+          />
+          {showMarge && (
+            <Line
+              type="monotone"
+              dataKey="Marge"
+              stroke="#6366f1"
+              strokeWidth={3}
+              dot={{ fill: '#6366f1', strokeWidth: 2, r: 5 }}
+              activeDot={{ r: 8 }}
+              name="Marge / Deckungsbeitrag"
+            />
+          )}
+        </LineChart>
+      </ResponsiveContainer>
+
+      {/* Zusätzliche KPI-Zeile unter dem Chart */}
+      <div className="mt-4 grid grid-cols-3 sm:grid-cols-6 gap-2 border-t border-gray-100 pt-4">
+        {data.map((d, idx) => (
+          <div key={idx} className="text-center">
+            <div className="text-[10px] text-gray-400 mb-0.5">{d.monatLabel}</div>
+            <div className={`text-xs font-semibold ${
+              d.marge >= 0 ? 'text-emerald-600' : 'text-red-600'
+            }`}>
+              {formatEuro(d.marge)}
+            </div>
+            <div className="text-[10px] text-gray-400">
+              {d.touren} Touren
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** CSS-basiertes Balkendiagramm (Fallback/Alternative) */
 function TrendChart({
   data,
   showSollArbeitstage = false
@@ -268,6 +404,60 @@ function TrendChart({
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Saldo-Anzeige mit großer Zahl für Festgehaltfahrer */
+function SaldoDisplay({
+  umsatz,
+  planKosten,
+  fahrername,
+  isTeilzeit = false
+}: {
+  umsatz: number
+  planKosten: number
+  fahrername: string
+  isTeilzeit?: boolean
+}) {
+  const saldo = umsatz - planKosten
+  const isPositiv = saldo >= 0
+
+  return (
+    <div className={`rounded-xl p-4 ${
+      isPositiv ? 'bg-emerald-50 border-2 border-emerald-200' : 'bg-red-50 border-2 border-red-200'
+    }`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-gray-600">Saldo gegen Plan</span>
+        <Badge className={`${
+          isPositiv
+            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+            : 'bg-red-100 text-red-800 border-red-300'
+        } border font-semibold`}>
+          {isPositiv ? 'Im Plus' : 'Im Minus'}
+        </Badge>
+      </div>
+      <div className={`text-3xl font-bold tracking-tight ${
+        isPositiv ? 'text-emerald-700' : 'text-red-700'
+      }`}>
+        {isPositiv ? '+' : ''}{formatEuro(saldo)}
+      </div>
+      <div className="mt-2 text-xs text-gray-500 space-y-0.5">
+        <div className="flex justify-between">
+          <span>Umsatz:</span>
+          <span className="font-medium">{formatEuro(umsatz)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Plan-Kosten:</span>
+          <span className="font-medium">{formatEuro(planKosten)}</span>
+        </div>
+      </div>
+      {isTeilzeit && (
+        <div className="mt-2 flex items-center gap-1 text-[10px] text-amber-600">
+          <AlertTriangle className="h-3 w-3" />
+          <span>Teilzeit - Orientierungswert</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -883,34 +1073,34 @@ export default function AnalyticsPage() {
             </div>
 
             {/* ============================================================ */}
-            {/* MONATSTREND-GRAFIK */}
+            {/* MONATLICHE LEISTUNGSENTWICKLUNG - LINIENDIAGRAMM */}
             {/* ============================================================ */}
-            {analytics.trend && analytics.trend.monatsDaten.length >= 1 && (
+            {analytics.trendSixMonths && analytics.trendSixMonths.monatsDaten.length >= 1 && (
               <Card className="border-gray-100">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">
-                    <LineChart className="h-5 w-5 text-violet-600" />
-                    <CardTitle className="text-base font-semibold text-gray-900">Leistungsentwicklung</CardTitle>
-                    {analytics.trend.trend !== 'n/a' && (
+                    <LineChartIcon className="h-5 w-5 text-violet-600" />
+                    <CardTitle className="text-base font-semibold text-gray-900">Monatliche Leistungsentwicklung</CardTitle>
+                    {analytics.trendSixMonths.trend !== 'n/a' && (
                       <Badge className={`ml-2 border font-medium ${
-                        analytics.trend.trend === 'up' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                        analytics.trend.trend === 'down' ? 'bg-red-50 text-red-700 border-red-200' :
+                        analytics.trendSixMonths.trend === 'up' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        analytics.trendSixMonths.trend === 'down' ? 'bg-red-50 text-red-700 border-red-200' :
                         'bg-gray-50 text-gray-600 border-gray-200'
                       }`}>
-                        {analytics.trend.trend === 'up' && <ArrowUp className="h-3 w-3 mr-1" />}
-                        {analytics.trend.trend === 'down' && <ArrowDown className="h-3 w-3 mr-1" />}
-                        {analytics.trend.trend === 'flat' && <Minus className="h-3 w-3 mr-1" />}
-                        {analytics.trend.trend === 'up' ? 'Aufwärts' :
-                         analytics.trend.trend === 'down' ? 'Abwärts' : 'Stabil'}
+                        {analytics.trendSixMonths.trend === 'up' && <ArrowUp className="h-3 w-3 mr-1" />}
+                        {analytics.trendSixMonths.trend === 'down' && <ArrowDown className="h-3 w-3 mr-1" />}
+                        {analytics.trendSixMonths.trend === 'flat' && <Minus className="h-3 w-3 mr-1" />}
+                        {analytics.trendSixMonths.trend === 'up' ? 'Aufwärts' :
+                         analytics.trendSixMonths.trend === 'down' ? 'Abwärts' : 'Stabil'}
                       </Badge>
                     )}
                   </div>
-                  <CardDescription>Monatsansicht: Umsatz, Einsatztage und Umsatz pro Einsatztag</CardDescription>
+                  <CardDescription>Umsatz und Marge im Monatsvergleich (letzte {analytics.trendSixMonths.monatsDaten.length} Monate)</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <TrendChart
-                    data={analytics.trend.monatsDaten}
-                    showSollArbeitstage={analytics.fahrer.festgehaltFahrerMitTouren > 0}
+                  <MonthlyLineChart
+                    data={analytics.trendSixMonths.monatsDaten}
+                    showMarge={true}
                   />
                 </CardContent>
               </Card>
@@ -967,6 +1157,16 @@ export default function AnalyticsPage() {
                         </div>
                       </CardHeader>
                       <CardContent className="pt-0">
+                        {/* PROMINENTE SALDO-ANZEIGE */}
+                        <div className="mb-4">
+                          <SaldoDisplay
+                            umsatz={fahrer.umsatz}
+                            planKosten={fahrer.planMonatskosten ?? calculateFixedSalaryMonthlyCost()}
+                            fahrername={fahrer.name}
+                            isTeilzeit={fahrer.compensationModel === 'fixed_salary_part_time'}
+                          />
+                        </div>
+
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {/* Umsatz */}
                           <div className="bg-gray-50 rounded p-2">
