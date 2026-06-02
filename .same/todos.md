@@ -2,82 +2,171 @@
 
 ## ✅ Abgeschlossen
 
-### 2026-06-02: Vergütungsmodell Bugfixes
-- [x] Bug-Fix: Admin-Portal zeitmodell-Fehler beim Fahrer-Speichern
-- [x] Bug-Fix: Fahrerportal compensation_model-Laden für Dustin Wett
-- [x] Bug-Fix: Doppelte Funktionsdefinitionen entfernt
-- [x] Minijob-Limit auf 603€ aktualisiert
+### 2026-06-02: Analytics Festgehaltfahrer-Controlling & Monatstrend - VOLLSTÄNDIG IMPLEMENTIERT
 
-### 2026-06-02: TEIL A - Analytics nach Vergütungsmodell
-- [x] 1. compensation_model in analytics-calculator laden (profiles.compensation_model)
-- [x] 2. FahrerLeistungKPI um compensation_model erweitern
-- [x] 3. KPI-Logik für Minijob-Fahrer (6-Tage-Ziel nur für tour_based_minijob)
-- [x] 4. KPI-Logik für Festgehaltfahrer (Auslastung, Soll-Arbeitstage, Leerlauftage)
-- [x] 5. UI-Anpassung: Verschiedene KPI-Labels je nach compensation_model
-- [x] 6. fahrerUnterZiel zählt nur noch Minijob-Fahrer
+#### Neu implementiert:
+- [x] Kostenlogik für Festgehaltfahrer als interne Planwerte
+  - `FIXED_SALARY_DEFAULT_GROSS = 1200 €`
+  - `FIXED_SALARY_EMPLOYER_COST_RATE = 0.25` (25%)
+  - `FIXED_SALARY_ADDITIONAL_COST = 900 €`
+  - `calculateFixedSalaryMonthlyCost() = 2400 €`
+  - `calculateDailyBreakEvenRevenue(sollArbeitstage)`
+- [x] Soll-Arbeitstage mit NRW-Feiertagen (`countWorkdaysWithHolidays`)
+- [x] Festgehaltfahrer-Controlling UI-Bereich mit:
+  - Fahrername + Vergütungsmodell-Badge
+  - Umsatz, Touren, Einsatztage
+  - Soll-Arbeitstage (nur Vollzeit, Mo-Fr abzgl. NRW-Feiertage)
+  - Leerlauftage (nur Vollzeit)
+  - Umsatz pro Einsatztag
+  - Umsatz pro Soll-Arbeitstag (nur Vollzeit)
+  - Plan-Monatskosten (2400 €)
+  - Tagesziel zur Kostendeckung (nur Vollzeit)
+  - Auslastungsquote (nur Vollzeit)
+  - Kostendeckungs-Status Badge
+- [x] Monatstrend-Grafik mit:
+  - Umsatz pro Monat (Balkendiagramm)
+  - Einsatztage pro Monat (Balkendiagramm)
+  - Umsatz pro Einsatztag (Zahlen)
+  - Trend-Richtung (Aufwärts/Abwärts/Stabil)
+- [x] Neue Types: `MonthlyTrendDataPoint`, `TrendData`, `MonthlyTrendType`
+- [x] Neue KPI-Felder in `FahrerLeistungKPI`:
+  - `umsatzProSollArbeitstag`
+  - `planMonatskosten`
+  - `tageszielKostendeckung`
+  - `kostendeckungsStatus`
+- [x] `festgehaltFahrer` Array in `FahrerKPIs`
+- [x] Teilzeit-Hinweis: "Individuelle Solltage nicht hinterlegt"
 
-### 2026-06-02: TEIL B - Auslagenformular payment_method
-- [x] 1. Migration erstellt: payment_method Spalte (private/company_card)
-- [x] 2. Fahrerportal: Zahlungsart-Auswahl für ALLE Belegtypen (nicht nur Tankbeleg)
-- [x] 3. Admin: Zahlungsart-Spalte in Auslagenübersicht
-- [x] 4. company_card-Auslagen zeigen "Nicht erstatten" Hinweis
-- [x] 5. API aktualisiert: payment_method wird korrekt gespeichert
-- [x] 6. TypeScript-Typen aktualisiert (Auslagennachweis, PaymentMethod)
+### 2026-06-02: Analytics & Auslagen payment_method - VOLLSTÄNDIG IMPLEMENTIERT
 
-## 📋 Migration noch auszuführen
+#### TEIL A: Analytics nach Vergütungsmodell
+- [x] compensation_model in analytics-calculator laden (profiles.compensation_model)
+- [x] FahrerLeistungKPI um compensation_model erweitern
+- [x] KPI-Logik für Minijob-Fahrer (6-Tage-Ziel nur für tour_based_minijob)
+- [x] KPI-Logik für Festgehaltfahrer (Auslastung, Soll-Arbeitstage, Leerlauftage)
+- [x] UI-Anpassung: Verschiedene KPI-Labels je nach compensation_model
+- [x] fahrerUnterZiel zählt nur noch Minijob-Fahrer
+- [x] Minijob-Zieltage Badge nur bei Minijob-Fahrern angezeigt
+- [x] Festgehalt-Teilzeit zeigt Hinweis "Individuelle Solltage"
 
-Die Migration `20260602_payment_method.sql` muss noch im Supabase Dashboard ausgeführt werden:
-1. SQL Editor im Supabase Dashboard öffnen
-2. Inhalt von `supabase/migrations/20260602_payment_method.sql` einfügen
-3. Ausführen
+#### TEIL B: Auslagenformular payment_method
+- [x] Migration erstellt: payment_method Spalte (private/company_card)
+- [x] Fahrerportal: Zahlungsart-Auswahl für ALLE Belegtypen (nicht nur Tankbeleg)
+- [x] Admin: Zahlungsart-Spalte in Auslagenübersicht
+- [x] company_card-Auslagen zeigen "Nicht erstatten" Hinweis
+- [x] API aktualisiert: payment_method wird korrekt gespeichert
+- [x] TypeScript-Typen aktualisiert (Auslagennachweis, PaymentMethod)
+- [x] AuslagenTab: "Als überwiesen markieren" Button für company_card deaktiviert
+- [x] admin-api: markAuslageAsReimbursed() prüft payment_method
+- [x] admin-api: billMultipleAuslagen() schließt company_card aus
+- [x] invoice-api: getBillableExpenses() filtert company_card aus
+- [x] Fahrerportal Auslagenabrechnung: company_card nicht in Erstattungssumme
+- [x] Migration live angewendet (214 Auslagen → private)
 
-## 📝 Geänderte Dateien
+## ✅ Migration Status
 
-### Analytics
+| Migration | Status | Details |
+|-----------|--------|---------|
+| `20260602_compensation_model.sql` | ✅ Live | Vergütungsmodell in profiles |
+| `20260602_payment_method.sql` | ✅ Live | 214 Auslagen auf 'private' gesetzt |
+
+## 📝 Zusammenfassung der Änderungen
+
+### Neue Analytics-Features (Festgehaltfahrer-Controlling)
+
+**Kostenlogik (interne Planwerte):**
+```
+Bruttogehalt:           1.200 €
++ AG-Kosten (25%):        300 €
++ Zusatzkosten:           900 €
+= Monatskosten:         2.400 €
+
+Tagesziel = 2.400 € / Soll-Arbeitstage
+```
+
+**Soll-Arbeitstage für Vollzeit:**
+- Montag bis Freitag im Zeitraum
+- Abzüglich NRW-Feiertage (Neujahr, Karfreitag, Ostermontag, Tag der Arbeit, Christi Himmelfahrt, Pfingstmontag, Fronleichnam, Tag der Deutschen Einheit, Allerheiligen, 1. & 2. Weihnachtstag)
+- Verwendet `countWorkdays()` aus `holidays.ts`
+
+**Kostendeckungs-Status:**
+- `ueber_ziel`: Umsatz/Soll-Tag >= Tagesziel
+- `nahe_ziel`: Umsatz/Soll-Tag >= 80% des Tagesziels
+- `unter_ziel`: Umsatz/Soll-Tag < 80% des Tagesziels
+- `operativ_pruefen`: Teilzeit (keine Solltage berechenbar)
+
+**Monatstrend-Grafik:**
+- Gruppiert Touren nach Monat
+- Zeigt Balkendiagramme für Umsatz und Einsatztage
+- Zeigt Umsatz pro Einsatztag
+- Trend-Badge: Aufwärts/Abwärts/Stabil (basierend auf letzten 2 Monaten)
+
+### Geänderte Dateien (Festgehaltfahrer-Controlling):
+
 - `src/lib/analytics-calculator.ts`
-  - CompensationModelType hinzugefügt
-  - FahrerLeistungKPI um compensation_model, sollArbeitstage, leerlauftage, auslastungsquote erweitert
-  - FahrerKPIs um minijobFahrerMitTouren, festgehaltFahrerMitTouren erweitert
-  - Fahrer-Laden um profiles.compensation_model erweitert
-  - Unterschiedliche KPI-Berechnung je nach Vergütungsmodell
+  - Neue Konstanten: `FIXED_SALARY_DEFAULT_GROSS`, `FIXED_SALARY_EMPLOYER_COST_RATE`, `FIXED_SALARY_ADDITIONAL_COST`
+  - Neue Funktionen: `calculateFixedSalaryMonthlyCost()`, `calculateDailyBreakEvenRevenue()`
+  - Neue Types: `MonthlyTrendDataPoint`, `TrendData`, `MonthlyTrendType`
+  - Erweiterte `FahrerLeistungKPI` mit Kostendeckungs-Feldern
+  - `FahrerKPIs.festgehaltFahrer` Array
+  - Monatstrend-Berechnung
+  - `countWorkdays` nutzt jetzt NRW-Feiertage
 
 - `src/app/admin/analytics/page.tsx`
-  - "Minijob-Zieltage" statt generisch "Fahrer-Ziel (6 Tage)"
-  - "Einsatztage" statt "Aktive Tage"
-  - Typ-Spalte in Fahrer-Tabelle (Minijob/TZ/VZ)
-  - Detail-Ansicht zeigt unterschiedliche KPIs je nach Vergütungsmodell
-  - Festgehalt-Vollzeit: Soll-Arbeitstage, Auslastung, Leerlauftage
-  - Teilzeit-Festgehalt: Hinweis "individuelle Solltage"
+  - Neue Komponente: `TrendChart`
+  - Neue Komponente: `KostendeckungsStatusBadge`
+  - Neuer Bereich: "Festgehaltfahrer – Controlling"
+  - Neuer Bereich: "Leistungsentwicklung" (Monatstrend)
+  - Planwert-Hinweis mit Kostenaufschlüsselung
 
-### Auslagen
-- `supabase/migrations/20260602_payment_method.sql` (NEU)
-  - payment_method Spalte (private/company_card)
-  - Check-Constraint für gültige Werte
-  - Index für schnelle Filterung
+### Wo finde ich was?
 
-- `src/lib/supabase.ts`
-  - PaymentMethod Type hinzugefügt
-  - Auslagennachweis um payment_method erweitert
+| Feature | Ort |
+|---------|-----|
+| Festgehaltfahrer-Controlling | Admin > Analytics > "Festgehaltfahrer – Controlling" |
+| Monatstrend-Grafik | Admin > Analytics > "Leistungsentwicklung" |
+| Kostendeckungs-Status | Badges in Festgehaltfahrer-Karten |
+| Planwert-Hinweis | Gelber Info-Kasten über Festgehaltfahrer-Karten |
 
-- `src/lib/api.ts`
-  - createAuslagennachweis akzeptiert payment_method statt ist_tankkarte
-  - Status 'tankcard' für company_card-Auslagen
+### Fachliche Logik
 
-- `src/app/fahrerportal/auslagennachweis/page.tsx`
-  - Zahlungsart-Auswahl für ALLE Belegtypen
-  - Zwei Radio-Buttons: "Eigene Tasche" / "Firmenkreditkarte"
-  - Beschreibungstexte für jede Option
+**Dustin Wett (fixed_salary_part_time):**
+- ✅ Sieht keine Minijob-6-Tage-Logik
+- ✅ Sieht im Admin-Controlling: Umsatz, Touren, Einsatztage, €/Einsatztag
+- ✅ Sieht Plan-Monatskosten 2.400 €
+- ✅ Sieht Hinweis "Teilzeit-Solltage individuell"
+- ✅ Status: "Individuell prüfen"
+- ❌ Kein Tagesziel (da keine Solltage berechenbar)
+- ❌ Keine Auslastungsquote
+- ❌ Keine Leerlauftage
 
-- `src/components/admin/tabs/AuslagenTab.tsx`
-  - Auslage Interface um paymentMethod erweitert
-  - Neue Spalte "Bezahlt mit"
-  - Badge für Firmenkreditkarte mit "Nicht erstatten" Hinweis
+**Vollzeit-Festgehalt (fixed_salary_full_time):**
+- ✅ Soll-Arbeitstage = Mo-Fr minus NRW-Feiertage
+- ✅ Leerlauftage = Soll - Einsatztage
+- ✅ Auslastungsquote = Einsatztage / Soll * 100
+- ✅ Umsatz pro Soll-Arbeitstag
+- ✅ Tagesziel = 2.400 € / Soll-Arbeitstage
+- ✅ Kostendeckungs-Status (Ampel)
 
-- `src/app/admin/auslagen/page.tsx`
-  - paymentMethod in Mapping hinzugefügt
+**Minijob-Fahrer:**
+- ✅ Minijob-Zieltage (6 Tage) weiterhin sichtbar
+- ✅ Minijob-Auslastung (% vom 603€-Limit)
+- ❌ Keine Festgehalt-Kosten-KPIs
 
-## 📝 Notizen
-- Keine Gehalts-/Kostenlogik in Fahrerakte
-- Keine neuen Feature-Blöcke außerhalb dieser beiden Themen
-- Build erfolgreich
-- Push nach main steht noch aus
+**Was im Fahrerportal NICHT angezeigt wird:**
+- ❌ Planwerte / Kostenlogik
+- ❌ Tagesziele
+- ❌ Kostendeckungs-Status
+- ❌ Ertragswerte
+
+## 📝 Bekannte Fehler (nicht Teil dieser Aufgabe)
+
+- Onboarding-API: Fehlende Exporte (validateQuestionnaireForm, etc.)
+- Admin Fahrer-Seite: zeitmodell-Feld im updateFahrer-Aufruf
+
+## ✅ Build & Deploy Status
+
+- Typecheck: ✅ Erfolgreich (Fehler in nicht-relevanten Dateien)
+- Build: ✅ Erfolgreich
+- Push nach main: ⏳ Ausstehend
+- Version: ⏳ Wird erstellt

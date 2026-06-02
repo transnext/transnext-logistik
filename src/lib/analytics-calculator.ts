@@ -16,6 +16,42 @@ import {
   type FahrerUploadCompliance,
   type FahrerVerfuegbarkeitsAuslastung
 } from "./alerts-calculator"
+import { countWorkdays as countWorkdaysWithHolidays, isWorkday } from "./holidays"
+
+// ============================================================
+// FESTGEHALT-KOSTENLOGIK (INTERNE PLANWERTE)
+// ============================================================
+// Diese Konstanten sind interne Analytics-Planwerte für die
+// Controlling-Berechnung von Festgehaltfahrern.
+// NICHT in Fahrerakte anzeigen, NICHT für Kundenabrechnung verwenden.
+
+/** Planwert: Bruttogehalt für Festgehaltfahrer (€) */
+export const FIXED_SALARY_DEFAULT_GROSS = 1200
+
+/** Planwert: Arbeitgeber-Kostenaufschlag (25% = 0.25) */
+export const FIXED_SALARY_EMPLOYER_COST_RATE = 0.25
+
+/** Planwert: Zusatzkosten netto (Fahrzeug, Versicherung, etc.) (€) */
+export const FIXED_SALARY_ADDITIONAL_COST = 900
+
+/**
+ * Berechnet die kalkulatorischen monatlichen Gesamtkosten für einen Festgehaltfahrer.
+ * Formula: Brutto + AG-Kosten + Zusatzkosten = 1200 + 300 + 900 = 2400 €
+ */
+export function calculateFixedSalaryMonthlyCost(): number {
+  return FIXED_SALARY_DEFAULT_GROSS
+    + (FIXED_SALARY_DEFAULT_GROSS * FIXED_SALARY_EMPLOYER_COST_RATE)
+    + FIXED_SALARY_ADDITIONAL_COST
+}
+
+/**
+ * Berechnet den erforderlichen Tagesumsatz zur Kostendeckung.
+ * @param sollArbeitstage - Anzahl der Soll-Arbeitstage im Monat
+ */
+export function calculateDailyBreakEvenRevenue(sollArbeitstage: number): number {
+  if (sollArbeitstage <= 0) return 0
+  return calculateFixedSalaryMonthlyCost() / sollArbeitstage
+}
 
 // ============================================================
 // TYPES
@@ -30,6 +66,8 @@ export type AnalyticsTimeRange =
   | "last_year"
   | "since_dec_2025"
   | "custom"
+
+export type MonthlyTrendType = "up" | "down" | "flat" | "n/a"
 
 export interface TimeRangeParams {
   range: AnalyticsTimeRange
@@ -205,6 +243,14 @@ export interface FahrerLeistungKPI {
   leerlauftage: number | null
   /** Auslastungsquote (Einsatztage / Soll-Arbeitstage * 100, nur für Festgehalt) */
   auslastungsquote: number | null
+  /** Umsatz pro Soll-Arbeitstag (nur für Festgehalt-Vollzeit) */
+  umsatzProSollArbeitstag: number | null
+  /** Kalkulatorische Monatskosten (nur für Festgehalt, aus Planwerten) */
+  planMonatskosten: number | null
+  /** Erforderlicher Tagesumsatz zur Kostendeckung (nur für Festgehalt) */
+  tageszielKostendeckung: number | null
+  /** Kostendeckungs-Status */
+  kostendeckungsStatus: 'ueber_ziel' | 'nahe_ziel' | 'unter_ziel' | 'operativ_pruefen' | null
 }
 
 export interface FahrerKPIs {
@@ -240,6 +286,46 @@ export interface FahrerKPIs {
   minijobFahrerMitTouren: number
   /** Anzahl Festgehalt-Fahrer mit Touren */
   festgehaltFahrerMitTouren: number
+  /** Nur Festgehaltfahrer für Controlling-Bereich */
+  festgehaltFahrer: FahrerLeistungKPI[]
+}
+
+/** Monatlicher Trend-Datenpunkt für Grafiken */
+export interface MonthlyTrendDataPoint {
+  /** Monat im Format "YYYY-MM" */
+  monat: string
+  /** Anzeige-Label (z.B. "Jan 26") */
+  monatLabel: string
+  /** Umsatz im Monat */
+  umsatz: number
+  /** Anzahl Touren */
+  touren: number
+  /** Anzahl Einsatztage */
+  einsatztage: number
+  /** Umsatz pro Einsatztag */
+  umsatzProEinsatztag: number | null
+  /** Soll-Arbeitstage (nur für Vollzeit-Festgehalt) */
+  sollArbeitstage: number | null
+  /** Auslastungsquote (nur für Vollzeit-Festgehalt) */
+  auslastungsquote: number | null
+  /** Tagesziel zur Kostendeckung (nur für Festgehalt) */
+  tageszielKostendeckung: number | null
+  /** Umsatz pro Soll-Arbeitstag (nur für Vollzeit-Festgehalt) */
+  umsatzProSollArbeitstag: number | null
+}
+
+/** Trend-Daten für einen Fahrer oder aggregiert */
+export interface TrendData {
+  /** Fahrer-Name (oder "Alle Fahrer" für aggregiert) */
+  fahrerName: string
+  /** Fahrer-ID (null für aggregiert) */
+  fahrerId: number | null
+  /** Vergütungsmodell (null für aggregiert) */
+  compensationModel: CompensationModelType | null
+  /** Monatliche Datenpunkte */
+  monatsDaten: MonthlyTrendDataPoint[]
+  /** Trend-Richtung (basierend auf letzten 2 Monaten) */
+  trend: MonthlyTrendType
 }
 
 /** Einzelne verspätete Tour mit Details */
@@ -342,6 +428,8 @@ export interface AnalyticsData {
   fahrer: FahrerKPIs
   /** NEU: Compliance-KPIs */
   compliance: ComplianceKPIs
+  /** NEU: Monatstrend-Daten */
+  trend: TrendData | null
   /** Zeitpunkt der Berechnung */
   berechnetAm: string
 }
@@ -976,6 +1064,10 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     | "sollArbeitstage"
     | "leerlauftage"
     | "auslastungsquote"
+    | "umsatzProSollArbeitstag"
+    | "planMonatskosten"
+    | "tageszielKostendeckung"
+    | "kostendeckungsStatus"
   > & {
     tageSet: Set<string>
     umsatz: number
@@ -1083,20 +1175,7 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
   // Berechne Soll-Arbeitstage (Mo-Fr minus Feiertage) für Vollzeit-Festgehalt
   // Hilfsfunktion: Anzahl Werktage (Mo-Fr) in einem Zeitraum
   function countWorkdays(start: string, end: string): number {
-    const startDate = new Date(start)
-    const endDate = new Date(end)
-    let count = 0
-    const current = new Date(startDate)
-
-    while (current <= endDate) {
-      const dayOfWeek = current.getDay()
-      // 0 = Sonntag, 6 = Samstag
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        count++
-      }
-      current.setDate(current.getDate() + 1)
-    }
-    return count
+    return countWorkdaysWithHolidays(start, end)
   }
 
   const sollArbeitstageVollzeit = countWorkdays(dateRange.start, dateRange.end)
@@ -1126,6 +1205,10 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     let sollArbeitstage: number | null = null
     let leerlauftage: number | null = null
     let auslastungsquote: number | null = null
+    let umsatzProSollArbeitstag: number | null = null
+    let planMonatskosten: number | null = null
+    let tageszielKostendeckung: number | null = null
+    let kostendeckungsStatus: 'ueber_ziel' | 'nahe_ziel' | 'unter_ziel' | 'operativ_pruefen' | null = null
     let bewertung: FahrerBewertung = "inaktiv"
 
     if (f.compensationModel === 'tour_based_minijob') {
@@ -1148,16 +1231,45 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
       sollArbeitstage = sollArbeitstageVollzeit
       leerlauftage = Math.max(0, sollArbeitstage - aktiveFahrtage)
       auslastungsquote = sollArbeitstage > 0 ? (aktiveFahrtage / sollArbeitstage) * 100 : null
+      umsatzProSollArbeitstag = sollArbeitstage > 0 ? f.umsatz / sollArbeitstage : null
 
-      // Bewertung für Vollzeit-Festgehalt (basierend auf Auslastung)
+      // Plankosten und Kostendeckung (nur bei Monatszeitraum)
+      if (dateRange.istMonat) {
+        planMonatskosten = calculateFixedSalaryMonthlyCost()
+        tageszielKostendeckung = calculateDailyBreakEvenRevenue(sollArbeitstage)
+
+        // Kostendeckungs-Status ermitteln
+        const umsatzProSollTag = umsatzProSollArbeitstag ?? 0
+        if (tageszielKostendeckung > 0) {
+          const deckungsgrad = umsatzProSollTag / tageszielKostendeckung
+          if (deckungsgrad >= 1.0) {
+            kostendeckungsStatus = 'ueber_ziel'
+          } else if (deckungsgrad >= 0.8) {
+            kostendeckungsStatus = 'nahe_ziel'
+          } else {
+            kostendeckungsStatus = 'unter_ziel'
+          }
+        }
+      }
+
+      // Bewertung für Vollzeit-Festgehalt (basierend auf Auslastung + Kostendeckung)
       if (aktiveFahrtage > 0) {
-        const auslastung = auslastungsquote ?? 0
-        if (auslastung >= 80) {
-          bewertung = "stark" // Hohe Auslastung
-        } else if (auslastung >= 50) {
-          bewertung = "pruefen" // Mittlere Auslastung
+        if (kostendeckungsStatus === 'ueber_ziel') {
+          bewertung = "stark"
+        } else if (kostendeckungsStatus === 'nahe_ziel') {
+          bewertung = "pruefen"
+        } else if (kostendeckungsStatus === 'unter_ziel') {
+          bewertung = "ausbauen"
         } else {
-          bewertung = "ausbauen" // Geringe Auslastung
+          // Fallback auf Auslastung
+          const auslastung = auslastungsquote ?? 0
+          if (auslastung >= 80) {
+            bewertung = "stark"
+          } else if (auslastung >= 50) {
+            bewertung = "pruefen"
+          } else {
+            bewertung = "ausbauen"
+          }
         }
       }
 
@@ -1167,10 +1279,18 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
       sollArbeitstage = null // Individuell - nicht berechenbar
       leerlauftage = null
       auslastungsquote = null
+      umsatzProSollArbeitstag = null
+
+      // Plankosten trotzdem anzeigen (als Planwert)
+      if (dateRange.istMonat) {
+        planMonatskosten = calculateFixedSalaryMonthlyCost()
+        // Kein Tagesziel, da keine Solltage
+        kostendeckungsStatus = 'operativ_pruefen' // Individuelle Prüfung erforderlich
+      }
 
       // Bewertung für Teilzeit-Festgehalt (basierend auf Aktivität)
       if (aktiveFahrtage > 0) {
-        bewertung = "stark" // Aktiv = gut
+        bewertung = "stark" // Aktiv = grundsätzlich gut
       }
     }
 
@@ -1196,7 +1316,11 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
       compensationModel: f.compensationModel,
       sollArbeitstage,
       leerlauftage,
-      auslastungsquote
+      auslastungsquote,
+      umsatzProSollArbeitstag,
+      planMonatskosten,
+      tageszielKostendeckung,
+      kostendeckungsStatus
     }
   })
 
@@ -1256,9 +1380,10 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
 
   // Anzahl Fahrer nach Vergütungsmodell
   const minijobFahrerMitTouren = alleFahrer.filter(f => f.compensationModel === 'tour_based_minijob').length
-  const festgehaltFahrerMitTouren = alleFahrer.filter(f =>
+  const festgehaltFahrer = alleFahrer.filter(f =>
     f.compensationModel === 'fixed_salary_part_time' || f.compensationModel === 'fixed_salary_full_time'
-  ).length
+  )
+  const festgehaltFahrerMitTouren = festgehaltFahrer.length
 
   const fahrerKPIs: FahrerKPIs = {
     aktiveFahrer,
@@ -1276,7 +1401,8 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     fahrerPruefen,
     fahrerUnterZiel,
     minijobFahrerMitTouren,
-    festgehaltFahrerMitTouren
+    festgehaltFahrerMitTouren,
+    festgehaltFahrer
   }
 
   // ============================================================
@@ -1662,7 +1788,109 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
   }
 
   // ============================================================
-  // 7. ERGEBNIS ZUSAMMENSTELLEN
+  // 7. MONATSTREND-DATEN BERECHNEN
+  // ============================================================
+
+  let trend: TrendData | null = null
+
+  try {
+    // Monatstrend-Berechnung (aggregiert für alle Fahrer)
+    // Gruppiere Touren nach Monat
+    const tourenProMonat = new Map<string, {
+      umsatz: number
+      touren: number
+      einsatztagsSet: Set<string>
+    }>()
+
+    for (const tour of relevantTouren) {
+      if (!tour.datum) continue
+      const monat = tour.datum.substring(0, 7) // YYYY-MM
+
+      if (!tourenProMonat.has(monat)) {
+        tourenProMonat.set(monat, { umsatz: 0, touren: 0, einsatztagsSet: new Set() })
+      }
+
+      const priceResult = preisMap.get(tour.id)
+      const tourUmsatz = priceResult?.amount ?? 0
+
+      const entry = tourenProMonat.get(monat)!
+      entry.umsatz += tourUmsatz
+      entry.touren += 1
+      entry.einsatztagsSet.add(tour.datum)
+    }
+
+    // Konvertiere zu MonthlyTrendDataPoint-Array
+    const monatsDaten: MonthlyTrendDataPoint[] = []
+
+    // Sortiere Monate chronologisch
+    const sortedMonths = Array.from(tourenProMonat.keys()).sort()
+
+    for (const monat of sortedMonths) {
+      const data = tourenProMonat.get(monat)!
+      const einsatztage = data.einsatztagsSet.size
+
+      // Berechne Soll-Arbeitstage für diesen Monat (für Vollzeit-Referenz)
+      const [jahr, mon] = monat.split('-').map(Number)
+      const monatsStart = `${jahr}-${String(mon).padStart(2, '0')}-01`
+      const letzterTag = new Date(jahr, mon, 0).getDate()
+      const monatsEnde = `${jahr}-${String(mon).padStart(2, '0')}-${String(letzterTag).padStart(2, '0')}`
+      const sollArbeitstageDieserMonat = countWorkdays(monatsStart, monatsEnde)
+
+      // Monats-Label (z.B. "Jan 26")
+      const monatLabel = new Date(jahr, mon - 1, 1).toLocaleDateString('de-DE', {
+        month: 'short',
+        year: '2-digit'
+      })
+
+      monatsDaten.push({
+        monat,
+        monatLabel,
+        umsatz: data.umsatz,
+        touren: data.touren,
+        einsatztage,
+        umsatzProEinsatztag: einsatztage > 0 ? data.umsatz / einsatztage : null,
+        sollArbeitstage: sollArbeitstageDieserMonat,
+        auslastungsquote: sollArbeitstageDieserMonat > 0
+          ? (einsatztage / sollArbeitstageDieserMonat) * 100
+          : null,
+        tageszielKostendeckung: calculateDailyBreakEvenRevenue(sollArbeitstageDieserMonat),
+        umsatzProSollArbeitstag: sollArbeitstageDieserMonat > 0
+          ? data.umsatz / sollArbeitstageDieserMonat
+          : null
+      })
+    }
+
+    // Trend-Richtung ermitteln (basierend auf letzten 2 Monaten Umsatz)
+    let trendDirection: MonthlyTrendType = 'n/a'
+    if (monatsDaten.length >= 2) {
+      const letztesMonat = monatsDaten[monatsDaten.length - 1]
+      const vorletzterMonat = monatsDaten[monatsDaten.length - 2]
+      const diff = letztesMonat.umsatz - vorletzterMonat.umsatz
+      const threshold = vorletzterMonat.umsatz * 0.05 // 5% Schwelle
+
+      if (diff > threshold) {
+        trendDirection = 'up'
+      } else if (diff < -threshold) {
+        trendDirection = 'down'
+      } else {
+        trendDirection = 'flat'
+      }
+    }
+
+    trend = {
+      fahrerName: 'Alle Fahrer',
+      fahrerId: null,
+      compensationModel: null,
+      monatsDaten,
+      trend: trendDirection
+    }
+  } catch (err) {
+    console.error("Trend-Berechnung Fehler:", err)
+    // trend bleibt null
+  }
+
+  // ============================================================
+  // 8. ERGEBNIS ZUSAMMENSTELLEN
   // ============================================================
 
   return {
@@ -1672,6 +1900,7 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     auslagen: auslagenKPIs,
     fahrer: fahrerKPIs,
     compliance,
+    trend,
     berechnetAm: new Date().toISOString()
   }
 }

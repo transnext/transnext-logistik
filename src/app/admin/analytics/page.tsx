@@ -23,13 +23,19 @@ import { getCurrentUser, getUserProfile, signOut } from "@/lib/api"
 import {
   calculateAnalytics,
   validateCustomTimeRange,
+  calculateFixedSalaryMonthlyCost,
+  FIXED_SALARY_DEFAULT_GROSS,
+  FIXED_SALARY_EMPLOYER_COST_RATE,
+  FIXED_SALARY_ADDITIONAL_COST,
   type AnalyticsData,
   type AnalyticsTimeRange,
   type FahrerLeistungKPI,
   type FahrerBewertung,
   type FahrerUploadComplianceDetail,
   type VerspaeteteTourDetail,
-  type FahrerVerfuegbarkeitsDetail
+  type FahrerVerfuegbarkeitsDetail,
+  type TrendData,
+  type MonthlyTrendDataPoint
 } from "@/lib/analytics-calculator"
 import {
   TrendingUp,
@@ -58,7 +64,10 @@ import {
   Download,
   Eye,
   AlertTriangle,
-  Info
+  Info,
+  Briefcase,
+  DollarSign,
+  LineChart
 } from "lucide-react"
 
 // ============================================================
@@ -174,6 +183,113 @@ function SimpleBarChart({
         </div>
       ))}
     </div>
+  )
+}
+
+/** Einfache Linien-/Balkengrafik für Monatstrend (CSS-basiert) */
+function TrendChart({
+  data,
+  showSollArbeitstage = false
+}: {
+  data: MonthlyTrendDataPoint[]
+  showSollArbeitstage?: boolean
+}) {
+  if (data.length === 0) return <p className="text-sm text-gray-400">Keine Daten für Trend verfügbar</p>
+
+  const maxUmsatz = Math.max(...data.map(d => d.umsatz), 1)
+  const maxEinsatztage = Math.max(...data.map(d => d.einsatztage), 1)
+
+  return (
+    <div className="space-y-4">
+      {/* Umsatz-Balken */}
+      <div>
+        <p className="text-xs font-medium text-gray-500 mb-2">Umsatz pro Monat</p>
+        <div className="flex items-end gap-1 h-24">
+          {data.map((d, idx) => {
+            const heightPercent = (d.umsatz / maxUmsatz) * 100
+            return (
+              <div key={idx} className="flex-1 flex flex-col items-center group relative">
+                <div
+                  className="w-full bg-emerald-500 rounded-t transition-all duration-300 hover:bg-emerald-600"
+                  style={{ height: `${heightPercent}%`, minHeight: d.umsatz > 0 ? '4px' : '0' }}
+                  title={`${d.monatLabel}: ${d.umsatz.toFixed(0)} €`}
+                />
+                <span className="text-[10px] text-gray-400 mt-1 truncate w-full text-center">{d.monatLabel}</span>
+                {/* Tooltip */}
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
+                  {d.umsatz.toFixed(0)} €
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Einsatztage-Balken */}
+      <div>
+        <p className="text-xs font-medium text-gray-500 mb-2">Einsatztage pro Monat</p>
+        <div className="flex items-end gap-1 h-16">
+          {data.map((d, idx) => {
+            const heightPercent = (d.einsatztage / maxEinsatztage) * 100
+            return (
+              <div key={idx} className="flex-1 flex flex-col items-center group relative">
+                <div
+                  className="w-full bg-sky-500 rounded-t transition-all duration-300 hover:bg-sky-600"
+                  style={{ height: `${heightPercent}%`, minHeight: d.einsatztage > 0 ? '4px' : '0' }}
+                  title={`${d.monatLabel}: ${d.einsatztage} Tage`}
+                />
+                {/* Tooltip */}
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
+                  {d.einsatztage} Tage
+                  {showSollArbeitstage && d.sollArbeitstage && (
+                    <span className="text-gray-300"> / {d.sollArbeitstage} Soll</span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Umsatz/Einsatztag */}
+      <div className="border-t border-gray-100 pt-3">
+        <p className="text-xs font-medium text-gray-500 mb-2">Umsatz pro Einsatztag</p>
+        <div className="flex gap-1 overflow-x-auto">
+          {data.map((d, idx) => (
+            <div key={idx} className="flex-1 min-w-[50px] text-center">
+              <div className={`text-sm font-semibold ${
+                (d.umsatzProEinsatztag ?? 0) >= 200 ? 'text-emerald-600' :
+                (d.umsatzProEinsatztag ?? 0) >= 150 ? 'text-amber-600' : 'text-gray-600'
+              }`}>
+                {d.umsatzProEinsatztag !== null ? `${d.umsatzProEinsatztag.toFixed(0)}€` : '-'}
+              </div>
+              <div className="text-[10px] text-gray-400">{d.monatLabel}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Kostendeckungs-Status Badge */
+function KostendeckungsStatusBadge({ status }: {
+  status: 'ueber_ziel' | 'nahe_ziel' | 'unter_ziel' | 'operativ_pruefen' | null
+}) {
+  if (!status) return null
+
+  const config = {
+    'ueber_ziel': { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", label: "Ziel erreicht" },
+    'nahe_ziel': { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", label: "Nahe Ziel" },
+    'unter_ziel': { bg: "bg-red-50", text: "text-red-700", border: "border-red-200", label: "Unter Ziel" },
+    'operativ_pruefen': { bg: "bg-gray-50", text: "text-gray-600", border: "border-gray-200", label: "Individuell prüfen" }
+  }
+  const c = config[status]
+
+  return (
+    <Badge className={`${c.bg} ${c.text} ${c.border} border font-medium text-xs`}>
+      {c.label}
+    </Badge>
   )
 }
 
@@ -719,6 +835,221 @@ export default function AnalyticsPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* ============================================================ */}
+            {/* MONATSTREND-GRAFIK */}
+            {/* ============================================================ */}
+            {analytics.trend && analytics.trend.monatsDaten.length > 1 && (
+              <Card className="border-gray-100">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <LineChart className="h-5 w-5 text-violet-600" />
+                    <CardTitle className="text-base font-semibold text-gray-900">Leistungsentwicklung</CardTitle>
+                    {analytics.trend.trend !== 'n/a' && (
+                      <Badge className={`ml-2 border font-medium ${
+                        analytics.trend.trend === 'up' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        analytics.trend.trend === 'down' ? 'bg-red-50 text-red-700 border-red-200' :
+                        'bg-gray-50 text-gray-600 border-gray-200'
+                      }`}>
+                        {analytics.trend.trend === 'up' && <ArrowUp className="h-3 w-3 mr-1" />}
+                        {analytics.trend.trend === 'down' && <ArrowDown className="h-3 w-3 mr-1" />}
+                        {analytics.trend.trend === 'flat' && <Minus className="h-3 w-3 mr-1" />}
+                        {analytics.trend.trend === 'up' ? 'Aufwärts' :
+                         analytics.trend.trend === 'down' ? 'Abwärts' : 'Stabil'}
+                      </Badge>
+                    )}
+                  </div>
+                  <CardDescription>Monatsansicht: Umsatz, Einsatztage und Umsatz pro Einsatztag</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <TrendChart
+                    data={analytics.trend.monatsDaten}
+                    showSollArbeitstage={analytics.fahrer.festgehaltFahrerMitTouren > 0}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ============================================================ */}
+            {/* FESTGEHALTFAHRER – CONTROLLING */}
+            {/* ============================================================ */}
+            {analytics.fahrer.festgehaltFahrer && analytics.fahrer.festgehaltFahrer.length > 0 && (
+              <div>
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Briefcase className="h-4 w-4" />
+                  Festgehaltfahrer – Controlling
+                </h2>
+
+                {/* Planwert-Hinweis */}
+                <Card className="border-amber-200 bg-amber-50/30 mb-4">
+                  <CardContent className="p-3 flex items-start gap-2">
+                    <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-amber-800">
+                      <span className="font-medium">Planwerte für Controlling:</span>{' '}
+                      Bruttogehalt {FIXED_SALARY_DEFAULT_GROSS.toLocaleString('de-DE')} € +{' '}
+                      {(FIXED_SALARY_EMPLOYER_COST_RATE * 100).toFixed(0)}% AG-Kosten +{' '}
+                      {FIXED_SALARY_ADDITIONAL_COST.toLocaleString('de-DE')} € Zusatzkosten ={' '}
+                      <strong>{calculateFixedSalaryMonthlyCost().toLocaleString('de-DE')} € / Monat</strong>.
+                      Diese Werte dienen der internen Kalkulation und sind nicht in der Fahrerakte hinterlegt.
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {analytics.fahrer.festgehaltFahrer.map((fahrer) => (
+                    <Card key={fahrer.canonicalKey} className="border-gray-100 hover:border-violet-200 transition-colors">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-sm font-semibold text-gray-900">{fahrer.name}</CardTitle>
+                            <Badge className={`text-xs border font-medium ${
+                              fahrer.compensationModel === 'fixed_salary_part_time'
+                                ? "bg-violet-50 text-violet-700 border-violet-200"
+                                : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                            }`}>
+                              {fahrer.compensationModel === 'fixed_salary_part_time' ? 'Teilzeit' : 'Vollzeit'}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <KostendeckungsStatusBadge status={fahrer.kostendeckungsStatus} />
+                            {fahrer.fahrerId && (
+                              <Link href={`/admin/fahrer/${fahrer.fahrerId}`} className="text-violet-600 hover:text-violet-800">
+                                <FileText className="h-4 w-4" />
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {/* Umsatz */}
+                          <div className="bg-gray-50 rounded p-2">
+                            <p className="text-[10px] text-gray-500 uppercase">Umsatz</p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              <CurrencyDisplay amount={fahrer.umsatz} />
+                            </p>
+                          </div>
+
+                          {/* Touren */}
+                          <div className="bg-gray-50 rounded p-2">
+                            <p className="text-[10px] text-gray-500 uppercase">Touren</p>
+                            <p className="text-sm font-semibold text-gray-900">{fahrer.touren}</p>
+                          </div>
+
+                          {/* Einsatztage */}
+                          <div className="bg-gray-50 rounded p-2">
+                            <p className="text-[10px] text-gray-500 uppercase">Einsatztage</p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {fahrer.aktiveFahrtage}
+                              {fahrer.sollArbeitstage !== null && (
+                                <span className="text-gray-400 font-normal"> / {fahrer.sollArbeitstage}</span>
+                              )}
+                            </p>
+                          </div>
+
+                          {/* Soll-Arbeitstage (nur Vollzeit) */}
+                          {fahrer.compensationModel === 'fixed_salary_full_time' && fahrer.sollArbeitstage !== null && (
+                            <div className="bg-gray-50 rounded p-2">
+                              <p className="text-[10px] text-gray-500 uppercase">Soll-Arbeitstage</p>
+                              <p className="text-sm font-semibold text-gray-900">{fahrer.sollArbeitstage}</p>
+                              <p className="text-[10px] text-gray-400">Mo-Fr abzgl. Feiertage</p>
+                            </div>
+                          )}
+
+                          {/* Leerlauftage (nur Vollzeit) */}
+                          {fahrer.compensationModel === 'fixed_salary_full_time' && fahrer.leerlauftage !== null && (
+                            <div className={`rounded p-2 ${
+                              fahrer.leerlauftage === 0 ? 'bg-emerald-50' :
+                              fahrer.leerlauftage <= 3 ? 'bg-amber-50' : 'bg-red-50'
+                            }`}>
+                              <p className="text-[10px] text-gray-500 uppercase">Leerlauftage</p>
+                              <p className={`text-sm font-semibold ${
+                                fahrer.leerlauftage === 0 ? 'text-emerald-700' :
+                                fahrer.leerlauftage <= 3 ? 'text-amber-700' : 'text-red-700'
+                              }`}>
+                                {fahrer.leerlauftage}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Umsatz/Einsatztag */}
+                          <div className="bg-gray-50 rounded p-2">
+                            <p className="text-[10px] text-gray-500 uppercase">€/Einsatztag</p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {fahrer.umsatzProTag !== null ? <CurrencyDisplay amount={fahrer.umsatzProTag} /> : 'N/A'}
+                            </p>
+                          </div>
+
+                          {/* Umsatz/Soll-Arbeitstag (nur Vollzeit) */}
+                          {fahrer.compensationModel === 'fixed_salary_full_time' && fahrer.umsatzProSollArbeitstag !== null && (
+                            <div className="bg-gray-50 rounded p-2">
+                              <p className="text-[10px] text-gray-500 uppercase">€/Soll-Tag</p>
+                              <p className="text-sm font-semibold text-gray-900">
+                                <CurrencyDisplay amount={fahrer.umsatzProSollArbeitstag} />
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Plan-Monatskosten */}
+                          {fahrer.planMonatskosten !== null && (
+                            <div className="bg-violet-50 rounded p-2">
+                              <p className="text-[10px] text-violet-600 uppercase">Plan-Kosten</p>
+                              <p className="text-sm font-semibold text-violet-700">
+                                <CurrencyDisplay amount={fahrer.planMonatskosten} />
+                              </p>
+                              <p className="text-[10px] text-violet-400">pro Monat</p>
+                            </div>
+                          )}
+
+                          {/* Tagesziel Kostendeckung (nur Vollzeit) */}
+                          {fahrer.compensationModel === 'fixed_salary_full_time' && fahrer.tageszielKostendeckung !== null && (
+                            <div className={`rounded p-2 ${
+                              fahrer.kostendeckungsStatus === 'ueber_ziel' ? 'bg-emerald-50' :
+                              fahrer.kostendeckungsStatus === 'nahe_ziel' ? 'bg-amber-50' :
+                              fahrer.kostendeckungsStatus === 'unter_ziel' ? 'bg-red-50' : 'bg-gray-50'
+                            }`}>
+                              <p className="text-[10px] text-gray-500 uppercase">Tagesziel</p>
+                              <p className={`text-sm font-semibold ${
+                                fahrer.kostendeckungsStatus === 'ueber_ziel' ? 'text-emerald-700' :
+                                fahrer.kostendeckungsStatus === 'nahe_ziel' ? 'text-amber-700' :
+                                fahrer.kostendeckungsStatus === 'unter_ziel' ? 'text-red-700' : 'text-gray-700'
+                              }`}>
+                                <CurrencyDisplay amount={fahrer.tageszielKostendeckung} />
+                              </p>
+                              <p className="text-[10px] text-gray-400">zur Kostendeckung</p>
+                            </div>
+                          )}
+
+                          {/* Auslastung (nur Vollzeit) */}
+                          {fahrer.compensationModel === 'fixed_salary_full_time' && fahrer.auslastungsquote !== null && (
+                            <div className={`rounded p-2 ${
+                              fahrer.auslastungsquote >= 80 ? 'bg-emerald-50' :
+                              fahrer.auslastungsquote >= 50 ? 'bg-amber-50' : 'bg-red-50'
+                            }`}>
+                              <p className="text-[10px] text-gray-500 uppercase">Auslastung</p>
+                              <p className={`text-sm font-semibold ${
+                                fahrer.auslastungsquote >= 80 ? 'text-emerald-700' :
+                                fahrer.auslastungsquote >= 50 ? 'text-amber-700' : 'text-red-700'
+                              }`}>
+                                {fahrer.auslastungsquote.toFixed(0)}%
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Teilzeit-Hinweis */}
+                        {fahrer.compensationModel === 'fixed_salary_part_time' && (
+                          <div className="mt-3 flex items-center gap-2 text-xs text-gray-500 border-t border-gray-100 pt-2">
+                            <Info className="h-3 w-3" />
+                            <span>Teilzeit-Festgehalt: Individuelle Solltage nicht hinterlegt. Operative Prüfung erforderlich.</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* ============================================================ */}
             {/* FAHRER PERFORMANCE TABELLE */}
