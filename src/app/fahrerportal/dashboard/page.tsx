@@ -31,11 +31,12 @@ import {
   CheckCircle2,
   Megaphone
 } from "lucide-react"
-import { getCurrentUser, canAccessFahrerportal, getArbeitsnachweiseByUser, getAuslagennachweiseByUser } from "@/lib/api"
+import { getCurrentUser, canAccessFahrerportal, getArbeitsnachweiseByUser, getAuslagennachweiseByUser, getUserProfile } from "@/lib/api"
 import { getFahrerTouren, formatTourStatus, getTourStatusColor, formatFahrzeugart } from "@/lib/touren-api"
 import { calculateFahrerAlerts, getAlertColors, type FahrerAlert, type FahrerAlertsResult } from "@/lib/fahrerportal-alerts"
 import { getFahrerAnnouncements, type Announcement } from "@/lib/announcements-api"
-import type { Tour, TourStatus } from "@/lib/supabase"
+import { shouldShowTourBasedSalary } from "@/lib/salary-calculator"
+import type { Tour, TourStatus, CompensationModel } from "@/lib/supabase"
 
 interface StatusCounts {
   arbeitsnachweise: {
@@ -119,6 +120,15 @@ export default function FahrerportalDashboard() {
         ? `${accessResult.fahrer.vorname} ${accessResult.fahrer.nachname}`
         : 'Fahrer'
       setFahrerName(name)
+
+      // Lade Profil für compensation_model
+      try {
+        const profile = await getUserProfile(user.id)
+        setCompensationModel((profile?.compensation_model as CompensationModel) || 'tour_based_minijob')
+      } catch {
+        // Fallback bei Fehler
+        setCompensationModel('tour_based_minijob')
+      }
 
       // Lade offene Touren, Status-Counts, Alerts und Hinweise parallel
       await Promise.all([

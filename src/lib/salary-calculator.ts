@@ -9,7 +9,8 @@ export interface KmRange {
 }
 
 // Monatliches Verdienst-Limit für Fahrer (Minijob)
-export const MONTHLY_LIMIT = 556
+// Stand 2024/2025: 603€ (vorher: 556€, davor: 520€)
+export const MONTHLY_LIMIT = 603
 
 // Standard KM-Tabelle für alle Fahrer
 export const KM_RANGES: KmRange[] = [

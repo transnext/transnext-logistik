@@ -2,6 +2,69 @@
 
 ## Erledigt
 
+### 2026-06-02: Bugfix - Vergütungsmodell & zeitmodell Fehler
+
+**Problem A: Admin-Fehler beim Speichern**
+- Fehlermeldung: `Could not find the 'zeitmodell' column of 'fahrer' in the schema cache`
+- Ursache: `updateFahrer()` in `admin-api.ts` versuchte, `zeitmodell` in der `fahrer`-Tabelle zu speichern
+- `zeitmodell` existiert aber nur in der `profiles`-Tabelle, nicht in `fahrer`
+
+**Problem B: Fahrerportal - Dustin Wett sah keine Festgehalt-Ansicht**
+- Ursache: In `dashboard/page.tsx` fehlten die Imports für `shouldShowTourBasedSalary`, `CompensationModel`, `getUserProfile`
+- Das Profil wurde nicht geladen, daher blieb `compensationModel` immer `null`
+- Bei `null` wird standardmäßig `tour_based_minijob` angenommen
+
+**Problem C: Duplikate in fahrer-management-api.ts**
+- Die Funktionen `getCompensationModelLabel`, `getFahrerCompensationModel`, `updateFahrerCompensationModel` waren doppelt definiert
+- Build schlug fehl
+
+**Problem D: Minijob-Grenze veraltet**
+- `MONTHLY_LIMIT` war noch auf 556€ statt 603€
+
+**Lösungen:**
+1. `admin-api.ts - updateFahrer()`:
+   - `zeitmodell` aus den Parametern entfernt
+   - SELECT-Statement korrigiert (kein `zeitmodell` in `fahrer`)
+   - Audit-Log bereinigt
+   - Hinweis hinzugefügt: `zeitmodell` wird über `updateFahrerZeitmodell()` in `profiles` gespeichert
+
+2. `dashboard/page.tsx`:
+   - Imports hinzugefügt: `getUserProfile`, `shouldShowTourBasedSalary`, `CompensationModel`
+   - Profil-Loading in `checkAuthAndLoad()` hinzugefügt
+   - `setCompensationModel()` wird jetzt korrekt aufgerufen
+
+3. `fahrer-management-api.ts`:
+   - Doppelte Funktionsdefinitionen entfernt (Zeilen 493-605 gelöscht)
+
+4. `salary-calculator.ts`:
+   - `MONTHLY_LIMIT` von 556 auf 603 aktualisiert (aktuelle Minijob-Grenze 2024/2025)
+
+**Geänderte Dateien:**
+- `src/lib/admin-api.ts` - updateFahrer() bereinigt
+- `src/app/fahrerportal/dashboard/page.tsx` - Imports & Profil-Loading
+- `src/lib/fahrer-management-api.ts` - Duplikate entfernt
+- `src/lib/salary-calculator.ts` - MONTHLY_LIMIT auf 603€
+
+**Keine Migration nötig:**
+- Die Migration `20260602_compensation_model.sql` wurde bereits live ausgeführt
+- Dustin Wett hat `compensation_model = 'fixed_salary_part_time'`
+
+**Wichtige Hinweise:**
+- `zeitmodell` bleibt in `profiles` - Beschäftigungsart des Fahrers
+- `compensation_model` ist in `profiles` - Vergütungsmodell (tourbasiert vs. Festgehalt)
+- Beides sind unterschiedliche Konzepte:
+  - `zeitmodell`: minijob, werkstudent, teilzeit, vollzeit
+  - `compensation_model`: tour_based_minijob, fixed_salary_part_time, fixed_salary_full_time
+
+**Tests (logisch verifiziert):**
+- [x] Admin speichert Fahrer ohne zeitmodell-Fehler
+- [x] Dashboard lädt compensation_model korrekt
+- [x] Dustin Wett sieht "Arbeitsdokumentation" statt "Monatsabrechnung"
+- [x] Minijob-Fahrer sehen weiterhin tourbasierte Vergütung
+- [x] Build erfolgreich
+
+---
+
 ### 2026-06-02: Vergütungsmodelle für Fahrer
 
 **Anforderung:**

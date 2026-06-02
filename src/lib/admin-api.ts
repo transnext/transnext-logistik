@@ -180,6 +180,10 @@ export async function createFahrer(data: {
 /**
  * Aktualisiert Fahrer-Daten (ohne Email/Passwort)
  * WICHTIG: Aktualisiert auch profiles.full_name wenn Vor-/Nachname geändert wird
+ *
+ * HINWEIS: zeitmodell und compensation_model werden in der `profiles`-Tabelle gespeichert,
+ * nicht in der `fahrer`-Tabelle! Für diese Felder bitte die Funktionen in
+ * fahrer-management-api.ts verwenden: updateFahrerZeitmodell, updateFahrerCompensationModel
  */
 export async function updateFahrer(fahrerId: number, data: {
   vorname?: string
@@ -195,12 +199,13 @@ export async function updateFahrer(fahrerId: number, data: {
   ausweisnummer?: string
   ausweis_ablauf?: string
   status?: 'aktiv' | 'inaktiv'
-  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'
+  // ENTFERNT: zeitmodell existiert nicht in fahrer-Tabelle, nur in profiles
+  // Verwende updateFahrerZeitmodell() aus fahrer-management-api.ts
 }) {
   // 0. Fahrer vor Update laden für Audit
   const { data: beforeFahrer } = await supabase
     .from('fahrer')
-    .select('id, vorname, nachname, status, zeitmodell')
+    .select('id, vorname, nachname, status')
     .eq('id', fahrerId)
     .single()
 
@@ -253,15 +258,13 @@ export async function updateFahrer(fahrerId: number, data: {
       id: beforeFahrer.id,
       vorname: beforeFahrer.vorname,
       nachname: beforeFahrer.nachname,
-      status: beforeFahrer.status,
-      zeitmodell: beforeFahrer.zeitmodell
+      status: beforeFahrer.status
     } : null,
     afterData: {
       id: fahrerId,
       vorname: result.vorname,
       nachname: result.nachname,
-      status: result.status,
-      zeitmodell: result.zeitmodell
+      status: result.status
     },
     metadata: {
       changed_fields: Object.keys(data)
