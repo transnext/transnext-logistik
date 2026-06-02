@@ -2,6 +2,82 @@
 
 ## Erledigt
 
+### 2026-06-02: Vergütungsmodelle für Fahrer
+
+**Anforderung:**
+- Fahrer können verschiedene Vergütungsmodelle haben
+- `tour_based_minijob`: Tourbasierte Vergütung (bisheriges Verhalten)
+- `fixed_salary_part_time`: Festgehalt Teilzeit (keine Tourpreise im Fahrerportal)
+- `fixed_salary_full_time`: Festgehalt Vollzeit (keine Tourpreise im Fahrerportal)
+
+**Erledigte Aufgaben:**
+- [x] Migration erstellt: `20260602_compensation_model.sql`
+  - compensation_model Feld in profiles
+  - fixed_monthly_gross_salary (optional)
+  - contracted_hours_per_week (optional)
+  - Dustin Wett auf fixed_salary_part_time gesetzt
+- [x] supabase.ts: Profile-Typ erweitert um CompensationModel
+- [x] salary-calculator.ts:
+  - hasFixedSalaryCompensation() hinzugefügt
+  - shouldShowTourBasedSalary() hinzugefügt
+- [x] fahrer-management-api.ts:
+  - getFahrerCompensationModel() hinzugefügt
+  - updateFahrerCompensationModel() hinzugefügt
+  - getCompensationModelLabel() hinzugefügt
+- [x] admin-api.ts: getAllFahrerAdmin() erweitert um compensation_model
+- [x] FahrerakteUserData.tsx:
+  - Vergütungsmodell-Dropdown hinzugefügt
+  - Speichern/Audit-Log funktioniert
+  - Anzeige in Lesemodus
+- [x] monatsabrechnung/page.tsx:
+  - Preise/Verdienst ausgeblendet für Festgehalt-Fahrer
+  - Alternativer Hinweis "Du erhältst ein festes Monatsgehalt..."
+  - Touren-Übersicht ohne Verdienst-Spalte
+- [x] dashboard/page.tsx:
+  - Menüpunkt angepasst für Festgehalt-Fahrer
+  - "Arbeitsdokumentation" statt "Monatsabrechnung"
+- [x] Typecheck erfolgreich (bestehende onboarding-Fehler unberührt)
+- [x] Build erfolgreich
+
+**Geänderte Dateien:**
+1. `supabase/migrations/20260602_compensation_model.sql` - Migration
+2. `src/lib/supabase.ts` - CompensationModel Type + Helper
+3. `src/lib/salary-calculator.ts` - shouldShowTourBasedSalary()
+4. `src/lib/fahrer-management-api.ts` - CRUD für compensation_model
+5. `src/lib/admin-api.ts` - getAllFahrerAdmin() erweitert
+6. `src/components/admin/FahrerakteUserData.tsx` - UI für Vergütungsmodell
+7. `src/app/admin/fahrer/[id]/page.tsx` - compensation_model weitergeben
+8. `src/app/fahrerportal/monatsabrechnung/page.tsx` - Festgehalt-Ansicht
+9. `src/app/fahrerportal/dashboard/page.tsx` - Menü anpassen
+
+**Was Dustin Wett jetzt sieht:**
+- Fahrerportal Dashboard: "Arbeitsdokumentation" statt "Monatsabrechnung"
+- Arbeitsdokumentation-Seite: Kein Verdienst, kein Tourlohn
+- Hinweis: "Du erhältst ein festes Monatsgehalt gemäß deinem Arbeitsvertrag."
+- Touren-Übersicht: Nur Tour-Nr, Datum, KM, Status (kein Verdienst)
+- Auslagen: Weiterhin sichtbar/einreichbar
+
+**Was Minijob-Fahrer weiterhin sehen:**
+- Tourbasierte Vergütung wie bisher
+- Monatsabrechnung mit Verdienst pro Tour
+- Auszahlung mit 556€ Minijob-Grenze
+
+**Was Admin/GF sehen:**
+- Fahrerakte: Neues Dropdown "Vergütungsmodell"
+- Optionen: Tourbasiert/Minijob, Festgehalt Teilzeit, Festgehalt Vollzeit
+- Hinweis wenn Festgehalt: "Fahrer sieht keine Tourpreise/-löhne im Fahrerportal"
+
+**Kundenabrechnung:**
+- UNVERÄNDERT - Touren werden weiterhin berechnet und abgerechnet
+- Kundenumsatz, Analytics, Smart&Care/Onlogist-Abrechnung funktionieren
+
+**Nächste Schritte:**
+- Migration live ausführen (Supabase Dashboard)
+- Testen: Dustin Wett Login → keine Tourpreise sichtbar
+- Testen: Normaler Minijob-Fahrer → bisheriges Verhalten
+
+---
+
 ### 2026-06-01: Fix Abrechnungslogik - Korrekte KW-Filterung
 
 **Problem:**
@@ -66,6 +142,37 @@ NICHT in Abrechnung:
 **Geänderte Dateien:**
 - `src/lib/invoice-api.ts` - Cutoff-Konstanten und Filter
 - `src/app/admin/abrechnung/page.tsx` - UI-Hinweis
+
+---
+
+## In Arbeit
+
+### 2026-06-01: Vergütungsmodelle für Fahrer
+
+**Anforderung:**
+- Fahrer können verschiedene Vergütungsmodelle haben
+- `tour_based_minijob`: Tourbasierte Vergütung (bisheriges Verhalten)
+- `fixed_salary_part_time`: Festgehalt Teilzeit (keine Tourpreise im Fahrerportal)
+- `fixed_salary_full_time`: Festgehalt Vollzeit (keine Tourpreise im Fahrerportal)
+
+**Aufgaben:**
+- [ ] Migration erstellen: compensation_model Feld in profiles
+- [ ] supabase.ts: Profile-Typ erweitern
+- [ ] salary-calculator.ts: hasFixedSalary-Check hinzufügen
+- [ ] fahrer-management-api.ts: CRUD für compensation_model
+- [ ] FahrerakteUserData.tsx: Vergütungsmodell bearbeitbar
+- [ ] monatsabrechnung/page.tsx: Preise ausblenden für Festgehalt-Fahrer
+- [ ] dashboard/page.tsx: Menüpunkt anpassen für Festgehalt-Fahrer
+- [ ] Dustin Wett auf fixed_salary_part_time setzen
+- [ ] Typecheck/Build
+- [ ] Push nach main
+
+**Wichtig:**
+- Kundenabrechnung NICHT kaputtmachen
+- Interne Umsatzberechnung bleibt erhalten
+- Bestehende Fahrer bleiben tour_based_minijob
+
+---
 
 ## Offen
 

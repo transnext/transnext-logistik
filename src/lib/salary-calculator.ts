@@ -216,3 +216,27 @@ export function getKmRangeText(km: number, fahrerName?: string): string {
 
   return `über ${maxKm} km`
 }
+
+
+// =====================================================
+// VERGÜTUNGSMODELL (Compensation Model)
+// =====================================================
+
+import type { CompensationModel } from './supabase'
+
+/**
+ * Prüft ob ein Fahrer ein Festgehalt hat (keine tourbasierte Vergütung)
+ */
+export function hasFixedSalaryCompensation(compensationModel?: CompensationModel | null): boolean {
+  return compensationModel === 'fixed_salary_part_time' || compensationModel === 'fixed_salary_full_time'
+}
+
+/**
+ * Prüft ob tourbasierte Vergütung im Fahrerportal angezeigt werden soll
+ * Fahrer mit Festgehalt sehen keine Tourpreise/-löhne
+ */
+export function shouldShowTourBasedSalary(compensationModel?: CompensationModel | null): boolean {
+  // Wenn kein Modell gesetzt, Standard ist tour_based_minijob (anzeigen)
+  if (!compensationModel) return true
+  return compensationModel === 'tour_based_minijob'
+}

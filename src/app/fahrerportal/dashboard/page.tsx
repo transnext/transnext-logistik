@@ -89,6 +89,10 @@ export default function FahrerportalDashboard() {
     summary: { high: 0, medium: 0, total: 0 }
   })
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [compensationModel, setCompensationModel] = useState<CompensationModel | null>(null)
+
+  // Prüft ob tourbasierte Vergütung angezeigt werden soll
+  const showTourBasedSalary = shouldShowTourBasedSalary(compensationModel)
 
   useEffect(() => {
     checkAuthAndLoad()
@@ -305,8 +309,9 @@ export default function FahrerportalDashboard() {
       iconColor: "text-violet-600"
     },
     {
-      title: "Monatsabrechnung",
-      description: "Touren & Verdienst",
+      // Unterschiedliche Beschreibung für Festgehalt-Fahrer
+      title: showTourBasedSalary ? "Monatsabrechnung" : "Arbeitsdokumentation",
+      description: showTourBasedSalary ? "Touren & Verdienst" : "Touren-Übersicht",
       icon: FileText,
       href: "/fahrerportal/monatsabrechnung",
       iconBg: "bg-indigo-50",

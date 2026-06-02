@@ -609,7 +609,8 @@ export async function getAllFahrerAdmin() {
       profiles!fahrer_user_id_fkey (
         full_name,
         zeitmodell,
-        festes_gehalt
+        festes_gehalt,
+        compensation_model
       )
     `)
     .order('nachname', { ascending: true })
@@ -619,7 +620,8 @@ export async function getAllFahrerAdmin() {
   return data.map(item => ({
     ...item,
     zeitmodell: item.profiles?.zeitmodell || 'minijob',
-    festes_gehalt: item.profiles?.festes_gehalt
+    festes_gehalt: item.profiles?.festes_gehalt,
+    compensation_model: item.profiles?.compensation_model || 'tour_based_minijob'
   }))
 }
 

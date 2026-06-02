@@ -31,7 +31,10 @@ import {
 import {
   updateFahrerName,
   updateFahrerZeitmodell,
-  requestPasswordReset
+  updateFahrerCompensationModel,
+  requestPasswordReset,
+  getCompensationModelLabel,
+  type CompensationModel
 } from "@/lib/fahrer-management-api"
 import { updateFahrerStatus } from "@/lib/admin-api"
 
@@ -41,6 +44,7 @@ interface FahrerDetails {
   vorname: string
   nachname: string
   zeitmodell: string | null
+  compensation_model?: CompensationModel | null
   status: 'aktiv' | 'inaktiv'
 }
 
@@ -64,6 +68,9 @@ export function FahrerakteUserData({
   const [vorname, setVorname] = useState(fahrer.vorname)
   const [nachname, setNachname] = useState(fahrer.nachname)
   const [zeitmodell, setZeitmodell] = useState(fahrer.zeitmodell || 'minijob')
+  const [compensationModel, setCompensationModel] = useState<CompensationModel>(
+    fahrer.compensation_model || 'tour_based_minijob'
+  )
   const [statusAktiv, setStatusAktiv] = useState(fahrer.status === 'aktiv')
 
   // Passwort-Reset State
@@ -76,6 +83,7 @@ export function FahrerakteUserData({
     setVorname(fahrer.vorname)
     setNachname(fahrer.nachname)
     setZeitmodell(fahrer.zeitmodell || 'minijob')
+    setCompensationModel(fahrer.compensation_model || 'tour_based_minijob')
     setStatusAktiv(fahrer.status === 'aktiv')
     setIsEditing(true)
     setError("")
@@ -114,6 +122,14 @@ export function FahrerakteUserData({
         )
         if (!zeitmodellResult.success) {
           throw new Error(zeitmodellResult.error || 'Fehler beim Aktualisieren des Zeitmodells')
+        }
+      }
+
+      // Vergütungsmodell aktualisieren wenn geändert
+      if (compensationModel !== (fahrer.compensation_model || 'tour_based_minijob')) {
+        const compResult = await updateFahrerCompensationModel(fahrer.id, compensationModel)
+        if (!compResult.success) {
+          throw new Error(compResult.error || 'Fehler beim Aktualisieren des Vergütungsmodells')
         }
       }
 
@@ -268,7 +284,7 @@ export function FahrerakteUserData({
                 </div>
               </div>
 
-              {/* Zeitmodell und Status */}
+              {/* Zeitmodell und Vergütungsmodell */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="zeitmodell">Zeitmodell</Label>
@@ -285,24 +301,46 @@ export function FahrerakteUserData({
                   </Select>
                 </div>
 
-                {/* Status aktiv/inaktiv */}
                 <div className="space-y-2">
-                  <Label>Fahrer-Status</Label>
-                  <div className="flex items-center gap-3 h-10">
-                    <Switch
-                      id="statusAktiv"
-                      checked={statusAktiv}
-                      onCheckedChange={setStatusAktiv}
-                    />
-                    <Label
-                      htmlFor="statusAktiv"
-                      className={`cursor-pointer font-medium ${
-                        statusAktiv ? 'text-emerald-600' : 'text-gray-500'
-                      }`}
-                    >
-                      {statusAktiv ? 'Aktiv' : 'Inaktiv'}
-                    </Label>
-                  </div>
+                  <Label htmlFor="compensationModel">Vergütungsmodell</Label>
+                  <Select
+                    value={compensationModel}
+                    onValueChange={(value) => setCompensationModel(value as CompensationModel)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vergütungsmodell wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tour_based_minijob">Tourbasiert / Minijob</SelectItem>
+                      <SelectItem value="fixed_salary_part_time">Festgehalt Teilzeit</SelectItem>
+                      <SelectItem value="fixed_salary_full_time">Festgehalt Vollzeit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {compensationModel !== 'tour_based_minijob' && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      Fahrer sieht keine Tourpreise/-löhne im Fahrerportal
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Status aktiv/inaktiv */}
+              <div className="space-y-2">
+                <Label>Fahrer-Status</Label>
+                <div className="flex items-center gap-3 h-10">
+                  <Switch
+                    id="statusAktiv"
+                    checked={statusAktiv}
+                    onCheckedChange={setStatusAktiv}
+                  />
+                  <Label
+                    htmlFor="statusAktiv"
+                    className={`cursor-pointer font-medium ${
+                      statusAktiv ? 'text-emerald-600' : 'text-gray-500'
+                    }`}
+                  >
+                    {statusAktiv ? 'Aktiv' : 'Inaktiv'}
+                  </Label>
                 </div>
               </div>
 
@@ -361,7 +399,7 @@ export function FahrerakteUserData({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Name</p>
                   <p className="text-sm font-medium">{fahrer.vorname} {fahrer.nachname}</p>
@@ -372,6 +410,16 @@ export function FahrerakteUserData({
                     <Clock className="h-3.5 w-3.5 text-gray-400" />
                     <span className="text-sm font-medium">{formatZeitmodell(fahrer.zeitmodell)}</span>
                   </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Vergütung</p>
+                  <Badge className={
+                    fahrer.compensation_model?.startsWith('fixed_salary')
+                      ? 'bg-blue-50 text-blue-700 border-blue-200 border'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 border'
+                  }>
+                    {getCompensationModelLabel(fahrer.compensation_model)}
+                  </Badge>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Status</p>

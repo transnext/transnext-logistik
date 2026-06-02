@@ -16,11 +16,15 @@
  */
 
 import { supabase } from './supabase'
+import type { CompensationModel } from './supabase'
 import { logAuditEvent } from './audit-api'
 
 // =====================================================
 // TYPES
 // =====================================================
+
+// Re-export CompensationModel for convenience
+export type { CompensationModel } from './supabase'
 
 export type DocumentType =
   | 'ausweis'
@@ -363,6 +367,238 @@ export async function updateFahrerZeitmodell(
     isFinancial: true,
     beforeData: { zeitmodell: oldZeitmodell },
     afterData: { zeitmodell }
+  })
+
+  return { success: true }
+}
+
+
+
+// =====================================================
+// VERGÜTUNGSMODELL (Compensation Model)
+// =====================================================
+
+/**
+ * Gibt das Label für ein Vergütungsmodell zurück
+ */
+export function getCompensationModelLabel(model?: CompensationModel | null): string {
+  switch (model) {
+    case 'tour_based_minijob':
+      return 'Tourbasiert / Minijob'
+    case 'fixed_salary_part_time':
+      return 'Festgehalt Teilzeit'
+    case 'fixed_salary_full_time':
+      return 'Festgehalt Vollzeit'
+    default:
+      return 'Tourbasiert / Minijob'
+  }
+}
+
+/**
+ * Lädt das Vergütungsmodell eines Fahrers
+ */
+export async function getFahrerCompensationModel(
+  fahrerId: number
+): Promise<{ success: boolean; model?: CompensationModel; error?: string }> {
+  // Fahrer laden um user_id zu bekommen
+  const { data: fahrer, error: fetchError } = await supabase
+    .from('fahrer')
+    .select('id, user_id')
+    .eq('id', fahrerId)
+    .maybeSingle()
+
+  if (fetchError || !fahrer || !fahrer.user_id) {
+    return { success: false, error: 'Fahrer nicht gefunden oder kein Benutzerkonto verknüpft' }
+  }
+
+  // Profile laden
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('compensation_model')
+    .eq('id', fahrer.user_id)
+    .maybeSingle()
+
+  if (profileError) {
+    return { success: false, error: profileError.message }
+  }
+
+  return {
+    success: true,
+    model: (profile?.compensation_model as CompensationModel) || 'tour_based_minijob'
+  }
+}
+
+/**
+ * Aktualisiert das Vergütungsmodell eines Fahrers
+ */
+export async function updateFahrerCompensationModel(
+  fahrerId: number,
+  compensationModel: CompensationModel
+): Promise<{ success: boolean; error?: string }> {
+  if (!(await hasHRAccess())) {
+    return { success: false, error: 'Keine Berechtigung' }
+  }
+
+  // Fahrer laden um user_id zu bekommen
+  const { data: fahrer, error: fetchError } = await supabase
+    .from('fahrer')
+    .select('id, user_id, vorname, nachname')
+    .eq('id', fahrerId)
+    .maybeSingle()
+
+  if (fetchError || !fahrer) {
+    return { success: false, error: 'Fahrer nicht gefunden' }
+  }
+
+  if (!fahrer.user_id) {
+    return { success: false, error: 'Fahrer hat kein verknüpftes Benutzerkonto' }
+  }
+
+  // Altes Vergütungsmodell laden für Audit
+  const { data: oldProfile } = await supabase
+    .from('profiles')
+    .select('compensation_model')
+    .eq('id', fahrer.user_id)
+    .maybeSingle()
+
+  const oldModel = oldProfile?.compensation_model || 'tour_based_minijob'
+
+  // Profile aktualisieren
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ compensation_model: compensationModel })
+    .eq('id', fahrer.user_id)
+
+  if (updateError) {
+    return { success: false, error: updateError.message }
+  }
+
+  // Audit-Log
+  await logAuditEvent({
+    action: 'fahrer_compensation_model_updated',
+    entityType: 'fahrer',
+    entityId: fahrerId,
+    entityLabel: `${fahrer.vorname} ${fahrer.nachname}`,
+    severity: 'warning',
+    isFinancial: true,
+    beforeData: { compensation_model: oldModel },
+    afterData: { compensation_model: compensationModel }
+  })
+
+  return { success: true }
+}
+
+
+
+// =====================================================
+// VERGÜTUNGSMODELL (Compensation Model)
+// =====================================================
+
+/**
+ * Gibt das Label für ein Vergütungsmodell zurück
+ */
+export function getCompensationModelLabel(model?: CompensationModel | null): string {
+  switch (model) {
+    case 'tour_based_minijob':
+      return 'Tourbasiert / Minijob'
+    case 'fixed_salary_part_time':
+      return 'Festgehalt Teilzeit'
+    case 'fixed_salary_full_time':
+      return 'Festgehalt Vollzeit'
+    default:
+      return 'Tourbasiert / Minijob'
+  }
+}
+
+/**
+ * Lädt das Vergütungsmodell eines Fahrers
+ */
+export async function getFahrerCompensationModel(
+  fahrerId: number
+): Promise<{ success: boolean; model?: CompensationModel; error?: string }> {
+  // Fahrer laden um user_id zu bekommen
+  const { data: fahrer, error: fetchError } = await supabase
+    .from('fahrer')
+    .select('id, user_id')
+    .eq('id', fahrerId)
+    .maybeSingle()
+
+  if (fetchError || !fahrer || !fahrer.user_id) {
+    return { success: false, error: 'Fahrer nicht gefunden oder kein Benutzerkonto verknüpft' }
+  }
+
+  // Profile laden
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('compensation_model')
+    .eq('id', fahrer.user_id)
+    .maybeSingle()
+
+  if (profileError) {
+    return { success: false, error: profileError.message }
+  }
+
+  return {
+    success: true,
+    model: (profile?.compensation_model as CompensationModel) || 'tour_based_minijob'
+  }
+}
+
+/**
+ * Aktualisiert das Vergütungsmodell eines Fahrers
+ */
+export async function updateFahrerCompensationModel(
+  fahrerId: number,
+  compensationModel: CompensationModel
+): Promise<{ success: boolean; error?: string }> {
+  if (!(await hasHRAccess())) {
+    return { success: false, error: 'Keine Berechtigung' }
+  }
+
+  // Fahrer laden um user_id zu bekommen
+  const { data: fahrer, error: fetchError } = await supabase
+    .from('fahrer')
+    .select('id, user_id, vorname, nachname')
+    .eq('id', fahrerId)
+    .maybeSingle()
+
+  if (fetchError || !fahrer) {
+    return { success: false, error: 'Fahrer nicht gefunden' }
+  }
+
+  if (!fahrer.user_id) {
+    return { success: false, error: 'Fahrer hat kein verknüpftes Benutzerkonto' }
+  }
+
+  // Altes Vergütungsmodell laden für Audit
+  const { data: oldProfile } = await supabase
+    .from('profiles')
+    .select('compensation_model')
+    .eq('id', fahrer.user_id)
+    .maybeSingle()
+
+  const oldModel = oldProfile?.compensation_model || 'tour_based_minijob'
+
+  // Profile aktualisieren
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ compensation_model: compensationModel })
+    .eq('id', fahrer.user_id)
+
+  if (updateError) {
+    return { success: false, error: updateError.message }
+  }
+
+  // Audit-Log
+  await logAuditEvent({
+    action: 'fahrer_compensation_model_updated',
+    entityType: 'fahrer',
+    entityId: fahrerId,
+    entityLabel: `${fahrer.vorname} ${fahrer.nachname}`,
+    severity: 'warning',
+    isFinancial: true,
+    beforeData: { compensation_model: oldModel },
+    afterData: { compensation_model: compensationModel }
   })
 
   return { success: true }

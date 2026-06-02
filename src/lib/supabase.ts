@@ -7,12 +7,19 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholde
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // TypeScript types for database schema
+
+// Vergütungsmodell für Fahrer
+export type CompensationModel = 'tour_based_minijob' | 'fixed_salary_part_time' | 'fixed_salary_full_time'
+
 export interface Profile {
   id: string
   role: 'fahrer' | 'admin' | 'disponent' | 'gf'
   full_name: string
   zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'
   festes_gehalt?: number
+  compensation_model?: CompensationModel
+  fixed_monthly_gross_salary?: number
+  contracted_hours_per_week?: number
   created_at: string
   updated_at: string
 }
