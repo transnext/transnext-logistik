@@ -1153,12 +1153,18 @@ export async function markAuslageAsReimbursed(auslagenId: number) {
     throw new Error('Kein angemeldeter Benutzer gefunden.')
   }
 
-  // Auslage vor Update laden für Audit
+  // Auslage vor Update laden für Audit und payment_method-Prüfung
   const { data: beforeAuslage } = await supabase
     .from('auslagennachweise')
-    .select('id, tour_nr, datum, belegart, status, driver_reimbursement_status')
+    .select('id, tour_nr, datum, belegart, status, driver_reimbursement_status, payment_method')
     .eq('id', auslagenId)
     .single()
+
+  // WICHTIG: company_card Auslagen dürfen NICHT als erstattet markiert werden!
+  // Sie wurden bereits mit Firmenkreditkarte bezahlt.
+  if (beforeAuslage?.payment_method === 'company_card') {
+    throw new Error('Diese Auslage wurde mit Firmenkreditkarte bezahlt und darf nicht als erstattet markiert werden.')
+  }
 
   // Phase-1-konforme Felder + Legacy-Status setzen
   const { data: result, error } = await supabase
@@ -1251,6 +1257,7 @@ export async function deleteAuslage(auslagenId: number) {
 /**
  * Markiert mehrere Auslagen als abgerechnet.
  * ⚠️ NUR FÜR ADMIN/GF - Disponenten dürfen nicht abrechnen.
+ * ⚠️ company_card Auslagen werden automatisch ausgeschlossen!
  */
 export async function billMultipleAuslagen(auslagenIds: number[]) {
   const isAdmin = await isAdminOrGF()
@@ -1259,13 +1266,28 @@ export async function billMultipleAuslagen(auslagenIds: number[]) {
     throw new Error('Nur Admin/Geschäftsführer dürfen Auslagen abrechnen.')
   }
 
+  // WICHTIG: company_card Auslagen von der Abrechnung ausschließen!
+  // Sie wurden bereits mit Firmenkreditkarte bezahlt und dürfen nicht an Fahrer ausgezahlt werden.
+  const { data: companyCardExpenses } = await supabase
+    .from('auslagennachweise')
+    .select('id')
+    .in('id', auslagenIds)
+    .eq('payment_method', 'company_card')
+
+  const companyCardIds = new Set((companyCardExpenses || []).map(e => e.id))
+  const eligibleIds = auslagenIds.filter(id => !companyCardIds.has(id))
+
+  if (eligibleIds.length === 0) {
+    return { success: true, count: 0, data: [], skippedCompanyCard: companyCardIds.size }
+  }
+
   const { data, error } = await supabase
     .from('auslagennachweise')
     .update({ status: 'billed' })
-    .in('id', auslagenIds)
+    .in('id', eligibleIds)
     .select()
   if (error) throw error
-  return { success: true, count: auslagenIds.length, data }
+  return { success: true, count: eligibleIds.length, data, skippedCompanyCard: companyCardIds.size }
 }
 
 /**

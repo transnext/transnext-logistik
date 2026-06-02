@@ -119,8 +119,10 @@ function RowActionMenu({
   const isLocked = auslage.status === 'paid' || auslage.status === 'billed'
   const isPaid = auslage.status === 'paid'
   const isRejected = auslage.status === 'rejected'
+  const isCompanyCard = auslage.paymentMethod === 'company_card'
   // Überweisen nur wenn genehmigt (approved) und noch nicht bezahlt/abgelehnt
-  const canMarkAsReimbursed = isAdmin && auslage.status === 'approved' && !isLocked
+  // WICHTIG: company_card Auslagen dürfen NICHT als überwiesen markiert werden!
+  const canMarkAsReimbursed = isAdmin && auslage.status === 'approved' && !isLocked && !isCompanyCard
 
   return (
     <div className="relative" ref={menuRef}>
@@ -163,15 +165,21 @@ function RowActionMenu({
             </button>
           )}
 
-          {/* Als überwiesen markieren - nur Admin/GF, nur wenn genehmigt */}
-          {onMarkAsReimbursed && canMarkAsReimbursed && (
-            <button
-              onClick={() => { onMarkAsReimbursed(); setIsOpen(false) }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 text-left"
-            >
-              <CreditCard className="h-4 w-4" />
-              Als überwiesen markieren
-            </button>
+          {/* Als überwiesen markieren - nur Admin/GF, nur wenn genehmigt und NICHT company_card */}
+          {onMarkAsReimbursed && isAdmin && auslage.status === 'approved' && !isLocked && (
+            isCompanyCard ? (
+              <div className="px-3 py-2 text-xs text-gray-400 italic">
+                Keine Auszahlung erforderlich (Firmenkarte)
+              </div>
+            ) : (
+              <button
+                onClick={() => { onMarkAsReimbursed(); setIsOpen(false) }}
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 text-left"
+              >
+                <CreditCard className="h-4 w-4" />
+                Als überwiesen markieren
+              </button>
+            )
           )}
 
           {/* Löschen - nur Admin/GF */}

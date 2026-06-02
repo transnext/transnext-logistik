@@ -24,6 +24,8 @@ interface Auslage {
   kosten: string
   status?: string
   belegUrl?: string
+  /** Zahlungsart: private = erstattungsrelevant, company_card = nur Dokumentation */
+  paymentMethod?: 'private' | 'company_card'
 }
 
 export default function AuslagenabrechnungPage() {
@@ -109,15 +111,19 @@ export default function AuslagenabrechnungPage() {
         belegart: a.belegart,
         kosten: a.kosten.toString(),
         status: a.status,
-        belegUrl: a.beleg_url
+        belegUrl: a.beleg_url,
+        paymentMethod: (a as any).payment_method || 'private'
       }))
 
       setAuslagen(convertedAuslagen)
 
-      // Berechne Gesamtkosten
-      const gesamt = convertedAuslagen.reduce((sum, auslage) => {
-        return sum + (Number.parseFloat(auslage.kosten) || 0)
-      }, 0)
+      // Berechne Gesamtkosten - NUR private Auslagen (eigene Tasche) sind erstattungsrelevant
+      // company_card Auslagen wurden bereits mit Firmenkreditkarte bezahlt
+      const gesamt = convertedAuslagen
+        .filter(a => a.paymentMethod !== 'company_card')
+        .reduce((sum, auslage) => {
+          return sum + (Number.parseFloat(auslage.kosten) || 0)
+        }, 0)
       setGesamtKosten(gesamt)
     } catch (error) {
       console.error("Fehler beim Laden der Auslagen:", error)
@@ -280,7 +286,7 @@ export default function AuslagenabrechnungPage() {
                       </TableHeader>
                       <TableBody>
                         {auslagen.map((auslage) => (
-                          <TableRow key={auslage.id}>
+                          <TableRow key={auslage.id} className={auslage.paymentMethod === 'company_card' ? 'bg-amber-50/50' : ''}>
                             <TableCell>{formatDate(auslage.datum)}</TableCell>
                             <TableCell className="font-medium">{auslage.tourNr}</TableCell>
                             <TableCell>{auslage.kennzeichen}</TableCell>
@@ -289,10 +295,21 @@ export default function AuslagenabrechnungPage() {
                             </TableCell>
                             <TableCell>{getBelegartBadge(auslage.belegart)}</TableCell>
                             <TableCell className="text-right font-semibold">
-                              {formatCurrency(auslage.kosten)}
+                              {auslage.paymentMethod === 'company_card' ? (
+                                <span className="text-gray-400 line-through">{formatCurrency(auslage.kosten)}</span>
+                              ) : (
+                                formatCurrency(auslage.kosten)
+                              )}
                             </TableCell>
                             <TableCell>
-                              {getStatusBadge(auslage.status)}
+                              {auslage.paymentMethod === 'company_card' ? (
+                                <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 w-fit text-xs">
+                                  <CreditCard className="h-3 w-3" />
+                                  Firmenkarte
+                                </Badge>
+                              ) : (
+                                getStatusBadge(auslage.status)
+                              )}
                             </TableCell>
                             <TableCell className="text-center">
                               <Button
@@ -323,20 +340,38 @@ export default function AuslagenabrechnungPage() {
                               <Euro className="h-6 w-6 text-orange-700" />
                             </div>
                             <div>
-                              <p className="text-sm text-gray-600">Gesamtkosten Auslagen</p>
+                              <p className="text-sm text-gray-600">Erstattungsfähige Auslagen</p>
                               <p className="text-3xl font-bold text-orange-700">
                                 {formatCurrency(gesamtKosten)}
                               </p>
                             </div>
                           </div>
                           <div className="text-right text-sm text-gray-600">
-                            <p>{auslagen.length} {auslagen.length === 1 ? 'Auslage' : 'Auslagen'}</p>
+                            <p>{auslagen.filter(a => a.paymentMethod !== 'company_card').length} {auslagen.filter(a => a.paymentMethod !== 'company_card').length === 1 ? 'Auslage' : 'Auslagen'}</p>
                             <p className="text-xs mt-1">Zur Erstattung</p>
+                            {auslagen.filter(a => a.paymentMethod === 'company_card').length > 0 && (
+                              <p className="text-xs text-amber-600 mt-2">
+                                + {auslagen.filter(a => a.paymentMethod === 'company_card').length} Firmenkarte
+                              </p>
+                            )}
                           </div>
                         </div>
                       </CardContent>
                     </Card>
                   </div>
+
+                  {/* Hinweis für Firmenkarten-Auslagen */}
+                  {auslagen.filter(a => a.paymentMethod === 'company_card').length > 0 && (
+                    <div className="text-sm text-amber-700 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                      <p className="font-medium mb-1 flex items-center gap-2">
+                        <CreditCard className="h-4 w-4" />
+                        Mit Firmenkreditkarte bezahlt
+                      </p>
+                      <p className="text-amber-600">
+                        {auslagen.filter(a => a.paymentMethod === 'company_card').length} {auslagen.filter(a => a.paymentMethod === 'company_card').length === 1 ? 'Auslage wurde' : 'Auslagen wurden'} mit Firmenkreditkarte bezahlt und {auslagen.filter(a => a.paymentMethod === 'company_card').length === 1 ? 'wird' : 'werden'} nicht erstattet.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="text-sm text-gray-500 mt-4 p-4 bg-blue-50 rounded-lg">
                     <p className="font-medium text-gray-700 mb-2">Hinweis:</p>

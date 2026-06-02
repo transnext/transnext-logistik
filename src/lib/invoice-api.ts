@@ -96,6 +96,8 @@ export interface BillableAuslage {
   locked_at: string | null
   beleg_url: string | null
   user_id?: string
+  /** Zahlungsart: private = erstattungsrelevant, company_card = nur Dokumentation */
+  payment_method?: 'private' | 'company_card'
   // Nachberechnungs-Felder
   billing_type: BillingPositionType
   original_billing_period: string | null
@@ -597,6 +599,9 @@ export async function getBillableExpenses(
   //
   // WICHTIG: Cutoff-Regel - nur Auslagen ab KW21/2026 (Datum >= 2026-05-18) werden berücksichtigt!
   // Ältere Auslagen wurden bereits manuell abgerechnet und dürfen nicht automatisch gezogen werden.
+  //
+  // WICHTIG: company_card Auslagen werden NICHT geladen, da sie nicht erstattungsrelevant sind!
+  // Sie wurden bereits mit Firmenkreditkarte bezahlt und dürfen nicht an Fahrer ausgezahlt werden.
   const { data, error } = await supabase
     .from('auslagennachweise')
     .select(`
@@ -614,13 +619,17 @@ export async function getBillableExpenses(
       locked_at,
       beleg_url,
       billing_type,
-      original_billing_period
+      original_billing_period,
+      payment_method
     `)
     .eq('status', 'approved')
     .or(`customer_billing_status.is.null,customer_billing_status.eq.nicht_abgerechnet`)
     .is('weekly_invoice_id', null)
     .is('locked_at', null)
     .gte('datum', BILLING_SYSTEM_START_DATE) // Cutoff: nur ab KW21/2026
+    // FILTER: Nur private Auslagen (eigene Tasche) sind erstattungsrelevant
+    // company_card Auslagen werden nicht in die Abrechnung aufgenommen
+    .or('payment_method.is.null,payment_method.eq.private')
     .order('datum', { ascending: true })
 
   if (error) {
