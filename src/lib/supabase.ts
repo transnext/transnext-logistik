@@ -1,16 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
-
 // Fallback für Build-Zeit (wenn Umgebungsvariablen nicht verfügbar sind)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
-
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
 // TypeScript types for database schema
-
 // Vergütungsmodell für Fahrer
-export type CompensationModel = 'tour_based_minijob' | 'fixed_salary_part_time' | 'fixed_salary_full_time'
-
+// owner_operator = Geschäftsführer / Inhaber, die operativ fahren (keine Minijob-/Festgehalt-Bewertung)
+export type CompensationModel = 'tour_based_minijob' | 'fixed_salary_part_time' | 'fixed_salary_full_time' | 'owner_operator'
 export interface Profile {
   id: string
   role: 'fahrer' | 'admin' | 'disponent' | 'gf'
@@ -23,7 +19,6 @@ export interface Profile {
   created_at: string
   updated_at: string
 }
-
 export interface Fahrer {
   id: string
   user_id: string
@@ -46,7 +41,6 @@ export interface Fahrer {
   created_at: string
   updated_at: string
 }
-
 export interface Arbeitsnachweis {
   id: number
   user_id: string
@@ -61,10 +55,8 @@ export interface Arbeitsnachweis {
   created_at: string
   updated_at: string
 }
-
 /** Zahlungsart für Auslagen */
 export type PaymentMethod = 'private' | 'company_card'
-
 export interface Auslagennachweis {
   id: number
   user_id: string
@@ -82,7 +74,6 @@ export interface Auslagennachweis {
   created_at: string
   updated_at: string
 }
-
 export interface Monatsueberschuss {
   id: number
   user_id: string
@@ -92,23 +83,18 @@ export interface Monatsueberschuss {
   created_at: string
   updated_at: string
 }
-
 // =====================================================
 // TOUREN (Neues Touren-Modul)
 // =====================================================
-
 export type TourStatus = 'neu' | 'uebernahme_offen' | 'unterwegs' | 'abgabe_offen' | 'abgeschlossen'
 export type Fahrzeugart = 'pkw' | 'e-auto' | 'transporter'
-
 export interface Tour {
   id: string
   tour_nummer: number
-
   // Fahrzeugdaten
   fahrzeugart: Fahrzeugart
   kennzeichen: string
   fin: string // 17 Zeichen
-
   // Abholort
   abholort_name: string
   abholort_strasse: string
@@ -116,7 +102,6 @@ export interface Tour {
   abholort_ort: string
   abholort_ansprechpartner_name: string
   abholort_ansprechpartner_telefon: string
-
   // Abgabeort
   abgabeort_name: string
   abgabeort_strasse: string
@@ -124,37 +109,29 @@ export interface Tour {
   abgabeort_ort: string
   abgabeort_ansprechpartner_name: string
   abgabeort_ansprechpartner_telefon: string
-
   // Zeiten
   abholzeit_ab?: string
   abgabezeit_bis?: string
-
   // Sonstige Felder
   hinweise?: string
   distance_km?: number
-
   // Fahrerzuweisung
   fahrer_id?: string
-
   // Status
   status: TourStatus
-
   // Übernahme-Protokoll
   uebernahme_zeitpunkt?: string
   uebernahme_km_stand?: number
   uebernahme_fotos?: string[]
   uebernahme_unterschrift_url?: string
-
   // Abgabe-Protokoll
   abgabe_zeitpunkt?: string
   abgabe_km_stand?: number
   abgabe_fotos?: string[]
   abgabe_unterschrift_url?: string
-
   // Timestamps
   created_at: string
   updated_at: string
-
   // Joined data (optional)
   fahrer?: {
     vorname: string
