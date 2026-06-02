@@ -168,5 +168,5 @@ Tagesziel = 2.400 € / Soll-Arbeitstage
 
 - Typecheck: ✅ Erfolgreich (Fehler in nicht-relevanten Dateien)
 - Build: ✅ Erfolgreich
-- Push nach main: ⏳ Ausstehend
-- Version: ⏳ Wird erstellt
+- Push nach main: ✅ Erfolgreich (c205aa8)
+- Version: ✅ 275

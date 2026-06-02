@@ -787,48 +787,40 @@ export default function AnalyticsPage() {
             {/* DIAGRAMME */}
             {/* ============================================================ */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Top Fahrer nach Ertrag */}
+              {/* Top Minijobfahrer nach Ertrag - NUR Minijob! */}
               <Card className="border-gray-100">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold text-gray-900">Top 5 Fahrer nach Ertrag</CardTitle>
-                  <CardDescription>Profitabelste Fahrer im Zeitraum</CardDescription>
+                  <CardTitle className="text-base font-semibold text-gray-900">Top Minijobfahrer nach Ertrag</CardTitle>
+                  <CardDescription>Nur tourbasierte Minijobfahrer (Festgehalt → Controlling)</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  {(analytics.fahrer.topFahrerErtrag?.length ?? 0) > 0 ? (
+                  {(analytics.fahrer.topMinijobFahrerErtrag?.length ?? 0) > 0 ? (
                     <SimpleBarChart
-                      data={(analytics.fahrer.topFahrerErtrag ?? []).slice(0, 5).map(f => ({ name: f.name.split(" ")[0], value: f.ertrag }))}
-                      maxValue={Math.max(...(analytics.fahrer.topFahrerErtrag ?? []).map(f => f.ertrag), 1)}
+                      data={(analytics.fahrer.topMinijobFahrerErtrag ?? []).slice(0, 5).map(f => ({ name: f.name.split(" ")[0], value: f.ertrag }))}
+                      maxValue={Math.max(...(analytics.fahrer.topMinijobFahrerErtrag ?? []).map(f => f.ertrag), 1)}
                       label="€"
                       color="bg-emerald-500"
                     />
                   ) : (
-                    <p className="text-sm text-gray-400">Keine Daten</p>
+                    <p className="text-sm text-gray-400">Keine Minijobfahrer mit Touren</p>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Aktive Fahrtage */}
+              {/* Top Fahrer nach Umsatz - ALLE Fahrer */}
               <Card className="border-gray-100">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold text-gray-900">Einsatztage je Fahrer</CardTitle>
-                  <CardDescription>{analytics.zeitraum.istMonat && analytics.fahrer.minijobFahrerMitTouren > 0 ? "Minijob-Ziel: mind. 6 Tage" : "Sortiert nach Einsatztagen"}</CardDescription>
+                  <CardTitle className="text-base font-semibold text-gray-900">Top Fahrer nach Umsatz</CardTitle>
+                  <CardDescription>Alle Fahrer nach generiertem Umsatz</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  {(analytics.fahrer.alleFahrer?.length ?? 0) > 0 ? (
-                    <>
-                      <SimpleBarChart
-                        data={[...(analytics.fahrer.alleFahrer ?? [])].sort((a, b) => b.aktiveFahrtage - a.aktiveFahrtage).slice(0, 5).map(f => ({ name: f.name.split(" ")[0], value: f.aktiveFahrtage }))}
-                        maxValue={Math.max(...(analytics.fahrer.alleFahrer ?? []).map(f => f.aktiveFahrtage), analytics.zeitraum.istMonat ? 6 : 1)}
-                        label="Tage"
-                        color="bg-sky-500"
-                      />
-                      {analytics.zeitraum.istMonat && analytics.fahrer.minijobFahrerMitTouren > 0 && (
-                        <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                          <div className="w-3 h-0.5 bg-amber-400"></div>
-                          <span>Minijob-Zielmarke: 6 Tage</span>
-                        </div>
-                      )}
-                    </>
+                  {(analytics.fahrer.topFahrerUmsatz?.length ?? 0) > 0 ? (
+                    <SimpleBarChart
+                      data={(analytics.fahrer.topFahrerUmsatz ?? []).slice(0, 5).map(f => ({ name: f.name.split(" ")[0], value: f.umsatz }))}
+                      maxValue={Math.max(...(analytics.fahrer.topFahrerUmsatz ?? []).map(f => f.umsatz), 1)}
+                      label="€"
+                      color="bg-sky-500"
+                    />
                   ) : (
                     <p className="text-sm text-gray-400">Keine Daten</p>
                   )}
@@ -836,10 +828,64 @@ export default function AnalyticsPage() {
               </Card>
             </div>
 
+            {/* Einsatztage getrennt nach Vergütungsmodell */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Einsatztage Minijobfahrer */}
+              {analytics.fahrer.minijobFahrerMitTouren > 0 && (
+                <Card className="border-gray-100">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base font-semibold text-gray-900">Einsatztage Minijobfahrer</CardTitle>
+                    <CardDescription>{analytics.zeitraum.istMonat ? "Minijob-Ziel: mind. 6 Tage" : "Sortiert nach Einsatztagen"}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <SimpleBarChart
+                      data={[...(analytics.fahrer.minijobFahrer ?? [])].sort((a, b) => b.aktiveFahrtage - a.aktiveFahrtage).slice(0, 5).map(f => ({ name: f.name.split(" ")[0], value: f.aktiveFahrtage }))}
+                      maxValue={Math.max(...(analytics.fahrer.minijobFahrer ?? []).map(f => f.aktiveFahrtage), analytics.zeitraum.istMonat ? 6 : 1)}
+                      label="Tage"
+                      color="bg-sky-500"
+                    />
+                    {analytics.zeitraum.istMonat && (
+                      <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                        <div className="w-3 h-0.5 bg-amber-400"></div>
+                        <span>Minijob-Zielmarke: 6 Tage</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Einsatztage Festgehaltfahrer - OHNE 6-Tage-Ziel */}
+              {analytics.fahrer.festgehaltFahrerMitTouren > 0 && (
+                <Card className="border-gray-100">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base font-semibold text-gray-900">Einsatztage Festgehaltfahrer</CardTitle>
+                    <CardDescription>
+                      {analytics.fahrer.monatsArbeitstage > 0
+                        ? `Monatsarbeitstage: ${analytics.fahrer.monatsArbeitstage} (Mo-Fr abzgl. Feiertage)`
+                        : "Sortiert nach Einsatztagen"
+                      }
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <SimpleBarChart
+                      data={[...(analytics.fahrer.festgehaltFahrer ?? [])].sort((a, b) => b.aktiveFahrtage - a.aktiveFahrtage).slice(0, 5).map(f => ({ name: f.name.split(" ")[0], value: f.aktiveFahrtage }))}
+                      maxValue={Math.max(...(analytics.fahrer.festgehaltFahrer ?? []).map(f => f.aktiveFahrtage), analytics.fahrer.monatsArbeitstage || 1)}
+                      label="Tage"
+                      color="bg-violet-500"
+                    />
+                    <div className="mt-2 text-xs text-gray-500">
+                      <Info className="inline h-3 w-3 mr-1" />
+                      Teilzeit: Solltage individuell. Vollzeit: {analytics.fahrer.monatsArbeitstage} Soll-Arbeitstage
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
             {/* ============================================================ */}
             {/* MONATSTREND-GRAFIK */}
             {/* ============================================================ */}
-            {analytics.trend && analytics.trend.monatsDaten.length > 1 && (
+            {analytics.trend && analytics.trend.monatsDaten.length >= 1 && (
               <Card className="border-gray-100">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">
@@ -921,7 +967,7 @@ export default function AnalyticsPage() {
                         </div>
                       </CardHeader>
                       <CardContent className="pt-0">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {/* Umsatz */}
                           <div className="bg-gray-50 rounded p-2">
                             <p className="text-[10px] text-gray-500 uppercase">Umsatz</p>
@@ -941,36 +987,8 @@ export default function AnalyticsPage() {
                             <p className="text-[10px] text-gray-500 uppercase">Einsatztage</p>
                             <p className="text-sm font-semibold text-gray-900">
                               {fahrer.aktiveFahrtage}
-                              {fahrer.sollArbeitstage !== null && (
-                                <span className="text-gray-400 font-normal"> / {fahrer.sollArbeitstage}</span>
-                              )}
                             </p>
                           </div>
-
-                          {/* Soll-Arbeitstage (nur Vollzeit) */}
-                          {fahrer.compensationModel === 'fixed_salary_full_time' && fahrer.sollArbeitstage !== null && (
-                            <div className="bg-gray-50 rounded p-2">
-                              <p className="text-[10px] text-gray-500 uppercase">Soll-Arbeitstage</p>
-                              <p className="text-sm font-semibold text-gray-900">{fahrer.sollArbeitstage}</p>
-                              <p className="text-[10px] text-gray-400">Mo-Fr abzgl. Feiertage</p>
-                            </div>
-                          )}
-
-                          {/* Leerlauftage (nur Vollzeit) */}
-                          {fahrer.compensationModel === 'fixed_salary_full_time' && fahrer.leerlauftage !== null && (
-                            <div className={`rounded p-2 ${
-                              fahrer.leerlauftage === 0 ? 'bg-emerald-50' :
-                              fahrer.leerlauftage <= 3 ? 'bg-amber-50' : 'bg-red-50'
-                            }`}>
-                              <p className="text-[10px] text-gray-500 uppercase">Leerlauftage</p>
-                              <p className={`text-sm font-semibold ${
-                                fahrer.leerlauftage === 0 ? 'text-emerald-700' :
-                                fahrer.leerlauftage <= 3 ? 'text-amber-700' : 'text-red-700'
-                              }`}>
-                                {fahrer.leerlauftage}
-                              </p>
-                            </div>
-                          )}
 
                           {/* Umsatz/Einsatztag */}
                           <div className="bg-gray-50 rounded p-2">
@@ -980,68 +998,139 @@ export default function AnalyticsPage() {
                             </p>
                           </div>
 
-                          {/* Umsatz/Soll-Arbeitstag (nur Vollzeit) */}
-                          {fahrer.compensationModel === 'fixed_salary_full_time' && fahrer.umsatzProSollArbeitstag !== null && (
-                            <div className="bg-gray-50 rounded p-2">
-                              <p className="text-[10px] text-gray-500 uppercase">€/Soll-Tag</p>
-                              <p className="text-sm font-semibold text-gray-900">
-                                <CurrencyDisplay amount={fahrer.umsatzProSollArbeitstag} />
-                              </p>
-                            </div>
-                          )}
+                          {/* Monatsarbeitstage (für ALLE Festgehaltfahrer) */}
+                          <div className="bg-gray-50 rounded p-2">
+                            <p className="text-[10px] text-gray-500 uppercase">Monatsarbeitstage</p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {fahrer.monatsArbeitstage ?? 'N/A'}
+                            </p>
+                            <p className="text-[10px] text-gray-400">Mo-Fr abzgl. Feiertage</p>
+                          </div>
+
+                          {/* Umsatz pro Monatsarbeitstag (für ALLE Festgehaltfahrer) */}
+                          <div className={`rounded p-2 ${
+                            fahrer.compensationModel === 'fixed_salary_part_time' ? 'bg-gray-50 border border-dashed border-gray-200' : 'bg-gray-50'
+                          }`}>
+                            <p className="text-[10px] text-gray-500 uppercase">
+                              €/Monatsarbeitstag
+                              {fahrer.compensationModel === 'fixed_salary_part_time' && <span className="text-amber-500"> *</span>}
+                            </p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {fahrer.umsatzProMonatsArbeitstag !== null ? <CurrencyDisplay amount={fahrer.umsatzProMonatsArbeitstag} /> : 'N/A'}
+                            </p>
+                          </div>
 
                           {/* Plan-Monatskosten */}
-                          {fahrer.planMonatskosten !== null && (
-                            <div className="bg-violet-50 rounded p-2">
-                              <p className="text-[10px] text-violet-600 uppercase">Plan-Kosten</p>
-                              <p className="text-sm font-semibold text-violet-700">
-                                <CurrencyDisplay amount={fahrer.planMonatskosten} />
-                              </p>
-                              <p className="text-[10px] text-violet-400">pro Monat</p>
-                            </div>
-                          )}
+                          <div className="bg-violet-50 rounded p-2">
+                            <p className="text-[10px] text-violet-600 uppercase">Plan-Kosten</p>
+                            <p className="text-sm font-semibold text-violet-700">
+                              <CurrencyDisplay amount={fahrer.planMonatskosten ?? 0} />
+                            </p>
+                            <p className="text-[10px] text-violet-400">pro Monat</p>
+                          </div>
 
-                          {/* Tagesziel Kostendeckung (nur Vollzeit) */}
-                          {fahrer.compensationModel === 'fixed_salary_full_time' && fahrer.tageszielKostendeckung !== null && (
-                            <div className={`rounded p-2 ${
+                          {/* Tagesziel Kostendeckung (für ALLE Festgehaltfahrer als Orientierung) */}
+                          <div className={`rounded p-2 ${
+                            fahrer.compensationModel === 'fixed_salary_part_time' ? 'bg-gray-50 border border-dashed border-gray-200' : (
                               fahrer.kostendeckungsStatus === 'ueber_ziel' ? 'bg-emerald-50' :
                               fahrer.kostendeckungsStatus === 'nahe_ziel' ? 'bg-amber-50' :
                               fahrer.kostendeckungsStatus === 'unter_ziel' ? 'bg-red-50' : 'bg-gray-50'
-                            }`}>
-                              <p className="text-[10px] text-gray-500 uppercase">Tagesziel</p>
-                              <p className={`text-sm font-semibold ${
+                            )
+                          }`}>
+                            <p className="text-[10px] text-gray-500 uppercase">
+                              Tagesziel
+                              {fahrer.compensationModel === 'fixed_salary_part_time' && <span className="text-amber-500"> *</span>}
+                            </p>
+                            <p className={`text-sm font-semibold ${
+                              fahrer.compensationModel === 'fixed_salary_part_time' ? 'text-gray-700' : (
                                 fahrer.kostendeckungsStatus === 'ueber_ziel' ? 'text-emerald-700' :
                                 fahrer.kostendeckungsStatus === 'nahe_ziel' ? 'text-amber-700' :
                                 fahrer.kostendeckungsStatus === 'unter_ziel' ? 'text-red-700' : 'text-gray-700'
-                              }`}>
-                                <CurrencyDisplay amount={fahrer.tageszielKostendeckung} />
+                              )
+                            }`}>
+                              {fahrer.tageszielKostendeckung !== null ? <CurrencyDisplay amount={fahrer.tageszielKostendeckung} /> : 'N/A'}
+                            </p>
+                            <p className="text-[10px] text-gray-400">zur Kostendeckung</p>
+                          </div>
+
+                          {/* Differenz zum Tagesziel */}
+                          {fahrer.differenzZumTagesziel !== null && (
+                            <div className={`rounded p-2 ${
+                              fahrer.compensationModel === 'fixed_salary_part_time' ? 'bg-gray-50 border border-dashed border-gray-200' : (
+                                fahrer.differenzZumTagesziel >= 0 ? 'bg-emerald-50' :
+                                fahrer.differenzZumTagesziel >= -20 ? 'bg-amber-50' : 'bg-red-50'
+                              )
+                            }`}>
+                              <p className="text-[10px] text-gray-500 uppercase">
+                                Diff. Tagesziel
+                                {fahrer.compensationModel === 'fixed_salary_part_time' && <span className="text-amber-500"> *</span>}
                               </p>
-                              <p className="text-[10px] text-gray-400">zur Kostendeckung</p>
+                              <p className={`text-sm font-semibold ${
+                                fahrer.compensationModel === 'fixed_salary_part_time' ? 'text-gray-700' : (
+                                  fahrer.differenzZumTagesziel >= 0 ? 'text-emerald-700' :
+                                  fahrer.differenzZumTagesziel >= -20 ? 'text-amber-700' : 'text-red-700'
+                                )
+                              }`}>
+                                {fahrer.differenzZumTagesziel >= 0 ? '+' : ''}<CurrencyDisplay amount={fahrer.differenzZumTagesziel} />
+                              </p>
                             </div>
                           )}
 
-                          {/* Auslastung (nur Vollzeit) */}
-                          {fahrer.compensationModel === 'fixed_salary_full_time' && fahrer.auslastungsquote !== null && (
-                            <div className={`rounded p-2 ${
-                              fahrer.auslastungsquote >= 80 ? 'bg-emerald-50' :
-                              fahrer.auslastungsquote >= 50 ? 'bg-amber-50' : 'bg-red-50'
-                            }`}>
-                              <p className="text-[10px] text-gray-500 uppercase">Auslastung</p>
-                              <p className={`text-sm font-semibold ${
-                                fahrer.auslastungsquote >= 80 ? 'text-emerald-700' :
-                                fahrer.auslastungsquote >= 50 ? 'text-amber-700' : 'text-red-700'
-                              }`}>
-                                {fahrer.auslastungsquote.toFixed(0)}%
-                              </p>
-                            </div>
+                          {/* Vollzeit-spezifische Felder */}
+                          {fahrer.compensationModel === 'fixed_salary_full_time' && (
+                            <>
+                              {/* Soll-Arbeitstage (nur Vollzeit) */}
+                              {fahrer.sollArbeitstage !== null && (
+                                <div className="bg-gray-50 rounded p-2">
+                                  <p className="text-[10px] text-gray-500 uppercase">Soll-Arbeitstage</p>
+                                  <p className="text-sm font-semibold text-gray-900">{fahrer.sollArbeitstage}</p>
+                                </div>
+                              )}
+
+                              {/* Leerlauftage */}
+                              {fahrer.leerlauftage !== null && (
+                                <div className={`rounded p-2 ${
+                                  fahrer.leerlauftage === 0 ? 'bg-emerald-50' :
+                                  fahrer.leerlauftage <= 3 ? 'bg-amber-50' : 'bg-red-50'
+                                }`}>
+                                  <p className="text-[10px] text-gray-500 uppercase">Leerlauftage</p>
+                                  <p className={`text-sm font-semibold ${
+                                    fahrer.leerlauftage === 0 ? 'text-emerald-700' :
+                                    fahrer.leerlauftage <= 3 ? 'text-amber-700' : 'text-red-700'
+                                  }`}>
+                                    {fahrer.leerlauftage}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Auslastung */}
+                              {fahrer.auslastungsquote !== null && (
+                                <div className={`rounded p-2 ${
+                                  fahrer.auslastungsquote >= 80 ? 'bg-emerald-50' :
+                                  fahrer.auslastungsquote >= 50 ? 'bg-amber-50' : 'bg-red-50'
+                                }`}>
+                                  <p className="text-[10px] text-gray-500 uppercase">Auslastung</p>
+                                  <p className={`text-sm font-semibold ${
+                                    fahrer.auslastungsquote >= 80 ? 'text-emerald-700' :
+                                    fahrer.auslastungsquote >= 50 ? 'text-amber-700' : 'text-red-700'
+                                  }`}>
+                                    {fahrer.auslastungsquote.toFixed(0)}%
+                                  </p>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
 
                         {/* Teilzeit-Hinweis */}
                         {fahrer.compensationModel === 'fixed_salary_part_time' && (
-                          <div className="mt-3 flex items-center gap-2 text-xs text-gray-500 border-t border-gray-100 pt-2">
-                            <Info className="h-3 w-3" />
-                            <span>Teilzeit-Festgehalt: Individuelle Solltage nicht hinterlegt. Operative Prüfung erforderlich.</span>
+                          <div className="mt-3 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                            <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                            <span>
+                              <strong>Teilzeit-Festgehalt:</strong> Individuelle Solltage nicht hinterlegt.
+                              Werte mit <span className="text-amber-500 font-bold">*</span> sind Orientierungswerte basierend auf Vollzeit-Arbeitstagen.
+                              Operative Einzelfallprüfung erforderlich.
+                            </span>
                           </div>
                         )}
                       </CardContent>
@@ -1088,7 +1177,9 @@ export default function AnalyticsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedFahrer.map((f) => (
+                      {sortedFahrer.map((f) => {
+                        const isFixedSalary = f.compensationModel !== 'tour_based_minijob'
+                        return (
                         <tr
                           key={f.canonicalKey}
                           className={`border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${selectedFahrer?.canonicalKey === f.canonicalKey ? "bg-sky-50" : ""}`}
@@ -1113,11 +1204,34 @@ export default function AnalyticsPage() {
                           </td>
                           <td className="py-2 px-2 text-right text-gray-700">{f.touren}</td>
                           <td className="py-2 px-2 text-right text-gray-700"><CurrencyDisplay amount={f.umsatz} /></td>
-                          <td className={`py-2 px-2 text-right font-medium ${f.ertrag >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-                            <CurrencyDisplay amount={f.ertrag} />
+                          {/* Ertrag: NUR für Minijob anzeigen, Festgehalt = "—" */}
+                          <td className={`py-2 px-2 text-right font-medium ${
+                            isFixedSalary ? "text-gray-400" : (f.ertrag >= 0 ? "text-emerald-700" : "text-red-700")
+                          }`}>
+                            {isFixedSalary ? (
+                              <span title="Festgehaltfahrer: Siehe Controlling-Bereich">—</span>
+                            ) : (
+                              <CurrencyDisplay amount={f.ertrag} />
+                            )}
                           </td>
-                          <td className="py-2 px-2 text-right text-gray-700">{f.margenquote?.toFixed(1) ?? "N/A"}%</td>
-                          <td className="py-2 px-2 text-center"><BewertungBadge bewertung={f.bewertung} /></td>
+                          {/* Marge: NUR für Minijob anzeigen, Festgehalt = "—" */}
+                          <td className="py-2 px-2 text-right text-gray-700">
+                            {isFixedSalary ? (
+                              <span className="text-gray-400" title="Festgehaltfahrer: Siehe Controlling-Bereich">—</span>
+                            ) : (
+                              `${f.margenquote?.toFixed(1) ?? "N/A"}%`
+                            )}
+                          </td>
+                          {/* Bewertung: Festgehalt = "Controlling" Badge */}
+                          <td className="py-2 px-2 text-center">
+                            {isFixedSalary ? (
+                              <Badge className="bg-violet-50 text-violet-700 border-violet-200 border font-medium text-xs">
+                                Controlling
+                              </Badge>
+                            ) : (
+                              <BewertungBadge bewertung={f.bewertung} />
+                            )}
+                          </td>
                           <td className="py-2 px-2 text-center">
                             {f.fahrerId ? (
                               <Link
@@ -1135,7 +1249,8 @@ export default function AnalyticsPage() {
                             )}
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1234,12 +1349,40 @@ export default function AnalyticsPage() {
 
                     <DetailKPICard label="Umsatz" value={<CurrencyDisplay amount={selectedFahrer.umsatz} />} />
                     <DetailKPICard label="Umsatz/Tag" value={selectedFahrer.umsatzProTag !== null ? <CurrencyDisplay amount={selectedFahrer.umsatzProTag} /> : "N/A"} />
-                    <DetailKPICard label="Ertrag" value={<CurrencyDisplay amount={selectedFahrer.ertrag} />} variant={selectedFahrer.ertrag >= 0 ? "success" : "danger"} />
-                    <DetailKPICard label="Margenquote" value={`${selectedFahrer.margenquote?.toFixed(1) ?? "N/A"}%`} variant={(selectedFahrer.margenquote ?? 0) >= 15 ? "success" : (selectedFahrer.margenquote ?? 0) >= 5 ? "warning" : "danger"} />
-                    <DetailKPICard label="Ertrag/Tag" value={selectedFahrer.ertragProTag !== null ? <CurrencyDisplay amount={selectedFahrer.ertragProTag} /> : "N/A"} variant={(selectedFahrer.ertragProTag ?? 0) > 0 ? "success" : "default"} />
-                    <DetailKPICard label="Kostenquote" value={`${selectedFahrer.kostenquote?.toFixed(1) ?? "N/A"}%`} />
+
+                    {/* Ertrag/Marge NUR für Minijob anzeigen */}
+                    {selectedFahrer.compensationModel === 'tour_based_minijob' ? (
+                      <>
+                        <DetailKPICard label="Ertrag" value={<CurrencyDisplay amount={selectedFahrer.ertrag} />} variant={selectedFahrer.ertrag >= 0 ? "success" : "danger"} />
+                        <DetailKPICard label="Margenquote" value={`${selectedFahrer.margenquote?.toFixed(1) ?? "N/A"}%`} variant={(selectedFahrer.margenquote ?? 0) >= 15 ? "success" : (selectedFahrer.margenquote ?? 0) >= 5 ? "warning" : "danger"} />
+                        <DetailKPICard label="Ertrag/Tag" value={selectedFahrer.ertragProTag !== null ? <CurrencyDisplay amount={selectedFahrer.ertragProTag} /> : "N/A"} variant={(selectedFahrer.ertragProTag ?? 0) > 0 ? "success" : "default"} />
+                        <DetailKPICard label="Kostenquote" value={`${selectedFahrer.kostenquote?.toFixed(1) ?? "N/A"}%`} />
+                      </>
+                    ) : (
+                      <>
+                        {/* Festgehalt: Zeige Controlling-relevante KPIs statt tourbasierter Ertrag */}
+                        <DetailKPICard label="Plan-Kosten" value={selectedFahrer.planMonatskosten !== null ? <CurrencyDisplay amount={selectedFahrer.planMonatskosten} /> : "N/A"} sublabel="pro Monat" />
+                        {selectedFahrer.tageszielKostendeckung !== null && (
+                          <DetailKPICard label="Tagesziel" value={<CurrencyDisplay amount={selectedFahrer.tageszielKostendeckung} />} sublabel="Kostendeckung" />
+                        )}
+                        {selectedFahrer.umsatzProMonatsArbeitstag !== null && (
+                          <DetailKPICard
+                            label="€/Monatsarbeitstag"
+                            value={<CurrencyDisplay amount={selectedFahrer.umsatzProMonatsArbeitstag} />}
+                            sublabel={selectedFahrer.compensationModel === 'fixed_salary_part_time' ? "Orientierung" : undefined}
+                          />
+                        )}
+                        {selectedFahrer.differenzZumTagesziel !== null && (
+                          <DetailKPICard
+                            label="Diff. Tagesziel"
+                            value={`${selectedFahrer.differenzZumTagesziel >= 0 ? '+' : ''}${selectedFahrer.differenzZumTagesziel.toFixed(0)} €`}
+                            variant={selectedFahrer.differenzZumTagesziel >= 0 ? "success" : selectedFahrer.differenzZumTagesziel >= -20 ? "warning" : "danger"}
+                          />
+                        )}
+                      </>
+                    )}
+
                     <DetailKPICard label="Anteil Umsatz" value={`${selectedFahrer.anteilUmsatz?.toFixed(1) ?? "N/A"}%`} />
-                    <DetailKPICard label="Anteil Ertrag" value={`${selectedFahrer.anteilErtrag?.toFixed(1) ?? "N/A"}%`} />
                   </div>
 
                   {/* Hinweise basierend auf Vergütungsmodell */}
@@ -1266,17 +1409,29 @@ export default function AnalyticsPage() {
                 <div className="flex items-center gap-2">
                   <Euro className="h-5 w-5 text-emerald-600" />
                   <CardTitle className="text-base font-semibold text-gray-900">Finanzübersicht</CardTitle>
+                  <Badge variant="outline" className="text-xs text-gray-500 border-gray-200">Tourbasiert</Badge>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                   <DetailKPICard label="Umsatz" value={<CurrencyDisplay amount={analytics.finanzen.umsatz} />} variant="success" />
-                  <DetailKPICard label="Fahrerlohn" value={<CurrencyDisplay amount={analytics.finanzen.fahrerlohn} />} />
-                  <DetailKPICard label="AG-Kosten" value={<CurrencyDisplay amount={analytics.finanzen.arbeitgeberkosten} />} />
+                  <DetailKPICard label="Fahrerlohn" value={<CurrencyDisplay amount={analytics.finanzen.fahrerlohn} />} sublabel="tourbasiert" />
+                  <DetailKPICard label="AG-Kosten" value={<CurrencyDisplay amount={analytics.finanzen.arbeitgeberkosten} />} sublabel="tourbasiert" />
                   <DetailKPICard label="Rohertrag" value={<CurrencyDisplay amount={analytics.finanzen.margeVorArbeitgeberkosten} />} sublabel="Vor AG-Kosten" />
                   <DetailKPICard label="Ertrag (netto)" value={<CurrencyDisplay amount={analytics.finanzen.margeNachArbeitgeberkosten} />} variant={analytics.finanzen.margeNachArbeitgeberkosten >= 0 ? "success" : "danger"} />
                   <DetailKPICard label="Margenquote" value={`${analytics.finanzen.margenquote?.toFixed(1) ?? "N/A"}%`} variant={(analytics.finanzen.margenquote ?? 0) >= 15 ? "success" : (analytics.finanzen.margenquote ?? 0) >= 5 ? "warning" : "danger"} />
                 </div>
+                {/* Hinweis bei Festgehaltfahrern */}
+                {analytics.fahrer.festgehaltFahrerMitTouren > 0 && (
+                  <div className="mt-4 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong>Hinweis:</strong> Fahrerlohn/AG-Kosten/Ertrag/Marge enthalten nur tourbasierte Vergütung.
+                      Festgehaltkosten ({analytics.fahrer.festgehaltFahrerMitTouren} Fahrer) werden im Bereich
+                      <strong> Festgehaltfahrer – Controlling</strong> separat dargestellt.
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

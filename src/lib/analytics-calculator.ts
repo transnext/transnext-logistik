@@ -251,6 +251,12 @@ export interface FahrerLeistungKPI {
   tageszielKostendeckung: number | null
   /** Kostendeckungs-Status */
   kostendeckungsStatus: 'ueber_ziel' | 'nahe_ziel' | 'unter_ziel' | 'operativ_pruefen' | null
+  /** Arbeitstage im Zeitraum (Mo-Fr minus Feiertage) - für alle Festgehaltfahrer */
+  monatsArbeitstage: number | null
+  /** Umsatz pro Monatsarbeitstag (als Orientierungswert, auch für Teilzeit) */
+  umsatzProMonatsArbeitstag: number | null
+  /** Differenz zum Tagesziel (Umsatz pro Monatsarbeitstag - Tagesziel) */
+  differenzZumTagesziel: number | null
 }
 
 export interface FahrerKPIs {
@@ -270,15 +276,15 @@ export interface FahrerKPIs {
   aktiveTageProFahrer: number | null
   /** Alle Fahrer mit KPIs (für Tabelle und Rankings) */
   alleFahrer: FahrerLeistungKPI[]
-  /** Top Fahrer nach Ertrag */
-  topFahrerErtrag: FahrerLeistungKPI[]
-  /** Top Fahrer nach Umsatz */
+  /** Top Minijob-Fahrer nach Ertrag (NUR tour_based_minijob!) */
+  topMinijobFahrerErtrag: FahrerLeistungKPI[]
+  /** Top Fahrer nach Umsatz (alle Fahrer) */
   topFahrerUmsatz: FahrerLeistungKPI[]
   /** Top Fahrer nach Touren */
   topFahrerTouren: FahrerLeistungKPI[]
-  /** Fahrer mit guter Marge aber wenig Tagen (Ausbauen) */
+  /** Fahrer mit guter Marge aber wenig Tagen (Ausbauen) - nur Minijob */
   fahrerAusbauen: FahrerLeistungKPI[]
-  /** Fahrer mit vielen Tagen aber schwacher Marge (Prüfen) */
+  /** Fahrer mit vielen Tagen aber schwacher Marge (Prüfen) - nur Minijob */
   fahrerPruefen: FahrerLeistungKPI[]
   /** Anzahl Minijob-Fahrer unter Ziel (< 6 aktive Tage, nur bei Monatszeitraum) */
   fahrerUnterZiel: number
@@ -286,8 +292,12 @@ export interface FahrerKPIs {
   minijobFahrerMitTouren: number
   /** Anzahl Festgehalt-Fahrer mit Touren */
   festgehaltFahrerMitTouren: number
+  /** Nur Minijobfahrer für separate Charts */
+  minijobFahrer: FahrerLeistungKPI[]
   /** Nur Festgehaltfahrer für Controlling-Bereich */
   festgehaltFahrer: FahrerLeistungKPI[]
+  /** Arbeitstage im Zeitraum (Mo-Fr minus NRW-Feiertage) */
+  monatsArbeitstage: number
 }
 
 /** Monatlicher Trend-Datenpunkt für Grafiken */
@@ -1068,6 +1078,9 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     | "planMonatskosten"
     | "tageszielKostendeckung"
     | "kostendeckungsStatus"
+    | "monatsArbeitstage"
+    | "umsatzProMonatsArbeitstag"
+    | "differenzZumTagesziel"
   > & {
     tageSet: Set<string>
     umsatz: number
@@ -1209,6 +1222,9 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     let planMonatskosten: number | null = null
     let tageszielKostendeckung: number | null = null
     let kostendeckungsStatus: 'ueber_ziel' | 'nahe_ziel' | 'unter_ziel' | 'operativ_pruefen' | null = null
+    let monatsArbeitstage: number | null = null
+    let umsatzProMonatsArbeitstag: number | null = null
+    let differenzZumTagesziel: number | null = null
     let bewertung: FahrerBewertung = "inaktiv"
 
     if (f.compensationModel === 'tour_based_minijob') {
@@ -1229,69 +1245,62 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     } else if (f.compensationModel === 'fixed_salary_full_time') {
       // Vollzeit-Festgehalt: Soll-Arbeitstage und Auslastung
       sollArbeitstage = sollArbeitstageVollzeit
+      monatsArbeitstage = sollArbeitstageVollzeit // Gleich für Vollzeit
       leerlauftage = Math.max(0, sollArbeitstage - aktiveFahrtage)
       auslastungsquote = sollArbeitstage > 0 ? (aktiveFahrtage / sollArbeitstage) * 100 : null
       umsatzProSollArbeitstag = sollArbeitstage > 0 ? f.umsatz / sollArbeitstage : null
+      umsatzProMonatsArbeitstag = monatsArbeitstage > 0 ? f.umsatz / monatsArbeitstage : null
 
-      // Plankosten und Kostendeckung (nur bei Monatszeitraum)
-      if (dateRange.istMonat) {
-        planMonatskosten = calculateFixedSalaryMonthlyCost()
-        tageszielKostendeckung = calculateDailyBreakEvenRevenue(sollArbeitstage)
+      // Plankosten und Kostendeckung
+      planMonatskosten = calculateFixedSalaryMonthlyCost()
+      tageszielKostendeckung = calculateDailyBreakEvenRevenue(monatsArbeitstage)
 
-        // Kostendeckungs-Status ermitteln
-        const umsatzProSollTag = umsatzProSollArbeitstag ?? 0
-        if (tageszielKostendeckung > 0) {
-          const deckungsgrad = umsatzProSollTag / tageszielKostendeckung
-          if (deckungsgrad >= 1.0) {
-            kostendeckungsStatus = 'ueber_ziel'
-          } else if (deckungsgrad >= 0.8) {
-            kostendeckungsStatus = 'nahe_ziel'
-          } else {
-            kostendeckungsStatus = 'unter_ziel'
-          }
-        }
+      // Differenz zum Tagesziel
+      if (umsatzProMonatsArbeitstag !== null && tageszielKostendeckung !== null) {
+        differenzZumTagesziel = umsatzProMonatsArbeitstag - tageszielKostendeckung
       }
 
-      // Bewertung für Vollzeit-Festgehalt (basierend auf Auslastung + Kostendeckung)
-      if (aktiveFahrtage > 0) {
-        if (kostendeckungsStatus === 'ueber_ziel') {
-          bewertung = "stark"
-        } else if (kostendeckungsStatus === 'nahe_ziel') {
-          bewertung = "pruefen"
-        } else if (kostendeckungsStatus === 'unter_ziel') {
-          bewertung = "ausbauen"
+      // Kostendeckungs-Status ermitteln
+      const umsatzProTag = umsatzProMonatsArbeitstag ?? 0
+      if (tageszielKostendeckung > 0) {
+        const deckungsgrad = umsatzProTag / tageszielKostendeckung
+        if (deckungsgrad >= 1.0) {
+          kostendeckungsStatus = 'ueber_ziel'
+        } else if (deckungsgrad >= 0.8) {
+          kostendeckungsStatus = 'nahe_ziel'
         } else {
-          // Fallback auf Auslastung
-          const auslastung = auslastungsquote ?? 0
-          if (auslastung >= 80) {
-            bewertung = "stark"
-          } else if (auslastung >= 50) {
-            bewertung = "pruefen"
-          } else {
-            bewertung = "ausbauen"
-          }
+          kostendeckungsStatus = 'unter_ziel'
         }
       }
+
+      // Bewertung für Festgehalt: IMMER "pruefen" (wird im Controlling bewertet)
+      bewertung = "pruefen"
 
     } else if (f.compensationModel === 'fixed_salary_part_time') {
-      // Teilzeit-Festgehalt: Keine Soll-Arbeitstage berechnen (individuell)
-      // Nur Einsatztage und Umsatz pro Tag
+      // Teilzeit-Festgehalt: Individuelle Solltage, aber Monatsarbeitstage als Orientierung
       sollArbeitstage = null // Individuell - nicht berechenbar
+      monatsArbeitstage = sollArbeitstageVollzeit // Als Orientierungswert trotzdem berechnen
       leerlauftage = null
       auslastungsquote = null
       umsatzProSollArbeitstag = null
 
-      // Plankosten trotzdem anzeigen (als Planwert)
-      if (dateRange.istMonat) {
-        planMonatskosten = calculateFixedSalaryMonthlyCost()
-        // Kein Tagesziel, da keine Solltage
-        kostendeckungsStatus = 'operativ_pruefen' // Individuelle Prüfung erforderlich
+      // Umsatz pro Monatsarbeitstag als Orientierungswert
+      umsatzProMonatsArbeitstag = monatsArbeitstage > 0 ? f.umsatz / monatsArbeitstage : null
+
+      // Plankosten und Tagesziel als Orientierungswert
+      planMonatskosten = calculateFixedSalaryMonthlyCost()
+      tageszielKostendeckung = calculateDailyBreakEvenRevenue(monatsArbeitstage)
+
+      // Differenz zum Tagesziel (als Orientierung)
+      if (umsatzProMonatsArbeitstag !== null && tageszielKostendeckung !== null) {
+        differenzZumTagesziel = umsatzProMonatsArbeitstag - tageszielKostendeckung
       }
 
-      // Bewertung für Teilzeit-Festgehalt (basierend auf Aktivität)
-      if (aktiveFahrtage > 0) {
-        bewertung = "stark" // Aktiv = grundsätzlich gut
-      }
+      // Status: immer individuell prüfen für Teilzeit
+      kostendeckungsStatus = 'operativ_pruefen'
+
+      // Bewertung für Festgehalt: IMMER "pruefen" (wird im Controlling bewertet)
+      bewertung = "pruefen"
     }
 
     return {
@@ -1320,7 +1329,10 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
       umsatzProSollArbeitstag,
       planMonatskosten,
       tageszielKostendeckung,
-      kostendeckungsStatus
+      kostendeckungsStatus,
+      monatsArbeitstage,
+      umsatzProMonatsArbeitstag,
+      differenzZumTagesziel
     }
   })
 
@@ -1350,11 +1362,16 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     ? alleFahrer.reduce((sum, f) => sum + f.aktiveFahrtage, 0) / fahrerMitTouren
     : null
 
-  // Top Fahrer (max 5)
-  const topFahrerErtrag = [...alleFahrer]
+  // Nur Minijob-Fahrer für separate Rankings
+  const minijobFahrer = alleFahrer.filter(f => f.compensationModel === 'tour_based_minijob')
+
+  // Top MINIJOB-Fahrer nach Ertrag (NUR tour_based_minijob!)
+  // Festgehaltfahrer dürfen NICHT in tourbasierter Ertragsrangliste erscheinen
+  const topMinijobFahrerErtrag = [...minijobFahrer]
     .sort((a, b) => (b.ertrag ?? 0) - (a.ertrag ?? 0))
     .slice(0, 5)
 
+  // Top Fahrer nach Umsatz (ALLE Fahrer - Umsatz ist vergütungsmodell-unabhängig)
   const topFahrerUmsatz = [...alleFahrer]
     .sort((a, b) => b.umsatz - a.umsatz)
     .slice(0, 5)
@@ -1363,23 +1380,24 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     .sort((a, b) => b.touren - a.touren)
     .slice(0, 5)
 
-  // Fahrer mit guter Marge aber wenig Tagen (ausbauen)
-  const fahrerAusbauen = alleFahrer.filter(f =>
+  // Fahrer mit guter Marge aber wenig Tagen (ausbauen) - NUR MINIJOB
+  // Festgehaltfahrer werden im Controlling bewertet, nicht hier
+  const fahrerAusbauen = minijobFahrer.filter(f =>
     f.bewertung === "ausbauen"
   )
 
-  // Fahrer mit vielen Tagen aber schwacher Marge (pruefen)
-  const fahrerPruefen = alleFahrer.filter(f =>
+  // Fahrer mit vielen Tagen aber schwacher Marge (pruefen) - NUR MINIJOB
+  const fahrerPruefen = minijobFahrer.filter(f =>
     f.bewertung === "pruefen"
   )
 
   // Fahrer unter Ziel (< 6 aktive Tage, nur für Minijob bei Monatszeitraum)
   const fahrerUnterZiel = dateRange.istMonat
-    ? alleFahrer.filter(f => f.compensationModel === 'tour_based_minijob' && f.aktiveFahrtage < 6).length
+    ? minijobFahrer.filter(f => f.aktiveFahrtage < 6).length
     : 0
 
   // Anzahl Fahrer nach Vergütungsmodell
-  const minijobFahrerMitTouren = alleFahrer.filter(f => f.compensationModel === 'tour_based_minijob').length
+  const minijobFahrerMitTouren = minijobFahrer.length
   const festgehaltFahrer = alleFahrer.filter(f =>
     f.compensationModel === 'fixed_salary_part_time' || f.compensationModel === 'fixed_salary_full_time'
   )
@@ -1394,7 +1412,7 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     ertragProFahrer,
     aktiveTageProFahrer,
     alleFahrer,
-    topFahrerErtrag,
+    topMinijobFahrerErtrag,
     topFahrerUmsatz,
     topFahrerTouren,
     fahrerAusbauen,
@@ -1402,7 +1420,9 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     fahrerUnterZiel,
     minijobFahrerMitTouren,
     festgehaltFahrerMitTouren,
-    festgehaltFahrer
+    minijobFahrer,
+    festgehaltFahrer,
+    monatsArbeitstage: sollArbeitstageVollzeit
   }
 
   // ============================================================
