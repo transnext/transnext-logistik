@@ -189,13 +189,16 @@ export async function createAuslagennachweis(data: {
   belegart: 'tankbeleg' | 'waschbeleg' | 'bahnticket' | 'bc50' | 'taxi' | 'uber'
   kosten: number
   beleg_url?: string
-  ist_tankkarte?: boolean
+  payment_method?: 'private' | 'company_card'
 }) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Nicht angemeldet')
 
-  // Wenn Tankkarte genutzt wurde, Status auf 'tankcard' setzen (keine Erstattung)
-  const status = data.ist_tankkarte ? 'tankcard' : 'pending'
+  // Zahlungsart: private = erstattungsrelevant, company_card = nur Dokumentation
+  const paymentMethod = data.payment_method ?? 'private'
+
+  // Status: Bei Firmenkreditkarte auf 'tankcard' (keine Erstattung), sonst 'pending'
+  const status = paymentMethod === 'company_card' ? 'tankcard' : 'pending'
 
   const { data: result, error } = await supabase
     .from('auslagennachweise')
@@ -209,6 +212,7 @@ export async function createAuslagennachweis(data: {
       belegart: data.belegart,
       kosten: data.kosten,
       beleg_url: data.beleg_url,
+      payment_method: paymentMethod,
       status: status,
     }])
     .select()

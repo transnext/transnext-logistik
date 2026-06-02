@@ -148,7 +148,8 @@ export default function AuslagenPage() {
         fahrer: a.fahrer_name || "Unbekannt",
         status: a.status,
         erstelltAm: a.created_at,
-        belegUrl: a.beleg_url
+        belegUrl: a.beleg_url,
+        paymentMethod: a.payment_method || 'private'
       })))
     } catch (error) {
       console.error("Fehler beim Laden der Auslagen:", error)

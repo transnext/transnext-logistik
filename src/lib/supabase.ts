@@ -62,6 +62,9 @@ export interface Arbeitsnachweis {
   updated_at: string
 }
 
+/** Zahlungsart für Auslagen */
+export type PaymentMethod = 'private' | 'company_card'
+
 export interface Auslagennachweis {
   id: number
   user_id: string
@@ -73,7 +76,9 @@ export interface Auslagennachweis {
   belegart: 'tankbeleg' | 'waschbeleg' | 'bahnticket' | 'bc50' | 'taxi' | 'uber'
   kosten: number
   beleg_url?: string
-  status: 'pending' | 'approved' | 'rejected' | 'paid' | 'billed'
+  status: 'pending' | 'approved' | 'rejected' | 'paid' | 'billed' | 'tankcard'
+  /** Zahlungsart: private = eigene Tasche (erstattungsrelevant), company_card = Firmenkreditkarte */
+  payment_method?: PaymentMethod
   created_at: string
   updated_at: string
 }

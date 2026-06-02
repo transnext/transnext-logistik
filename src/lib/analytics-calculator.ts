@@ -157,6 +157,9 @@ export interface AuslagenKPIs {
 /** Wirtschaftliche Bewertung eines Fahrers */
 export type FahrerBewertung = "stark" | "ausbauen" | "pruefen" | "inaktiv"
 
+/** Vergütungsmodell-Typ */
+export type CompensationModelType = 'tour_based_minijob' | 'fixed_salary_part_time' | 'fixed_salary_full_time'
+
 export interface FahrerLeistungKPI {
   /** Canonical Key (normalisierter Name) */
   canonicalKey: string
@@ -168,7 +171,7 @@ export interface FahrerLeistungKPI {
   touren: number
   /** Anzahl aktive Fahrtage (distinct Tage mit Touren) */
   aktiveFahrtage: number
-  /** Ziel mindestens 6 aktive Tage erreicht (für Monatszeitraum) */
+  /** Ziel mindestens 6 aktive Tage erreicht (für Monatszeitraum, nur für tour_based_minijob) */
   zielErreicht: boolean | null
   /** Umsatz im Zeitraum */
   umsatz: number
@@ -192,8 +195,16 @@ export interface FahrerLeistungKPI {
   anteilErtrag: number | null
   /** Wirtschaftliche Bewertung */
   bewertung: FahrerBewertung
-  /** Monatlicher Lohn relativ zum Minijob-Limit (in %) - nur Info, kein Risiko */
+  /** Monatlicher Lohn relativ zum Minijob-Limit (in %) - nur für tour_based_minijob */
   minijobAuslastung: number | null
+  /** Vergütungsmodell des Fahrers */
+  compensationModel: CompensationModelType
+  /** Soll-Arbeitstage im Zeitraum (nur für Festgehalt-Vollzeit) */
+  sollArbeitstage: number | null
+  /** Leerlauftage (Soll-Arbeitstage ohne Tour, nur für Festgehalt) */
+  leerlauftage: number | null
+  /** Auslastungsquote (Einsatztage / Soll-Arbeitstage * 100, nur für Festgehalt) */
+  auslastungsquote: number | null
 }
 
 export interface FahrerKPIs {
@@ -223,8 +234,12 @@ export interface FahrerKPIs {
   fahrerAusbauen: FahrerLeistungKPI[]
   /** Fahrer mit vielen Tagen aber schwacher Marge (Prüfen) */
   fahrerPruefen: FahrerLeistungKPI[]
-  /** Anzahl Fahrer unter Ziel (< 6 aktive Tage, nur bei Monatszeitraum) */
+  /** Anzahl Minijob-Fahrer unter Ziel (< 6 aktive Tage, nur bei Monatszeitraum) */
   fahrerUnterZiel: number
+  /** Anzahl Minijob-Fahrer mit Touren */
+  minijobFahrerMitTouren: number
+  /** Anzahl Festgehalt-Fahrer mit Touren */
+  festgehaltFahrerMitTouren: number
 }
 
 /** Einzelne verspätete Tour mit Details */
@@ -580,7 +595,7 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     fehler.push("Auslagennachweise konnten nicht geladen werden")
   }
 
-  // 1d. Fahrer laden
+  // 1d. Fahrer laden (mit compensation_model)
   interface FahrerRow {
     id: number
     user_id: string
@@ -590,7 +605,8 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     profiles?: {
       full_name: string
       zeitmodell: string | null
-    } | { full_name: string; zeitmodell: string | null }[] | null
+      compensation_model: string | null
+    } | { full_name: string; zeitmodell: string | null; compensation_model: string | null }[] | null
   }
 
   let fahrer: FahrerRow[] = []
@@ -605,7 +621,8 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
         nachname,
         profiles!fahrer_user_id_fkey (
           full_name,
-          zeitmodell
+          zeitmodell,
+          compensation_model
         )
       `)
 
@@ -881,32 +898,63 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     return `${f.vorname} ${f.nachname}`
   }
 
-  // Mapping: user_id -> { fahrerId, displayName, normalizedName }
+  // Mapping: user_id -> { fahrerId, displayName, normalizedName, compensationModel }
   interface FahrerInfo {
     fahrerId: number
     displayName: string
     normalizedName: string
+    compensationModel: CompensationModelType
   }
   const userIdToFahrerMap = new Map<string, FahrerInfo>()
+
+  /**
+   * Extrahiert das Vergütungsmodell aus FahrerRow.
+   */
+  function getFahrerCompensationModel(f: FahrerRow): CompensationModelType {
+    if (f.profiles) {
+      if (Array.isArray(f.profiles) && f.profiles.length > 0) {
+        const model = f.profiles[0].compensation_model
+        if (model === 'fixed_salary_part_time' || model === 'fixed_salary_full_time') {
+          return model
+        }
+      } else if (!Array.isArray(f.profiles) && f.profiles.compensation_model) {
+        const model = f.profiles.compensation_model
+        if (model === 'fixed_salary_part_time' || model === 'fixed_salary_full_time') {
+          return model as CompensationModelType
+        }
+      }
+    }
+    return 'tour_based_minijob' // Default
+  }
 
   // Mapping: normalizedName -> kanonischer displayName (erster gefundener)
   // Fallback für migrierte Alt-Daten; langfristig Stammdaten bereinigen.
   const normalizedNameToCanonical = new Map<string, string>()
 
+  // Mapping: normalizedName -> compensation_model (für Fahrer-Gruppierung)
+  const normalizedNameToCompensationModel = new Map<string, CompensationModelType>()
+
   for (const f of fahrer) {
     const displayName = getFahrerDisplayName(f)
     const normalizedName = normalizeDriverName(displayName)
+    const compensationModel = getFahrerCompensationModel(f)
 
     // Kanonischen Namen merken (erster Treffer gewinnt)
     if (!normalizedNameToCanonical.has(normalizedName)) {
       normalizedNameToCanonical.set(normalizedName, displayName)
     }
 
+    // Vergütungsmodell für Name merken (für Fahrer-Gruppierung)
+    if (!normalizedNameToCompensationModel.has(normalizedName)) {
+      normalizedNameToCompensationModel.set(normalizedName, compensationModel)
+    }
+
     if (f.user_id) {
       userIdToFahrerMap.set(f.user_id, {
         fahrerId: f.id,
         displayName,
-        normalizedName
+        normalizedName,
+        compensationModel
       })
     }
   }
@@ -925,12 +973,16 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     | "anteilUmsatz"
     | "anteilErtrag"
     | "bewertung"
+    | "sollArbeitstage"
+    | "leerlauftage"
+    | "auslastungsquote"
   > & {
     tageSet: Set<string>
     umsatz: number
     lohn: number
     touren: number
     minijobAuslastung: number | null
+    compensationModel: CompensationModelType
   }
 
   const fahrerLeistungMap = new Map<string, FahrerLeistungKPIInternal>()
@@ -975,6 +1027,11 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
       tourLohn = calculateTourVerdienst(km, wartezeit, canonicalDisplayName)
     }
 
+    // Vergütungsmodell ermitteln
+    const compensationModel: CompensationModelType = fahrerInfo?.compensationModel
+      ?? normalizedNameToCompensationModel.get(normalizedName)
+      ?? 'tour_based_minijob'
+
     if (fahrerLeistungMap.has(canonicalKey)) {
       // Existierender Eintrag: Werte summieren
       const existing = fahrerLeistungMap.get(canonicalKey)!
@@ -994,6 +1051,7 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
         umsatz: tourUmsatz,
         lohn: tourLohn,
         minijobAuslastung: null,
+        compensationModel,
         tageSet
       })
     }
@@ -1013,19 +1071,42 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     )
   }
 
-  // Minijob-Auslastung berechnen
+  // Minijob-Auslastung nur für tour_based_minijob berechnen
   for (const [, leistung] of fahrerLeistungMap) {
-    if (minijobLimit > 0) {
+    if (leistung.compensationModel === 'tour_based_minijob' && minijobLimit > 0) {
       leistung.minijobAuslastung = (leistung.lohn / minijobLimit) * 100
+    } else {
+      leistung.minijobAuslastung = null
     }
   }
+
+  // Berechne Soll-Arbeitstage (Mo-Fr minus Feiertage) für Vollzeit-Festgehalt
+  // Hilfsfunktion: Anzahl Werktage (Mo-Fr) in einem Zeitraum
+  function countWorkdays(start: string, end: string): number {
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    let count = 0
+    const current = new Date(startDate)
+
+    while (current <= endDate) {
+      const dayOfWeek = current.getDay()
+      // 0 = Sonntag, 6 = Samstag
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        count++
+      }
+      current.setDate(current.getDate() + 1)
+    }
+    return count
+  }
+
+  const sollArbeitstageVollzeit = countWorkdays(dateRange.start, dateRange.end)
 
   // Für Anteil-Berechnung
   const gesamtUmsatzFahrer = Array.from(fahrerLeistungMap.values()).reduce((sum, f) => sum + f.umsatz, 0)
   // Ertrag nach AG-Kosten pro Fahrer
   const gesamtErtragFahrer = Array.from(fahrerLeistungMap.values()).reduce((sum, f) => sum + (f.umsatz - f.lohn - (f.lohn * employerContributionRate)), 0)
 
-  // Fahrer-KPIs berechnen
+  // Fahrer-KPIs berechnen (nach Vergütungsmodell differenziert)
   const alleFahrer: FahrerLeistungKPI[] = Array.from(fahrerLeistungMap.values()).map(f => {
     const arbeitgeberkosten = f.lohn * employerContributionRate
     const ertrag = f.umsatz - f.lohn - arbeitgeberkosten
@@ -1037,23 +1118,59 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     const anteilUmsatz = gesamtUmsatzFahrer > 0 ? (f.umsatz / gesamtUmsatzFahrer) * 100 : null
     const anteilErtrag = gesamtErtragFahrer > 0 ? (ertrag / gesamtErtragFahrer) * 100 : null
 
-    // Ziel: mind. 6 aktive Tage im Monat (nur wenn Zeitraum ein Monat)
-    let zielErreicht: boolean | null = null
-    if (dateRange.istMonat) {
-      zielErreicht = aktiveFahrtage >= 6
-    }
+    // ============================================================
+    // KPIs nach Vergütungsmodell differenzieren
+    // ============================================================
 
-    // Bewertung (Phase-1: Ziel-Margenquote 15%):
-    // - "stark": Marge >= 15% UND Ziel erreicht (oder kein Monatszeitraum)
-    // - "ausbauen": Marge >= 15% UND Ziel NICHT erreicht
-    // - "pruefen": Marge < 15% UND aktiv
-    // - "inaktiv": keine Touren oder keine aktiven Tage
+    let zielErreicht: boolean | null = null
+    let sollArbeitstage: number | null = null
+    let leerlauftage: number | null = null
+    let auslastungsquote: number | null = null
     let bewertung: FahrerBewertung = "inaktiv"
-    if (aktiveFahrtage > 0) {
-      if ((margenquote ?? 0) >= 15) {
-        bewertung = zielErreicht === false ? "ausbauen" : "stark"
-      } else {
-        bewertung = zielErreicht === true ? "pruefen" : "inaktiv"
+
+    if (f.compensationModel === 'tour_based_minijob') {
+      // Minijob-Fahrer: 6-Tage-Ziel nur im Monat
+      if (dateRange.istMonat) {
+        zielErreicht = aktiveFahrtage >= 6
+      }
+
+      // Bewertung für Minijob (bisherige Logik)
+      if (aktiveFahrtage > 0) {
+        if ((margenquote ?? 0) >= 15) {
+          bewertung = zielErreicht === false ? "ausbauen" : "stark"
+        } else {
+          bewertung = zielErreicht === true ? "pruefen" : "inaktiv"
+        }
+      }
+
+    } else if (f.compensationModel === 'fixed_salary_full_time') {
+      // Vollzeit-Festgehalt: Soll-Arbeitstage und Auslastung
+      sollArbeitstage = sollArbeitstageVollzeit
+      leerlauftage = Math.max(0, sollArbeitstage - aktiveFahrtage)
+      auslastungsquote = sollArbeitstage > 0 ? (aktiveFahrtage / sollArbeitstage) * 100 : null
+
+      // Bewertung für Vollzeit-Festgehalt (basierend auf Auslastung)
+      if (aktiveFahrtage > 0) {
+        const auslastung = auslastungsquote ?? 0
+        if (auslastung >= 80) {
+          bewertung = "stark" // Hohe Auslastung
+        } else if (auslastung >= 50) {
+          bewertung = "pruefen" // Mittlere Auslastung
+        } else {
+          bewertung = "ausbauen" // Geringe Auslastung
+        }
+      }
+
+    } else if (f.compensationModel === 'fixed_salary_part_time') {
+      // Teilzeit-Festgehalt: Keine Soll-Arbeitstage berechnen (individuell)
+      // Nur Einsatztage und Umsatz pro Tag
+      sollArbeitstage = null // Individuell - nicht berechenbar
+      leerlauftage = null
+      auslastungsquote = null
+
+      // Bewertung für Teilzeit-Festgehalt (basierend auf Aktivität)
+      if (aktiveFahrtage > 0) {
+        bewertung = "stark" // Aktiv = gut
       }
     }
 
@@ -1075,7 +1192,11 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
       anteilUmsatz,
       anteilErtrag,
       bewertung,
-      minijobAuslastung: f.minijobAuslastung
+      minijobAuslastung: f.minijobAuslastung,
+      compensationModel: f.compensationModel,
+      sollArbeitstage,
+      leerlauftage,
+      auslastungsquote
     }
   })
 
@@ -1128,10 +1249,16 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     f.bewertung === "pruefen"
   )
 
-  // Fahrer unter Ziel (< 6 aktive Tage, nur bei Monatszeitraum)
+  // Fahrer unter Ziel (< 6 aktive Tage, nur für Minijob bei Monatszeitraum)
   const fahrerUnterZiel = dateRange.istMonat
-    ? alleFahrer.filter(f => f.aktiveFahrtage < 6).length
+    ? alleFahrer.filter(f => f.compensationModel === 'tour_based_minijob' && f.aktiveFahrtage < 6).length
     : 0
+
+  // Anzahl Fahrer nach Vergütungsmodell
+  const minijobFahrerMitTouren = alleFahrer.filter(f => f.compensationModel === 'tour_based_minijob').length
+  const festgehaltFahrerMitTouren = alleFahrer.filter(f =>
+    f.compensationModel === 'fixed_salary_part_time' || f.compensationModel === 'fixed_salary_full_time'
+  ).length
 
   const fahrerKPIs: FahrerKPIs = {
     aktiveFahrer,
@@ -1147,7 +1274,9 @@ export async function calculateAnalytics(params: TimeRangeParams): Promise<Analy
     topFahrerTouren,
     fahrerAusbauen,
     fahrerPruefen,
-    fahrerUnterZiel
+    fahrerUnterZiel,
+    minijobFahrerMitTouren,
+    festgehaltFahrerMitTouren
   }
 
   // ============================================================

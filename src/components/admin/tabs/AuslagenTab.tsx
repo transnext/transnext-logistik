@@ -32,6 +32,8 @@ export interface Auslage {
   status: string
   erstelltAm: string
   belegUrl?: string
+  /** Zahlungsart: private = eigene Tasche, company_card = Firmenkreditkarte */
+  paymentMethod?: 'private' | 'company_card'
 }
 
 interface AuslagenTabProps {
@@ -300,6 +302,7 @@ export function AuslagenTab({
                   <TableHead className="font-medium text-gray-600">Strecke</TableHead>
                   <TableHead className="font-medium text-gray-600">Belegart</TableHead>
                   <TableHead className="font-medium text-gray-600 text-right">Kosten</TableHead>
+                  <TableHead className="font-medium text-gray-600">Bezahlt mit</TableHead>
                   <TableHead className="font-medium text-gray-600">Status</TableHead>
                   <TableHead className="font-medium text-gray-600 text-right">Aktionen</TableHead>
                 </TableRow>
@@ -343,6 +346,21 @@ export function AuslagenTab({
                           bold
                           size="sm"
                         />
+                      </TableCell>
+                      <TableCell>
+                        {auslage.paymentMethod === 'company_card' ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 bg-amber-100 text-amber-700 rounded border border-amber-200">
+                            <CreditCard className="h-3 w-3" />
+                            Firmenkarte
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-500">
+                            Eigene Tasche
+                          </span>
+                        )}
+                        {auslage.paymentMethod === 'company_card' && (
+                          <p className="text-[10px] text-amber-600 mt-0.5">Nicht erstatten</p>
+                        )}
                       </TableCell>
                       <TableCell>{getStatusBadge(auslage.status)}</TableCell>
                       <TableCell>

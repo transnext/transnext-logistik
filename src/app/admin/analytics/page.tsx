@@ -646,20 +646,20 @@ export default function AnalyticsPage() {
                       <KpiTrafficLight value={Math.min(analytics.finanzen.margeNachArbeitgeberkosten, 2000)} min={0} max={2000} yellowThreshold={100} redThreshold={500} description="Ziel: Positiv" />
                     </div>
 
-                    {/* Aktive Tage */}
-                    {analytics.zeitraum.istMonat && (
+                    {/* Minijob-Zieltage (nur für Minijob-Fahrer relevant) */}
+                    {analytics.zeitraum.istMonat && analytics.fahrer.minijobFahrerMitTouren > 0 && (
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-700">Fahrer-Ziel (6 Tage)</span>
+                          <span className="text-sm font-medium text-gray-700">Minijob-Zieltage</span>
                           <Badge className={`border font-semibold ${
                             analytics.fahrer.fahrerUnterZiel === 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
                             analytics.fahrer.fahrerUnterZiel <= 2 ? "bg-amber-50 text-amber-700 border-amber-200" :
                             "bg-red-50 text-red-700 border-red-200"
                           }`}>
-                            {analytics.fahrer.fahrerMitTouren - analytics.fahrer.fahrerUnterZiel}/{analytics.fahrer.fahrerMitTouren} erreicht
+                            {analytics.fahrer.minijobFahrerMitTouren - analytics.fahrer.fahrerUnterZiel}/{analytics.fahrer.minijobFahrerMitTouren} erreicht
                           </Badge>
                         </div>
-                        <KpiTrafficLight value={analytics.fahrer.fahrerMitTouren - analytics.fahrer.fahrerUnterZiel} min={0} max={analytics.fahrer.fahrerMitTouren || 1} yellowThreshold={Math.floor((analytics.fahrer.fahrerMitTouren || 1) * 0.7)} redThreshold={analytics.fahrer.fahrerMitTouren || 1} description="Ziel: Alle >= 6 Tage" />
+                        <KpiTrafficLight value={analytics.fahrer.minijobFahrerMitTouren - analytics.fahrer.fahrerUnterZiel} min={0} max={analytics.fahrer.minijobFahrerMitTouren || 1} yellowThreshold={Math.floor((analytics.fahrer.minijobFahrerMitTouren || 1) * 0.7)} redThreshold={analytics.fahrer.minijobFahrerMitTouren || 1} description="Minijob: mind. 6 Tage" />
                       </div>
                     )}
                   </div>
@@ -694,8 +694,8 @@ export default function AnalyticsPage() {
               {/* Aktive Fahrtage */}
               <Card className="border-gray-100">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold text-gray-900">Aktive Fahrtage je Fahrer</CardTitle>
-                  <CardDescription>{analytics.zeitraum.istMonat ? "Ziel: mind. 6 Tage" : "Sortiert nach Tagen"}</CardDescription>
+                  <CardTitle className="text-base font-semibold text-gray-900">Einsatztage je Fahrer</CardTitle>
+                  <CardDescription>{analytics.zeitraum.istMonat && analytics.fahrer.minijobFahrerMitTouren > 0 ? "Minijob-Ziel: mind. 6 Tage" : "Sortiert nach Einsatztagen"}</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
                   {(analytics.fahrer.alleFahrer?.length ?? 0) > 0 ? (
@@ -706,10 +706,10 @@ export default function AnalyticsPage() {
                         label="Tage"
                         color="bg-sky-500"
                       />
-                      {analytics.zeitraum.istMonat && (
+                      {analytics.zeitraum.istMonat && analytics.fahrer.minijobFahrerMitTouren > 0 && (
                         <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
                           <div className="w-3 h-0.5 bg-amber-400"></div>
-                          <span>Zielmarke: 6 aktive Tage</span>
+                          <span>Minijob-Zielmarke: 6 Tage</span>
                         </div>
                       )}
                     </>
@@ -739,9 +739,9 @@ export default function AnalyticsPage() {
                       <tr className="border-b border-gray-100">
                         <th className="text-left py-2 px-2 font-medium text-gray-500">Fahrer</th>
                         <th className="text-right py-2 px-2 font-medium text-gray-500 cursor-pointer hover:text-gray-700" onClick={() => handleSort("aktiveFahrtage")}>
-                          Tage {sortColumn === "aktiveFahrtage" && (sortDirection === "desc" ? <ChevronDown className="inline h-3 w-3" /> : <ChevronUp className="inline h-3 w-3" />)}
+                          Einsatztage {sortColumn === "aktiveFahrtage" && (sortDirection === "desc" ? <ChevronDown className="inline h-3 w-3" /> : <ChevronUp className="inline h-3 w-3" />)}
                         </th>
-                        {analytics.zeitraum.istMonat && <th className="text-center py-2 px-2 font-medium text-gray-500">Ziel</th>}
+                        <th className="text-center py-2 px-2 font-medium text-gray-500">Typ</th>
                         <th className="text-right py-2 px-2 font-medium text-gray-500">Touren</th>
                         <th className="text-right py-2 px-2 font-medium text-gray-500 cursor-pointer hover:text-gray-700" onClick={() => handleSort("umsatz")}>
                           Umsatz {sortColumn === "umsatz" && (sortDirection === "desc" ? <ChevronDown className="inline h-3 w-3" /> : <ChevronUp className="inline h-3 w-3" />)}
@@ -764,12 +764,22 @@ export default function AnalyticsPage() {
                           onClick={() => setSelectedFahrer(selectedFahrer?.canonicalKey === f.canonicalKey ? null : f)}
                         >
                           <td className="py-2 px-2 font-medium text-gray-900">{f.name}</td>
-                          <td className="py-2 px-2 text-right text-gray-700">{f.aktiveFahrtage}</td>
-                          {analytics.zeitraum.istMonat && (
-                            <td className="py-2 px-2 text-center">
-                              {f.zielErreicht ? <Check className="inline h-4 w-4 text-emerald-600" /> : <Minus className="inline h-4 w-4 text-gray-400" />}
-                            </td>
-                          )}
+                          <td className="py-2 px-2 text-right text-gray-700">
+                            {f.aktiveFahrtage}
+                            {f.compensationModel === 'tour_based_minijob' && analytics.zeitraum.istMonat && (
+                              f.zielErreicht ? <Check className="inline h-4 w-4 text-emerald-600 ml-1" /> : <span className="text-amber-500 ml-1">/ 6</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <Badge className={`text-xs border font-medium ${
+                              f.compensationModel === 'tour_based_minijob'
+                                ? "bg-sky-50 text-sky-700 border-sky-200"
+                                : "bg-violet-50 text-violet-700 border-violet-200"
+                            }`}>
+                              {f.compensationModel === 'tour_based_minijob' ? 'Minijob' :
+                               f.compensationModel === 'fixed_salary_part_time' ? 'TZ' : 'VZ'}
+                            </Badge>
+                          </td>
                           <td className="py-2 px-2 text-right text-gray-700">{f.touren}</td>
                           <td className="py-2 px-2 text-right text-gray-700"><CurrencyDisplay amount={f.umsatz} /></td>
                           <td className={`py-2 px-2 text-right font-medium ${f.ertrag >= 0 ? "text-emerald-700" : "text-red-700"}`}>
@@ -832,23 +842,85 @@ export default function AnalyticsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
+                  {/* Vergütungsmodell-Badge */}
+                  <div className="mb-4">
+                    <Badge className={`text-xs border font-medium ${
+                      selectedFahrer.compensationModel === 'tour_based_minijob'
+                        ? "bg-sky-50 text-sky-700 border-sky-200"
+                        : "bg-violet-50 text-violet-700 border-violet-200"
+                    }`}>
+                      {selectedFahrer.compensationModel === 'tour_based_minijob' ? 'Minijob / Tourbasiert' :
+                       selectedFahrer.compensationModel === 'fixed_salary_part_time' ? 'Festgehalt Teilzeit' : 'Festgehalt Vollzeit'}
+                    </Badge>
+                  </div>
+
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
                     <DetailKPICard label="Touren" value={selectedFahrer.touren} />
-                    <DetailKPICard label="Aktive Tage" value={selectedFahrer.aktiveFahrtage} sublabel={analytics.zeitraum.istMonat && selectedFahrer.zielErreicht ? "Ziel erreicht" : undefined} variant={selectedFahrer.zielErreicht ? "success" : "default"} />
+
+                    {/* Unterschiedliche KPIs je nach Vergütungsmodell */}
+                    {selectedFahrer.compensationModel === 'tour_based_minijob' ? (
+                      <>
+                        <DetailKPICard
+                          label="Einsatztage"
+                          value={selectedFahrer.aktiveFahrtage}
+                          sublabel={analytics.zeitraum.istMonat && selectedFahrer.zielErreicht ? "Minijob-Ziel erreicht" : analytics.zeitraum.istMonat ? "Minijob-Ziel: 6 Tage" : undefined}
+                          variant={selectedFahrer.zielErreicht ? "success" : "default"}
+                        />
+                      </>
+                    ) : selectedFahrer.compensationModel === 'fixed_salary_full_time' ? (
+                      <>
+                        <DetailKPICard
+                          label="Einsatztage"
+                          value={selectedFahrer.aktiveFahrtage}
+                          sublabel={selectedFahrer.sollArbeitstage !== null ? `Soll: ${selectedFahrer.sollArbeitstage} Tage` : undefined}
+                        />
+                        <DetailKPICard
+                          label="Auslastung"
+                          value={selectedFahrer.auslastungsquote !== null ? `${selectedFahrer.auslastungsquote.toFixed(0)}%` : "N/A"}
+                          variant={
+                            (selectedFahrer.auslastungsquote ?? 0) >= 80 ? "success" :
+                            (selectedFahrer.auslastungsquote ?? 0) >= 50 ? "warning" : "danger"
+                          }
+                        />
+                        <DetailKPICard
+                          label="Leerlauftage"
+                          value={selectedFahrer.leerlauftage ?? "N/A"}
+                          variant={
+                            (selectedFahrer.leerlauftage ?? 0) === 0 ? "success" :
+                            (selectedFahrer.leerlauftage ?? 0) <= 3 ? "warning" : "danger"
+                          }
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <DetailKPICard
+                          label="Einsatztage"
+                          value={selectedFahrer.aktiveFahrtage}
+                          sublabel="Teilzeit - individuelle Solltage"
+                        />
+                      </>
+                    )}
+
                     <DetailKPICard label="Umsatz" value={<CurrencyDisplay amount={selectedFahrer.umsatz} />} />
-                    <DetailKPICard label="Fahrerlohn" value={<CurrencyDisplay amount={selectedFahrer.lohn} />} />
-                    <DetailKPICard label="AG-Kosten" value={<CurrencyDisplay amount={selectedFahrer.arbeitgeberkosten} />} />
+                    <DetailKPICard label="Umsatz/Tag" value={selectedFahrer.umsatzProTag !== null ? <CurrencyDisplay amount={selectedFahrer.umsatzProTag} /> : "N/A"} />
                     <DetailKPICard label="Ertrag" value={<CurrencyDisplay amount={selectedFahrer.ertrag} />} variant={selectedFahrer.ertrag >= 0 ? "success" : "danger"} />
                     <DetailKPICard label="Margenquote" value={`${selectedFahrer.margenquote?.toFixed(1) ?? "N/A"}%`} variant={(selectedFahrer.margenquote ?? 0) >= 15 ? "success" : (selectedFahrer.margenquote ?? 0) >= 5 ? "warning" : "danger"} />
-                    <DetailKPICard label="Umsatz/Tag" value={selectedFahrer.umsatzProTag !== null ? <CurrencyDisplay amount={selectedFahrer.umsatzProTag} /> : "N/A"} />
                     <DetailKPICard label="Ertrag/Tag" value={selectedFahrer.ertragProTag !== null ? <CurrencyDisplay amount={selectedFahrer.ertragProTag} /> : "N/A"} variant={(selectedFahrer.ertragProTag ?? 0) > 0 ? "success" : "default"} />
                     <DetailKPICard label="Kostenquote" value={`${selectedFahrer.kostenquote?.toFixed(1) ?? "N/A"}%`} />
                     <DetailKPICard label="Anteil Umsatz" value={`${selectedFahrer.anteilUmsatz?.toFixed(1) ?? "N/A"}%`} />
                     <DetailKPICard label="Anteil Ertrag" value={`${selectedFahrer.anteilErtrag?.toFixed(1) ?? "N/A"}%`} />
                   </div>
-                  {selectedFahrer.minijobAuslastung !== null && selectedFahrer.minijobAuslastung > 80 && (
+
+                  {/* Hinweise basierend auf Vergütungsmodell */}
+                  {selectedFahrer.compensationModel === 'tour_based_minijob' && selectedFahrer.minijobAuslastung !== null && selectedFahrer.minijobAuslastung > 80 && (
                     <p className="mt-4 text-sm text-gray-500">
                       Hinweis: Fahrerlohn bei {selectedFahrer.minijobAuslastung.toFixed(0)}% der Minijob-Grenze. Ggf. Carryover oder Abrechnung beachten.
+                    </p>
+                  )}
+                  {selectedFahrer.compensationModel === 'fixed_salary_part_time' && (
+                    <p className="mt-4 text-sm text-gray-500 flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      Teilzeit-Festgehalt: Individuelle Soll-Arbeitstage nicht hinterlegt. Auslastung kann nicht automatisch berechnet werden.
                     </p>
                   )}
                 </CardContent>

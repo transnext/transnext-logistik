@@ -33,7 +33,7 @@ export default function AuslagennachweisPage() {
     belegart: "tankbeleg" as "tankbeleg" | "waschbeleg" | "bahnticket" | "bc50" | "taxi" | "uber",
     kosten: "",
     beleg: null as File | null,
-    istTankkarte: false
+    paymentMethod: "private" as "private" | "company_card"
   })
 
   useEffect(() => {
@@ -92,7 +92,7 @@ export default function AuslagennachweisPage() {
         belegUrl = url
       }
 
-      // Erstelle Auslagennachweis mit Beleg-URL
+      // Erstelle Auslagennachweis mit Beleg-URL und Zahlungsart
       await createAuslagennachweis({
         tour_nr: formData.tourNr,
         kennzeichen: formData.kennzeichen,
@@ -102,7 +102,7 @@ export default function AuslagennachweisPage() {
         belegart: formData.belegart,
         kosten: parseFloat(formData.kosten),
         beleg_url: belegUrl,
-        ist_tankkarte: formData.istTankkarte
+        payment_method: formData.paymentMethod
       })
 
       setSaved(true)
@@ -117,7 +117,7 @@ export default function AuslagennachweisPage() {
           belegart: "tankbeleg",
           kosten: "",
           beleg: null,
-          istTankkarte: false
+          paymentMethod: "private"
         })
         setIsLoading(false)
       }, 2000)
@@ -328,29 +328,75 @@ export default function AuslagennachweisPage() {
                   />
                 </div>
 
-                {/* Tankkarten-Nutzung */}
-                {formData.belegart === "tankbeleg" && (
-                  <div className="space-y-2">
-                    <Button
+                {/* Zahlungsart - für ALLE Belegtypen */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">
+                    Zahlungsart <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="grid grid-cols-1 gap-3">
+                    {/* Eigene Tasche */}
+                    <button
                       type="button"
-                      variant={formData.istTankkarte ? "default" : "outline"}
-                      className={`w-full h-12 justify-start ${
-                        formData.istTankkarte
-                          ? "bg-amber-500 hover:bg-amber-600 text-white"
-                          : "border-amber-300 text-amber-700 hover:bg-amber-50"
+                      onClick={() => setFormData({ ...formData, paymentMethod: "private" })}
+                      className={`flex items-start p-4 rounded-xl border-2 transition-all text-left ${
+                        formData.paymentMethod === "private"
+                          ? "border-emerald-500 bg-emerald-50"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
                       }`}
-                      onClick={() => setFormData({ ...formData, istTankkarte: !formData.istTankkarte })}
                     >
-                      <CreditCard className="mr-3 h-5 w-5" />
-                      {formData.istTankkarte ? "Firmen-Tankkarte genutzt" : "Firmen-Tankkarte genutzt?"}
-                    </Button>
-                    {formData.istTankkarte && (
-                      <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded-lg">
-                        Bei Nutzung der Firmen-Tankkarte erfolgt keine Erstattung.
-                      </p>
-                    )}
+                      <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 mr-3 mt-0.5 flex items-center justify-center ${
+                        formData.paymentMethod === "private"
+                          ? "border-emerald-500 bg-emerald-500"
+                          : "border-gray-300"
+                      }`}>
+                        {formData.paymentMethod === "private" && (
+                          <CheckCircle className="h-3 w-3 text-white" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className={`font-medium ${
+                          formData.paymentMethod === "private" ? "text-emerald-700" : "text-gray-900"
+                        }`}>
+                          Aus eigener Tasche bezahlt
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Der Betrag soll nach Prüfung erstattet werden.
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* Firmenkreditkarte */}
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, paymentMethod: "company_card" })}
+                      className={`flex items-start p-4 rounded-xl border-2 transition-all text-left ${
+                        formData.paymentMethod === "company_card"
+                          ? "border-amber-500 bg-amber-50"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
+                      }`}
+                    >
+                      <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 mr-3 mt-0.5 flex items-center justify-center ${
+                        formData.paymentMethod === "company_card"
+                          ? "border-amber-500 bg-amber-500"
+                          : "border-gray-300"
+                      }`}>
+                        {formData.paymentMethod === "company_card" && (
+                          <CreditCard className="h-3 w-3 text-white" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className={`font-medium ${
+                          formData.paymentMethod === "company_card" ? "text-amber-700" : "text-gray-900"
+                        }`}>
+                          Mit Firmenkreditkarte bezahlt
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Der Beleg dient nur zur Dokumentation. Es erfolgt keine Auszahlung an dich.
+                        </p>
+                      </div>
+                    </button>
                   </div>
-                )}
+                </div>
 
                 {/* Beleg-Upload */}
                 <div className="space-y-2">
