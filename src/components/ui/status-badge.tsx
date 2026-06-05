@@ -28,7 +28,6 @@ export type StatusVariant =
   | "rejected"
   | "billed"
   | "paid"
-  | "tankcard"
   | "retoure"
   | "draft"
   | "open"
@@ -87,13 +86,6 @@ const STATUS_CONFIG: Record<string, {
     bgClass: "bg-purple-100",
     textClass: "text-purple-800",
     borderClass: "border-purple-200",
-    icon: <CreditCard className="h-3 w-3" />
-  },
-  tankcard: {
-    label: "Tankkarte",
-    bgClass: "bg-amber-100",
-    textClass: "text-amber-800",
-    borderClass: "border-amber-200",
     icon: <CreditCard className="h-3 w-3" />
   },
   retoure: {

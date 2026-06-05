@@ -197,8 +197,8 @@ export async function createAuslagennachweis(data: {
   // Zahlungsart: private = erstattungsrelevant, company_card = nur Dokumentation
   const paymentMethod = data.payment_method ?? 'private'
 
-  // Status: Bei Firmenkreditkarte auf 'tankcard' (keine Erstattung), sonst 'pending'
-  const status = paymentMethod === 'company_card' ? 'tankcard' : 'pending'
+  // Status ist immer 'pending', payment_method bildet die Zahlungsart ab
+  const status = 'pending'
 
   const { data: result, error } = await supabase
     .from('auslagennachweise')

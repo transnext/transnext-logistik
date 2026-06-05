@@ -68,7 +68,7 @@ export interface Auslagennachweis {
   belegart: 'tankbeleg' | 'waschbeleg' | 'bahnticket' | 'bc50' | 'taxi' | 'uber'
   kosten: number
   beleg_url?: string
-  status: 'pending' | 'approved' | 'rejected' | 'paid' | 'billed' | 'tankcard'
+  status: 'pending' | 'approved' | 'rejected' | 'paid' | 'billed'
   /** Zahlungsart: private = eigene Tasche (erstattungsrelevant), company_card = Firmenkreditkarte */
   payment_method?: PaymentMethod
   created_at: string
