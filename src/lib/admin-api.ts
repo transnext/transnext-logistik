@@ -56,7 +56,7 @@ export async function createFahrer(data: {
   fuehrerscheinklassen: string[]
   ausweisnummer: string
   ausweis_ablauf: string
-  zeitmodell?: 'minijob' | 'werkstudent' | 'teilzeit' | 'vollzeit'
+  // zeitmodell entfernt - wird über profiles.compensation_model verwaltet
 }) {
   console.log('[createFahrer] Starte Fahrer-Erstellung für:', data.email)
 
@@ -165,9 +165,9 @@ export async function createFahrer(data: {
       id: result.fahrer?.id,
       vorname: data.vorname,
       nachname: data.nachname,
-      status: 'aktiv',
-      zeitmodell: data.zeitmodell || 'minijob'
+      status: 'aktiv'
       // Keine sensiblen Daten wie Ausweisnummer, Führerscheinnummer im Log
+      // zeitmodell entfernt - wird über profiles.compensation_model verwaltet
     }
   })
 
