@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { FahrerportalLayout } from "@/components/fahrerportal/FahrerportalLayout"
 import { ArrowLeft, FileText, Euro, Clock, CheckCircle, XCircle, CreditCard } from "lucide-react"
-import { getCurrentUser, canAccessFahrerportal, getUserProfile, getAuslagennachweiseByUser } from "@/lib/api"
+import { getCurrentUser, canAccessFahrerportal, getAuslagennachweiseByUser } from "@/lib/api"
 
 interface Auslage {
   id: number
@@ -51,13 +51,20 @@ export default function AuslagenabrechnungPage() {
         return
       }
 
-      const profile = await getUserProfile(user.id)
-      if (profile.role !== 'fahrer') {
+      // Nutze canAccessFahrerportal statt hartem Rollen-Check
+      // Admin/GF mit Fahrerprofil dürfen auch zugreifen
+      const accessResult = await canAccessFahrerportal(user.id)
+      if (!accessResult.canAccess) {
+        console.log("Fahrerportal-Zugang verweigert:", accessResult.reason)
         router.push("/fahrerportal")
         return
       }
 
-      setFahrerName(profile.full_name)
+      // Fahrername aus Fahrer-Datensatz oder Profile
+      const name = accessResult.fahrer
+        ? `${accessResult.fahrer.vorname} ${accessResult.fahrer.nachname}`
+        : accessResult.profile?.full_name || 'Fahrer'
+      setFahrerName(name)
 
       // Setze aktuellen Monat als Standard
       const now = new Date()
