@@ -69,6 +69,18 @@ interface CandidateData {
   termin_gewaehlt: number | null
   appointment_selected_at?: string | null
 }
+// Hilfsfunktion für Fehlermeldungen
+function getErrorMessage(errorCode: string): string {
+  const errorMessages: Record<string, string> = {
+    'invalid_token': 'Ungültiger Link. Bitte prüfen Sie den Link oder kontaktieren Sie uns.',
+    'token_expired': 'Dieser Link ist abgelaufen. Bitte kontaktieren Sie uns für einen neuen Link.',
+    'already_submitted': 'Die Terminwahl wurde bereits abgeschlossen.',
+    'slot_required': 'Bitte wählen Sie einen Termin aus.',
+    'network_error': 'Netzwerkfehler. Bitte versuchen Sie es später erneut.',
+    'unknown': 'Ein unbekannter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.'
+  }
+  return errorMessages[errorCode] || errorMessages['unknown']
+}
 // Onboarding Fortschritts-Schritte
 type OnboardingStep = 'termin' | 'fragebogen' | 'dokumente'
 interface OnboardingProgress {
