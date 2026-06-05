@@ -1,39 +1,59 @@
-# TransNext Logistik - Todos
-## Erledigt (02.06.2026)
-### Problem 1: Geschäftsführer werden als Minijobber gezählt ✅
-- [x] Migration `20260602_owner_operator_compensation.sql` war bereits live
-- [x] Nicholas Mandzel und Burak Aydin haben `owner_operator` als compensation_model
-- [x] Analytics-Logik behandelt owner_operator separat:
-  - Nicht in Minijob-Rankings
-  - Keine 6-Tage-Ziel-Logik
-  - Bewertung "operativ" statt Minijob-Ampellogik
-  - Eigener Bereich "Geschäftsführer – Operative Einsätze" in Analytics
-### Problem 2: Nicholas sieht keine historischen Touren ✅
-- [x] Ursache: Nicholas hatte zwei getrennte Accounts:
-  - Admin: n.mandzel@transnext.de (ohne Fahrer-Daten)
-  - Fahrer: mandzelnicholas@gmail.com (mit 132 Arbeitsnachweisen)
-- [x] Lösung: Migration `20260602_nicholas_account_consolidation.sql` erstellt
-- [x] Live angewendet:
-  - 132 Arbeitsnachweise auf Admin-Account migriert
-  - 58 Auslagennachweise auf Admin-Account migriert
-  - Fahrer-Eintrag mit Admin-Account verknüpft
-  - Admin-Account: owner_operator
-  - Fahrer-Account: tour_based_minijob (kann deaktiviert werden)
-## Zusammenfassung
-### Account-Konsolidierung Nicholas Mandzel:
-| Eigenschaft | Admin-Account | Fahrer-Account |
-|-------------|---------------|----------------|
-| E-Mail | n.mandzel@transnext.de | mandzelnicholas@gmail.com |
-| Status | **Aktiv (Primär)** | Redundant |
-| Arbeitsnachweise | 132 | 0 |
-| Auslagennachweise | 58 | 0 |
-| compensation_model | owner_operator | tour_based_minijob |
-### Owner-Operator Logik:
-- Geschäftsführer erscheinen nicht in Minijob-Rankings
-- Keine 6-Tage-Ziel-Bewertung
-- Eigener Analytics-Bereich mit:
-  - Umsatz
-  - Touren
-  - Einsatztage
-  - Umsatz pro Einsatztag
-  - Badge "Geschäftsführer"
+# Transnext Logistik - Aktuelle Aufgaben
+
+## In Arbeit 🔧
+
+### TypeScript-Fehler beheben (05.06.2026)
+
+**Fehler 1: admin/fahrer/page.tsx - zeitmodell**
+- [ ] Zeile 290: `zeitmodell` aus updateFahrer-Aufruf entfernen
+- [ ] Zeile 230: `zeitmodell` aus createFahrer-Aufruf entfernen
+- [ ] Zeile 265: `zeitmodell` aus handleEditFahrer entfernen
+- [ ] Zeile 72: `zeitmodell` aus emptyFahrerForm entfernen
+- [ ] createFahrer API: `zeitmodell` Parameter entfernen
+
+**Fehler 2: onboarding/[token]/page.tsx - Fehlende Exporte**
+- [ ] validateQuestionnaireForm hinzufügen
+- [ ] LICENSE_CLASS_OPTIONS hinzufügen
+- [ ] MARITAL_STATUS_OPTIONS hinzufügen
+- [ ] TAX_CLASS_OPTIONS hinzufügen
+- [ ] DENOMINATION_OPTIONS hinzufügen
+- [ ] QuestionnaireFormData erweitern: birth_name, birth_country, tax_class, denomination, license_classes_array
+- [ ] getErrorMessage lokale Funktion hinzufügen oder import
+
+## Erledigt ✅
+
+### Nicholas Mandzel Auth/Zuordnungsproblem (05.06.2026)
+
+**Problem 1: "Hallo Fahrer" bei Gmail-Account**
+- ✅ Diagnose: Gmail-Account (`mandzelnicholas@gmail.com`) war nicht mit Fahrer-Eintrag verknüpft
+- ✅ Fix: Fahrer-Eintrag `user_id` auf Gmail-Account umgestellt
+- ✅ Historische Daten (133 Arbeitsnachweise, 61 Auslagen) auf Gmail-Account migriert
+
+**Problem 2: Login-Loop bei Auslagenabrechnung**
+- ✅ Diagnose: Harter `role !== 'fahrer'` Check in auslagenabrechnung/page.tsx
+- ✅ Fix: Ersetzt durch `canAccessFahrerportal()` (Commit: `101e71d`)
+
+**Durchgeführte SQL-Änderungen:**
+```sql
+-- Fahrer-Verknüpfung korrigiert
+UPDATE fahrer SET user_id = 'b23391e7-a84d-4c6d-8055-6b51e98c4f64'
+WHERE id = '2a657006-a09e-44b6-b673-a50a6d81ab3f';
+
+-- Historische Arbeitsnachweise migriert (133 Stück)
+UPDATE arbeitsnachweise SET user_id = 'b23391e7-a84d-4c6d-8055-6b51e98c4f64'
+WHERE user_id = '9783a8cf-24a1-4551-a909-23efad1eea5c';
+
+-- Historische Auslagennachweise migriert (61 Stück)
+UPDATE auslagennachweise SET user_id = 'b23391e7-a84d-4c6d-8055-6b51e98c4f64'
+WHERE user_id = '9783a8cf-24a1-4551-a909-23efad1eea5c';
+```
+
+**Durchgeführte Code-Änderungen:**
+- `src/app/fahrerportal/auslagenabrechnung/page.tsx`: Rollen-Check korrigiert
+
+## Neue Account-Zuordnung
+
+| Account | E-Mail | Rolle | Fahrer-Verknüpfung |
+|---------|--------|-------|-------------------|
+| Gmail | mandzelnicholas@gmail.com | fahrer | ✅ Nicholas Mandzel |
+| Transnext | n.mandzel@transnext.de | admin | Keine (nur Admin) |
