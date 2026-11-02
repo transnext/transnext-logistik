@@ -16,7 +16,7 @@ export default function ImpressumPage() {
               Impressum
             </h1>
             <p className="section-subtitle max-w-2xl mx-auto">
-              Rechtliche Informationen zu TransNext Logistik gemäß § 5 TMG
+              Rechtliche Informationen zu TransNext Logistik gemäß § 5 DDG
             </p>
           </div>
         </div>
@@ -32,7 +32,7 @@ export default function ImpressumPage() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Building className="h-5 w-5 text-primary-blue" />
-                  <span>Angaben gemäß § 5 TMG</span>
+                  <span>Angaben gemäß § 5 DDG</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -103,31 +103,7 @@ export default function ImpressumPage() {
               </CardContent>
             </Card>
 
-
-
-            {/* EU Dispute Resolution */}
-            <Card>
-              <CardHeader>
-                <CardTitle>EU-Streitschlichtung</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-muted-foreground">
-                  <p className="mb-4">
-                    Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit:
-                  </p>
-                  <p className="text-primary-blue">
-                    <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer" className="hover:underline">
-                      https://ec.europa.eu/consumers/odr/
-                    </a>
-                  </p>
-                  <p className="mt-4">
-                    Unsere E-Mail-Adresse finden Sie oben im Impressum.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Consumer Dispute Resolution */}
+                        {/* Consumer Dispute Resolution */}
             <Card>
               <CardHeader>
                 <CardTitle>Verbraucherstreitbeilegung/Universalschlichtungsstelle</CardTitle>
@@ -137,30 +113,6 @@ export default function ImpressumPage() {
                   <p>
                     Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer
                     Verbraucherschlichtungsstelle teilzunehmen.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Disclaimer */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Haftung für Inhalte</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-muted-foreground space-y-4">
-                  <p>
-                    Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten
-                    nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als
-                    Diensteanbieter jedoch nicht unter der Verpflichtung, übermittelte oder gespeicherte
-                    fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine
-                    rechtswidrige Tätigkeit hinweisen.
-                  </p>
-                  <p>
-                    Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den
-                    allgemeinen Gesetzen bleiben hiervon unberührt. Eine diesbezügliche Haftung ist jedoch
-                    erst ab dem Zeitpunkt der Kenntnis einer konkreten Rechtsverletzung möglich. Bei
-                    Bekanntwerden von entsprechenden Rechtsverletzungen werden wir diese Inhalte umgehend entfernen.
                   </p>
                 </div>
               </CardContent>
