@@ -141,9 +141,6 @@ export default function ReferenzenPage() {
               <img src="/images/leasplan-logo.png" alt="LeasePlan" className="max-w-full max-h-24 object-contain" />
             </div>
             <div className="bg-white rounded-lg p-8 flex items-center justify-center hover:shadow-lg transition-shadow min-h-[180px]">
-              <img src="/images/logo-2.png" alt="Partner 2" className="max-w-full max-h-24 object-contain" />
-            </div>
-            <div className="bg-white rounded-lg p-8 flex items-center justify-center hover:shadow-lg transition-shadow min-h-[180px]">
               <img src="/images/logo-3.svg" alt="Partner 3" className="max-w-full max-h-24 object-contain" />
             </div>
             <div className="bg-white rounded-lg p-8 flex items-center justify-center hover:shadow-lg transition-shadow min-h-[180px]">
