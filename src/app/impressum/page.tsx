@@ -75,7 +75,7 @@ export default function ImpressumPage() {
                   <div>
                     <h3 className="font-semibold mb-2">Kontaktdaten</h3>
                     <div className="text-muted-foreground space-y-1">
-                      <p>Telefon: <a href="tel:+4915563509886" className="text-primary-blue hover:underline">+49 155 635 098 86</a></p>
+                      <p>Telefon: <a href="tel:+4915257068633" className="text-primary-blue hover:underline">+49 152 57068633</a></p>
                       <p>E-Mail: <a href="mailto:info@transnext.de" className="text-primary-blue hover:underline">info@transnext.de</a></p>
                       <p>Internet: www.transnext.de</p>
                     </div>

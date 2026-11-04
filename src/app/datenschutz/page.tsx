@@ -50,7 +50,7 @@ export default function DatenschutzPage() {
                     <p>Herner Str. 299A</p>
                     <p>44809 Bochum</p>
                     <p>Deutschland</p>
-                    <p>Telefon: <a href="tel:+4915563509886" className="text-primary-blue hover:underline">+49 155 635 098 86</a></p>
+                    <p>Telefon: <a href="tel:+4915257068633" className="text-primary-blue hover:underline">+49 152 57068633</a></p>
                     <p>E-Mail: <a href="mailto:info@transnext.de" className="text-primary-blue hover:underline">info@transnext.de</a></p>
                   </div>
                 </div>
@@ -72,7 +72,7 @@ export default function DatenschutzPage() {
                   </p>
                   <div className="space-y-2">
                     <p>E-Mail: <a href="mailto:info@transnext.de" className="text-primary-blue hover:underline">info@transnext.de</a></p>
-                    <p>Telefon: <a href="tel:+4915563509886" className="text-primary-blue hover:underline">+49 155 635 098 86</a></p>
+                    <p>Telefon: <a href="tel:+4915257068633" className="text-primary-blue hover:underline">+49 152 57068633</a></p>
                   </div>
                   <p className="mt-4 text-sm">
                     <em>Wir nehmen den Schutz Ihrer persönlichen Daten sehr ernst und behandeln Ihre Anfragen vertraulich.</em>
