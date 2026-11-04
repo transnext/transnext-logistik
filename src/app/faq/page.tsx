@@ -89,7 +89,7 @@ const faqData = [
       },
       {
         question: "Wie erreiche ich TransNext Logistik?",
-        answer: "Telefonisch unter +49 155 635 098 86, per E-Mail an info@transnext.de, über unser Kontaktformular oder persönlich in Bochum (Herner Str. 299A, 44809 Bochum). Unsere Geschäftszeiten: Täglich 09:00 - 18:00 Uhr. Termine außerhalb der Geschäftszeiten nach Absprache möglich."
+        answer: "Telefonisch unter +49 152 57068633, per E-Mail an info@transnext.de, über unser Kontaktformular oder persönlich in Bochum (Herner Str. 299A, 44809 Bochum). Unsere Geschäftszeiten: Täglich 09:00 - 18:00 Uhr. Termine außerhalb der Geschäftszeiten nach Absprache möglich."
       },
       {
         question: "Arbeiten Sie auch am Wochenende?",
@@ -118,7 +118,7 @@ export default function FAQPage() {
               Leistungen. Sollten Sie weitere Fragen haben, kontaktieren Sie uns gerne direkt.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="tel:+4915563509886">
+              <a href="tel:+4915257068633">
                 <Button size="lg" className="bg-primary-blue hover-primary-darken">
                   <Phone className="mr-2 h-4 w-4" />
                   Direkt anrufen
@@ -244,10 +244,10 @@ export default function FAQPage() {
             Kontaktieren Sie uns direkt – wir helfen Ihnen gerne weiter
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="tel:+4915563509886">
+            <a href="tel:+4915257068633">
               <Button size="lg" className="bg-white text-primary-blue hover:bg-gray-100">
                 <Phone className="mr-2 h-4 w-4" />
-                +49 155 635 098 86
+                +49 152 57068633
               </Button>
             </a>
             <Link href="/kontakt">
