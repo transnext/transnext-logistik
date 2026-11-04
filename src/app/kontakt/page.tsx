@@ -49,8 +49,8 @@ export default function KontaktPage() {
                         <p className="text-muted-foreground mb-2">
                           Rufen Sie uns direkt an – wir beraten Sie gerne
                         </p>
-                        <a href="tel:+4915563509886" className="text-primary-blue font-medium hover:underline">
-                          +49 155 635 098 86
+                        <a href="tel:+4915257068633" className="text-primary-blue font-medium hover:underline">
+                          +49 152 57068633
                         </a>
                       </div>
                     </div>
