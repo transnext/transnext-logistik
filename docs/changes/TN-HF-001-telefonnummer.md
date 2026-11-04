@@ -30,3 +30,12 @@ Die veröffentlichte Erreichbarkeitsnummer auf allen überprüften öffentlichen
 - Geringes technisches Risiko, da nur statische Text- und Linkwerte geändert werden.
 - Falls fehlerhaft: den PR-Merge-Commit über GitHub-Revert rückgängig machen oder den vorherigen verifizierten Netlify-Deploy kontrolliert wiederherstellen. Keine Datenbankmigration, daher kein DB-Rollback nötig.
 - Nach Merge: Live-Seiten `/`, `/kontakt`, `/impressum` und `/datenschutz` sowie die `tel:`-Links prüfen; Netlify-Published-Deploy/Commit festhalten.
+
+## Ergänzung TN-HF-001b – Nachkontrolle und Restverweise (04.11.2026)
+- Nach dem ersten Merge (`03a3ad4217be1490cbd5ad6892991c8016f3b390`) wurden weitere öffentliche Seiten gelesen.
+- `src/app/faq/page.tsx`: zwei zusätzliche sichtbare Vorkommen und zwei zusätzliche `tel:`-Links korrigiert.
+- `src/app/fahrzeugueberfuehrung/page.tsx`: ein zusätzlicher `tel:`-Link ohne sichtbare Rufnummer korrigiert.
+- Die Karriereseite hat eine **abweichende, ausdrücklich der Ansprechpartnerin für Bewerbungen zugeordnete Nummer** (`+49 155 635 098 87`); diese wurde bewusst nicht ohne ausdrückliche Freigabe ersetzt.
+- Gesamt in beiden Hotfix-PRs: sieben Anzeigen und acht `tel:`-Links zur allgemeinen Erreichbarkeitsnummer korrigiert.
+- Statische Stringprüfung für zwei ergänzte Code-Dateien bestanden; keine weiteren Codeänderungen. Build-/Browser-/Produktivdeploy-Prüfung separat.
+- Branch: `fix/tn-hf-001b-restliche-kontaktlinks`; Ausgangs-SHA `03a3ad4217be1490cbd5ad6892991c8016f3b390`. Rollback: Revert des zweiten PR-Merge-Commits; keine Datenbankfolgen.
